@@ -1,0 +1,6 @@
+CHANGES
+=======
+
+v0.0.0, 15-Apr-2014 -- Alpha release
+-----------------------------------
+* Project administerial: README, INSTALL, setup.py mostly transcopied from wtlc
