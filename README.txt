@@ -15,7 +15,7 @@ Or get it directly from the PIP repository::
     pip3 install wltc
 
 
-Tested with Python 3.4, supposed to run with 2.7.
+Tested with Python 3.4.
 
 
 Overview:

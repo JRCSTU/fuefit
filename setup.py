@@ -35,7 +35,7 @@ Or get it directly from the PIP repository::
     pip3 install fuefit
 
 
-Tested with Python 3.4, supposed to run with 2.7.
+Tested with Python 3.4.
 
 
 Overview:
@@ -124,7 +124,7 @@ setup(
     keywords = ['fuel', 'fuel-consumption', 'engine', 'engine-map', 'emissions', 'fitting', 'vehicles', 'cars', 'automotive'],
     classifiers = [
         "Programming Language :: Python",
-        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
         "Development Status :: 4 - Beta",
         "Operating System :: MacOS :: MacOS X",
         "Operating System :: Microsoft :: Windows",
