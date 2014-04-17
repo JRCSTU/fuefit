@@ -38,18 +38,18 @@ def key_value_pair(arg):
     if m:
         return m.groups()
     else:
-        raise argparse.ArgumentTypeError("Not KEY=VALUE syntax: %s"%arg)
+        raise argparse.ArgumentTypeError("Not a KEY=VALUE syntax: %s"%arg)
 
 
-_column_specifier_regex = re.compile(r'^\s*([A-Za-z]\w*)\s*=\s*(.*)$')
+_column_specifier_regex = re.compile(r'^\s*([^(]+)\s*(\(([^)]+)\))?\s*$')
 def column_specifier(arg):
-    """Argument-type for --icolumns, syntaxed like: COL_NAME [(UNITS)] [ --> COL_RENAME [(UNITS)]]."""
+    """Argument-type for --icolumns, syntaxed like: COL_NAME [(UNITS)]."""
 
-    m = _key_value_regex.match(arg)
+    m = _column_specifier_regex.match(arg)
     if m:
         return m.groups()
     else:
-        raise argparse.ArgumentTypeError("Not a KEY=VALUE syntax: %s"%arg)
+        raise argparse.ArgumentTypeError("Not a COLUMN_SPEC syntax: %s"%arg)
 
 
 def main(argv=None):
@@ -66,7 +66,7 @@ def main(argv=None):
             12,0.14,180
             ...
 
-        then the next command would calculate and write the fitted engine map's parameters
+        then the next command  calculates and writes the fitted engine map's parameters
         as JSON into 'engine_map.json' file:
             %(prog)s --in-file engine_fc.csv -out-file engine_map
         and if header-row did not exist, it should become:
@@ -82,10 +82,15 @@ def main(argv=None):
 
         and the 2nd having 2 columns with no headers at all and the 1st one being 'Pnorm',
         then it would take the following to read them:
-            %(prog)s -o engine_map -i=engine_1.xlsx -c X X 'N-->RPM' 'Fuel consumption-->FC(g/s)' X -i=engine_2.csv -c Pnorm X
+            %(prog)s -o engine_map \
+                    -i=engine_1.xlsx \
+                    -c X   X   N   'Fuel consumption'  X \
+                    -r X   X   RPM 'FC(g/s)'           X \
+                    -i=engine_2.csv \
+                    -c Pnorm X
 
         To explicitly specify the encoding, the file-type and the separator character:
-            %(prog)s -o engine_map.txt -Oencoding=UTF-8 -i=engine_data -t csv -I 'sep=;' -I encoding=UTF-8
+            %(prog)s -o engine_map.txt -O encoding=UTF-8 -i=engine_data -f csv -I 'sep=;' -I encoding=UTF-8
     """
 
     global DEBUG
@@ -105,17 +110,21 @@ def main(argv=None):
         grp_input = parser.add_argument_group('Input', 'Options controlling reading of input-file(s).')
         grp_input.add_argument('-i', '--ifile', help=dedent("""\
                 the input-file(s) with the data-points (vectors).
-                If more than one --ifile given, the number of each --iformat, --icolumns and -I options
+                If more than one --ifile given, the number --iformat, --icolumns, --irename and -I options
                 must either match it, be 1 (meaning use them for all files), or be totally absent
                 (meaning use defaults for all files).
-                The number of data-points (i.e. rows excluding header) for all data-files must be equal."""),
+                The number of data-points (i.e. rows excluding header) for all data-files must be equal.
+                Default: %(default)s"""),
                             type=argparse.FileType('r'), required=True,
                             action='append', metavar='FILE')
+#                             type=argparse.FileType('r'), default=sys.stdin,
+#                             action='append', metavar='FILE')
         grp_input.add_argument('-c', '--icolumns', help=dedent("""\
                 describes the contents and the units of input file(s) (see --ifile).
-                It can be either a (int) denoting the index of the header-row within the tabular data, or
-                a list of column-names specifications, obeying the following syntax:
-                    COL_NAME [(UNITS)] [ --> COL_RENAME [(UNITS)]]
+                It must be followed either by an integer denoting the index of the header-row
+                within the tabular data, or by a list of column-names specifications,
+                obeying the following syntax:
+                    COL_NAME [(UNITS)]
                 Accepted quantities and their default units are grouped in 3+1 quantity-types and
                 on each run exactly one from each of the 3 first categories must be present:
                 1. engine-speed:
@@ -136,8 +145,16 @@ def main(argv=None):
                     X
                 Default when files include heqders is 0 (1st row), otherwise it is 'RPM,P,FC'."""),
                             action='append', nargs='+',
-                            type=column_specifier, metavar='COLUMN')
-        grp_input.add_argument('-t', '--iformat', help=dedent("""\
+                            type=column_specifier, metavar='COLUMN_SPEC')
+        grp_input.add_argument('-r', '--irename', help=dedent("""\
+                renames the columns of input-file(s)  (see --ifile).
+                It must be followed by a list of column-names specifications like --columns,
+                but without accepting integers.
+                The number of renamed-columns for each input-file must match those in the --icolumns.
+                Use 'X' for columns not to be renamed."""),
+                            action='append', nargs='+',
+                            type=column_specifier, metavar='COLUMN_SPEC')
+        grp_input.add_argument('-f', '--iformat', help=dedent("""\
                 the format of input data file(s).
                 It can be one of: %(choices)s
                 When AUTO, format deduced fro the filename's extension (ie use it with Excel files).
@@ -150,6 +167,7 @@ def main(argv=None):
                 Pass option(s) directly to pandas when reading input-file with syntax: -I 'opt=value, ...'"""),
                             nargs='+', type=key_value_pair, metavar='KEY=VALUE')
 
+
         grp_output = parser.add_argument_group('Output', 'Options controlling writting of output-file.')
         grp_output.add_argument('-o', '--ofile', help=dedent("""\
                 the output-file to write results into.
@@ -160,7 +178,7 @@ def main(argv=None):
                 append results if output-file already exists.
                 Default: %(default)s"""),
                             type=bool, default=True)
-        grp_output.add_argument('-r', '--oformat', help=dedent("""\
+        grp_output.add_argument('-t', '--oformat', help=dedent("""\
                 the file-format of the results (see --ofile).
                 It can be one of: %(choices)s
                 When AUTO, format deduced fro the filename's extension (ie use it with Excel files).
@@ -170,6 +188,10 @@ def main(argv=None):
                 Default: %(default)s"""),
                             choices=[ 'AUTO', 'CSV', 'TXT', 'EXCEL', 'JSON_SPLIT', 'JSON_SPLIT', 'JSON_RECORDS', 'JSON_INDEX', 'JSON_COLUMNS', 'JSON_VALUES'],
                             default='AUTO', metavar='FORMAT')
+        grp_input.add_argument('-O', help=dedent("""\
+                Pass option(s) directly to pandas when reading input-file with syntax: -O 'opt=value, ...'"""),
+                            nargs='+', type=key_value_pair, metavar='KEY=VALUE')
+
 
         grp_model = parser.add_argument_group('Model', 'Options specifying calculation constants and scalar model-values.')
         grp_model.add_argument('--model', help=dedent("""\
@@ -193,6 +215,7 @@ def main(argv=None):
         grp_model.add_argument('--capacity', help=dedent("""\
                 the engine's capacity (default units: cm^2).
                 Required if PMF is not among the inputs or requested to generate example-map with FC column."""))
+
 
         grp_various = parser.add_argument_group('Various', 'Options controlling various other aspects.')
         #parser.add_argument('--gui', help='start in GUI mode', action='store_true')
