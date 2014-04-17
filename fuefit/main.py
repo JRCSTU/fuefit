@@ -94,137 +94,15 @@ def main(argv=None):
     """
 
     global DEBUG
+
     program_name    = 'fuefit' #os.path.basename(sys.argv[0])
-    version_string  = '%%prog %s' % (fuefit._version)
-    doc_lines       = main.__doc__.splitlines()
-    desc            = doc_lines[0]
-    epilog          = dedent('\n'.join(doc_lines[1:]))
 
     if argv is None:
         argv = sys.argv[1:]
 
     try:
-        # setup option parser
-        parser = argparse.ArgumentParser(prog=program_name, description=desc, epilog=epilog, add_help=False,
-                                         formatter_class=RawTextHelpFormatter)
-        grp_input = parser.add_argument_group('Input', 'Options controlling reading of input-file(s).')
-        grp_input.add_argument('-i', '--ifile', help=dedent("""\
-                the input-file(s) with the data-points (vectors).
-                If more than one --ifile given, the number --iformat, --icolumns, --irename and -I options
-                must either match it, be 1 (meaning use them for all files), or be totally absent
-                (meaning use defaults for all files).
-                The number of data-points (i.e. rows excluding header) for all data-files must be equal.
-                Default: %(default)s"""),
-                            type=argparse.FileType('r'), required=True,
-                            action='append', metavar='FILE')
-#                             type=argparse.FileType('r'), default=sys.stdin,
-#                             action='append', metavar='FILE')
-        grp_input.add_argument('-c', '--icolumns', help=dedent("""\
-                describes the contents and the units of input file(s) (see --ifile).
-                It must be followed either by an integer denoting the index of the header-row
-                within the tabular data, or by a list of column-names specifications,
-                obeying the following syntax:
-                    COL_NAME [(UNITS)]
-                Accepted quantities and their default units are grouped in 3+1 quantity-types and
-                on each run exactly one from each of the 3 first categories must be present:
-                1. engine-speed:
-                    RPM      (rad/min)
-                    RPMnorm  (rad/min)  : normalized against RPMnorm * RPM_IDLE + (RPM_RATED - RPM_RATED)
-                    Omega    (rad/sec)
-                    CM       (m/sec)
-                2. work-capability:
-                    P        (kW)
-                    Pnorm    (kW)       : normalized against P_MAX
-                    T        (Nm)
-                    PME      (bar)
-                3. fuel-consumption:
-                    FC       (g/h)
-                    FCnorm   (g/h)      : normalized against P_MAX
-                    PMF      (bar)
-                4. Irellevant column:
-                    X
-                Default when files include heqders is 0 (1st row), otherwise it is 'RPM,P,FC'."""),
-                            action='append', nargs='+',
-                            type=column_specifier, metavar='COLUMN_SPEC')
-        grp_input.add_argument('-r', '--irename', help=dedent("""\
-                renames the columns of input-file(s)  (see --ifile).
-                It must be followed by a list of column-names specifications like --columns,
-                but without accepting integers.
-                The number of renamed-columns for each input-file must match those in the --icolumns.
-                Use 'X' for columns not to be renamed."""),
-                            action='append', nargs='+',
-                            type=column_specifier, metavar='COLUMN_SPEC')
-        grp_input.add_argument('-f', '--iformat', help=dedent("""\
-                the format of input data file(s).
-                It can be one of: %(choices)s
-                When AUTO, format deduced fro the filename's extension (ie use it with Excel files).
-                For explaination on the JSON formats see documentation of 'orient' keyword of Pandas.read_csv() method:
-                    http://pandas.pydata.org/pandas-docs/stable/generated/pandas.io.json.read_json.html
-                Default: %(default)s"""),
-                            choices=[ 'AUTO', 'CSV', 'TXT', 'EXCEL', 'JSON_SPLIT', 'JSON_SPLIT', 'JSON_RECORDS', 'JSON_INDEX', 'JSON_COLUMNS', 'JSON_VALUES'],
-                            default='AUTO', metavar='FORMAT')
-        grp_input.add_argument('-I', help=dedent("""\
-                Pass option(s) directly to pandas when reading input-file with syntax: -I 'opt=value, ...'"""),
-                            nargs='+', type=key_value_pair, metavar='KEY=VALUE')
+        parser = setup_args_parser(program_name)
 
-
-        grp_output = parser.add_argument_group('Output', 'Options controlling writting of output-file.')
-        grp_output.add_argument('-o', '--ofile', help=dedent("""\
-                the output-file to write results into.
-                Default: %(default)s]"""),
-                            default=sys.stdout,
-                            metavar='FILE')
-        grp_output.add_argument('-a', '--append', help=dedent("""\
-                append results if output-file already exists.
-                Default: %(default)s"""),
-                            type=bool, default=True)
-        grp_output.add_argument('-t', '--oformat', help=dedent("""\
-                the file-format of the results (see --ofile).
-                It can be one of: %(choices)s
-                When AUTO, format deduced fro the filename's extension (ie use it with Excel files).
-                If output-filename's extension omitted, CSV assumed.
-                For explaination on the JSON formats see documentation of 'orient' keyword of Pandas.read_csv() method:
-                    http://pandas.pydata.org/pandas-docs/stable/generated/pandas.io.json.read_json.html
-                Default: %(default)s"""),
-                            choices=[ 'AUTO', 'CSV', 'TXT', 'EXCEL', 'JSON_SPLIT', 'JSON_SPLIT', 'JSON_RECORDS', 'JSON_INDEX', 'JSON_COLUMNS', 'JSON_VALUES'],
-                            default='AUTO', metavar='FORMAT')
-        grp_input.add_argument('-O', help=dedent("""\
-                Pass option(s) directly to pandas when reading input-file with syntax: -O 'opt=value, ...'"""),
-                            nargs='+', type=key_value_pair, metavar='KEY=VALUE')
-
-
-        grp_model = parser.add_argument_group('Model', 'Options specifying calculation constants and scalar model-values.')
-        grp_model.add_argument('--model', help=dedent("""\
-                read model base-values as JSON.
-                Specific values can be overriden by options below.",
-                """))
-        grp_model.add_argument('--fuel', help="the engine's fuel-type used for selecting specific-temperature.  Default: %(default)s",
-                            default='PETROL', choices=['PETROL', 'DIESEL'])
-        grp_model.add_argument('--rpm-idle', help=dedent("""\
-                the engine's n_idle.
-                Required if RPMnorm exists in input-file's or example-map columns."""))
-        grp_model.add_argument('--rpm-max', help=dedent("""\
-                the engine's revolutions where rated power is attained.
-                Required if RPMnorm exists in input-file's or example-map columns."""))
-        grp_model.add_argument('--p-max', help=dedent("""\
-                the engine's rated-power.
-                Required if Pnorm or FCnorm exists in input-file's or example-map's columns."""))
-        grp_model.add_argument('--stroke', help=dedent("""\
-                the engine's stroke distance (default units: mm).
-                Required if CM is not among the inputs or requested to generate example-map with RPM column."""))
-        grp_model.add_argument('--capacity', help=dedent("""\
-                the engine's capacity (default units: cm^2).
-                Required if PMF is not among the inputs or requested to generate example-map with FC column."""))
-
-
-        grp_various = parser.add_argument_group('Various', 'Options controlling various other aspects.')
-        #parser.add_argument('--gui', help='start in GUI mode', action='store_true')
-        grp_various.add_argument("--debug", action="store_true", help="set debug level [default: %(default)s]", default=False)
-        grp_various.add_argument("--verbose", action="count", default=0, help="set verbosity level [default: %(default)s]")
-        grp_various.add_argument("--version", action="version", version=version_string, help="prints version identifier of the program")
-        grp_various.add_argument("--help", action="help", help='show this help message and exit')
-
-        # process options
         opts = parser.parse_args(argv)
 
         if opts.debug:
@@ -233,14 +111,146 @@ def main(argv=None):
         if opts.verbose > 0:
             print("verbosity level = %d" % opts.verbose)
 
-        # MAIN BODY #
-        print(opts)
+        validate_opts(opts)
 
     except (argparse.ArgumentError, argparse.ArgumentTypeError) as e:
         indent = len(program_name) * " "
         sys.stderr.write(program_name + ": " + repr(e) + "\n")
         sys.stderr.write(indent + "  for help use --help")
         return 2
+
+
+def validate_opts(opts):
+    ## Check number of input-files <--> related-opts
+    #
+    len(opts)
+
+def setup_args_parser(program_name):
+    version_string  = '%%prog %s' % (fuefit._version)
+    doc_lines       = main.__doc__.splitlines()
+    desc            = doc_lines[0]
+    epilog          = dedent('\n'.join(doc_lines[1:]))
+
+    parser = argparse.ArgumentParser(prog=program_name, description=desc, epilog=epilog, add_help=False,
+                                     formatter_class=RawTextHelpFormatter)
+    grp_input = parser.add_argument_group('Input', 'Options controlling reading of input-file(s).')
+    grp_input.add_argument('-i', '--ifile', help=dedent("""\
+            the input-file(s) with the data-points (vectors).
+            If more than one --ifile given, the number --iformat, --icolumns, --irename and -I options
+            must either match it, be 1 (meaning use them for all files), or be totally absent
+            (meaning use defaults for all files).
+            The number of data-points (i.e. rows excluding header) for all data-files must be equal.
+            Default: %(default)s"""),
+                        type=argparse.FileType('r'), required=True,
+                        action='append', metavar='FILE')
+#                             type=argparse.FileType('r'), default=sys.stdin,
+#                             action='append', metavar='FILE')
+    grp_input.add_argument('-c', '--icolumns', help=dedent("""\
+            describes the contents and the units of input file(s) (see --ifile).
+            It must be followed either by an integer denoting the index of the header-row
+            within the tabular data, or by a list of column-names specifications,
+            obeying the following syntax:
+                COL_NAME [(UNITS)]
+            Accepted quantities and their default units are grouped in 3+1 quantity-types and
+            on each run exactly one from each of the 3 first categories must be present:
+            1. engine-speed:
+                RPM      (rad/min)
+                RPMnorm  (rad/min)  : normalized against RPMnorm * RPM_IDLE + (RPM_RATED - RPM_RATED)
+                Omega    (rad/sec)
+                CM       (m/sec)
+            2. work-capability:
+                P        (kW)
+                Pnorm    (kW)       : normalized against P_MAX
+                T        (Nm)
+                PME      (bar)
+            3. fuel-consumption:
+                FC       (g/h)
+                FCnorm   (g/h)      : normalized against P_MAX
+                PMF      (bar)
+            4. Irellevant column:
+                X
+            Default when files include heqders is 0 (1st row), otherwise it is 'RPM,P,FC'."""),
+                        action='append', nargs='+',
+                        type=column_specifier, metavar='COLUMN_SPEC')
+    grp_input.add_argument('-r', '--irename', help=dedent("""\
+            renames the columns of input-file(s)  (see --ifile).
+            It must be followed by a list of column-names specifications like --columns,
+            but without accepting integers.
+            The number of renamed-columns for each input-file must match those in the --icolumns.
+            Use 'X' for columns not to be renamed."""),
+                        action='append', nargs='+',
+                        type=column_specifier, metavar='COLUMN_SPEC')
+    grp_input.add_argument('-f', '--iformat', help=dedent("""\
+            the format of input data file(s).
+            It can be one of: %(choices)s
+            When AUTO, format deduced fro the filename's extension (ie use it with Excel files).
+            For explaination on the JSON formats see documentation of 'orient' keyword of Pandas.read_csv() method:
+                http://pandas.pydata.org/pandas-docs/stable/generated/pandas.io.json.read_json.html
+            Default: %(default)s"""),
+                        choices=[ 'AUTO', 'CSV', 'TXT', 'EXCEL', 'JSON_SPLIT', 'JSON_SPLIT', 'JSON_RECORDS', 'JSON_INDEX', 'JSON_COLUMNS', 'JSON_VALUES'],
+                        default='AUTO', metavar='FORMAT')
+    grp_input.add_argument('-I', help=dedent("""\
+            Pass option(s) directly to pandas when reading input-file with syntax: -I 'opt=value, ...'"""),
+                        nargs='+', type=key_value_pair, metavar='KEY=VALUE')
+
+
+    grp_output = parser.add_argument_group('Output', 'Options controlling writting of output-file.')
+    grp_output.add_argument('-o', '--ofile', help=dedent("""\
+            the output-file to write results into.
+            Default: %(default)s]"""),
+                        default=sys.stdout,
+                        metavar='FILE')
+    grp_output.add_argument('-a', '--append', help=dedent("""\
+            append results if output-file already exists.
+            Default: %(default)s"""),
+                        type=bool, default=True)
+    grp_output.add_argument('-t', '--oformat', help=dedent("""\
+            the file-format of the results (see --ofile).
+            It can be one of: %(choices)s
+            When AUTO, format deduced fro the filename's extension (ie use it with Excel files).
+            If output-filename's extension omitted, CSV assumed.
+            For explaination on the JSON formats see documentation of 'orient' keyword of Pandas.read_csv() method:
+                http://pandas.pydata.org/pandas-docs/stable/generated/pandas.io.json.read_json.html
+            Default: %(default)s"""),
+                        choices=[ 'AUTO', 'CSV', 'TXT', 'EXCEL', 'JSON_SPLIT', 'JSON_SPLIT', 'JSON_RECORDS', 'JSON_INDEX', 'JSON_COLUMNS', 'JSON_VALUES'],
+                        default='AUTO', metavar='FORMAT')
+    grp_input.add_argument('-O', help=dedent("""\
+            Pass option(s) directly to pandas when reading input-file with syntax: -O 'opt=value, ...'"""),
+                        nargs='+', type=key_value_pair, metavar='KEY=VALUE')
+
+
+    grp_model = parser.add_argument_group('Model', 'Options specifying calculation constants and scalar model-values.')
+    grp_model.add_argument('--model', help=dedent("""\
+            read model base-values as JSON.
+            Specific values can be overriden by options below.",
+            """))
+    grp_model.add_argument('--fuel', help="the engine's fuel-type used for selecting specific-temperature.  Default: %(default)s",
+                        default='PETROL', choices=['PETROL', 'DIESEL'])
+    grp_model.add_argument('--rpm-idle', help=dedent("""\
+            the engine's n_idle.
+            Required if RPMnorm exists in input-file's or example-map columns."""))
+    grp_model.add_argument('--rpm-max', help=dedent("""\
+            the engine's revolutions where rated power is attained.
+            Required if RPMnorm exists in input-file's or example-map columns."""))
+    grp_model.add_argument('--p-max', help=dedent("""\
+            the engine's rated-power.
+            Required if Pnorm or FCnorm exists in input-file's or example-map's columns."""))
+    grp_model.add_argument('--stroke', help=dedent("""\
+            the engine's stroke distance (default units: mm).
+            Required if CM is not among the inputs or requested to generate example-map with RPM column."""))
+    grp_model.add_argument('--capacity', help=dedent("""\
+            the engine's capacity (default units: cm^2).
+            Required if PMF is not among the inputs or requested to generate example-map with FC column."""))
+
+
+    grp_various = parser.add_argument_group('Various', 'Options controlling various other aspects.')
+    #parser.add_argument('--gui', help='start in GUI mode', action='store_true')
+    grp_various.add_argument("--debug", action="store_true", help="set debug level [default: %(default)s]", default=False)
+    grp_various.add_argument("--verbose", action="count", default=0, help="set verbosity level [default: %(default)s]")
+    grp_various.add_argument("--version", action="version", version=version_string, help="prints version identifier of the program")
+    grp_various.add_argument("--help", action="help", help='show this help message and exit')
+
+    return parser
 
 
 if __name__ == "__main__":
