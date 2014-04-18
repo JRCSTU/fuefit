@@ -100,8 +100,8 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv[1:]
 
+    parser = setup_args_parser(program_name)
     try:
-        parser = setup_args_parser(program_name)
 
         opts = parser.parse_args(argv)
 
@@ -111,19 +111,31 @@ def main(argv=None):
         if opts.verbose > 0:
             print("verbosity level = %d" % opts.verbose)
 
-        validate_opts(opts)
+        opts = validate_opts(opts)
 
-    except (argparse.ArgumentError, argparse.ArgumentTypeError) as e:
+    except (ValueError) as e:
         indent = len(program_name) * " "
-        sys.stderr.write(program_name + ": " + repr(e) + "\n")
-        sys.stderr.write(indent + "  for help use --help")
-        return 2
+        parser.exit(3, "%s: %s\n%s  for help use --help"%(program_name, repr(e), indent))
 
 
 def validate_opts(opts):
     ## Check number of input-files <--> related-opts
     #
-    len(opts)
+    dopts = vars(opts)
+
+    if (not opts.ifile):
+        n_infiles = 1
+    else:
+        n_infiles = len(opts.ifile)
+    rel_opts = ['icolumns', 'irenames', 'iformat', 'I']
+    for ropt in rel_opts:
+        opt_val = dopts[ropt]
+        if (opt_val):
+            n_ropt = len(opt_val)
+            if( n_ropt > 1 and n_ropt != n_infiles):
+                raise ValueError("Number of --%s(%i) mismatches number of --infile(%i)!"%(ropt, n_ropt, n_infiles))
+
+    return opts
 
 def setup_args_parser(program_name):
     version_string  = '%%prog %s' % (fuefit._version)
@@ -136,15 +148,16 @@ def setup_args_parser(program_name):
     grp_input = parser.add_argument_group('Input', 'Options controlling reading of input-file(s).')
     grp_input.add_argument('-i', '--ifile', help=dedent("""\
             the input-file(s) with the data-points (vectors).
-            If more than one --ifile given, the number --iformat, --icolumns, --irename and -I options
+            If more than one --ifile given, the number --iformat, --icolumns, --irenames and -I options
             must either match it, be 1 (meaning use them for all files), or be totally absent
-            (meaning use defaults for all files).
+            (meaning use defaults for all files); the order is important only within same options.
             The number of data-points (i.e. rows excluding header) for all data-files must be equal.
             Default: %(default)s"""),
+                        action='append',
                         type=argparse.FileType('r'), required=True,
-                        action='append', metavar='FILE')
-#                             type=argparse.FileType('r'), default=sys.stdin,
-#                             action='append', metavar='FILE')
+                        metavar='FILE')
+#                         type=argparse.FileType('r'), default=sys.stdin,
+#                         action='append', metavar='FILE')
     grp_input.add_argument('-c', '--icolumns', help=dedent("""\
             describes the contents and the units of input file(s) (see --ifile).
             It must be followed either by an integer denoting the index of the header-row
@@ -172,7 +185,7 @@ def setup_args_parser(program_name):
             Default when files include heqders is 0 (1st row), otherwise it is 'RPM,P,FC'."""),
                         action='append', nargs='+',
                         type=column_specifier, metavar='COLUMN_SPEC')
-    grp_input.add_argument('-r', '--irename', help=dedent("""\
+    grp_input.add_argument('-r', '--irenames', help=dedent("""\
             renames the columns of input-file(s)  (see --ifile).
             It must be followed by a list of column-names specifications like --columns,
             but without accepting integers.
@@ -184,14 +197,16 @@ def setup_args_parser(program_name):
             the format of input data file(s).
             It can be one of: %(choices)s
             When AUTO, format deduced fro the filename's extension (ie use it with Excel files).
-            For explaination on the JSON formats see documentation of 'orient' keyword of Pandas.read_csv() method:
+            Different JSON sub-formats are supported through the use of the 'orient' keyword of Pandas
+            (use the -I option to pass it).  For more infos read the documentation of the read_json() method:
                 http://pandas.pydata.org/pandas-docs/stable/generated/pandas.io.json.read_json.html
             Default: %(default)s"""),
-                        choices=[ 'AUTO', 'CSV', 'TXT', 'EXCEL', 'JSON_SPLIT', 'JSON_SPLIT', 'JSON_RECORDS', 'JSON_INDEX', 'JSON_COLUMNS', 'JSON_VALUES'],
-                        default='AUTO', metavar='FORMAT')
+                        choices=[ 'AUTO', 'CSV', 'TXT', 'XLS', 'JSON'],
+                        action='append', metavar='FORMAT')
     grp_input.add_argument('-I', help=dedent("""\
             Pass option(s) directly to pandas when reading input-file with syntax: -I 'opt=value, ...'"""),
-                        nargs='+', type=key_value_pair, metavar='KEY=VALUE')
+                        action='append', nargs='+',
+                        type=key_value_pair, metavar='KEY=VALUE')
 
 
     grp_output = parser.add_argument_group('Output', 'Options controlling writting of output-file.')
@@ -206,14 +221,9 @@ def setup_args_parser(program_name):
                         type=bool, default=True)
     grp_output.add_argument('-t', '--oformat', help=dedent("""\
             the file-format of the results (see --ofile).
-            It can be one of: %(choices)s
-            When AUTO, format deduced fro the filename's extension (ie use it with Excel files).
-            If output-filename's extension omitted, CSV assumed.
-            For explaination on the JSON formats see documentation of 'orient' keyword of Pandas.read_csv() method:
-                http://pandas.pydata.org/pandas-docs/stable/generated/pandas.io.json.read_json.html
-            Default: %(default)s"""),
-                        choices=[ 'AUTO', 'CSV', 'TXT', 'EXCEL', 'JSON_SPLIT', 'JSON_SPLIT', 'JSON_RECORDS', 'JSON_INDEX', 'JSON_COLUMNS', 'JSON_VALUES'],
-                        default='AUTO', metavar='FORMAT')
+            See documentation for -f option."""),
+                        choices=[ 'AUTO', 'CSV', 'TXT', 'XLS', 'JSON'],
+                        action='append', metavar='FORMAT')
     grp_input.add_argument('-O', help=dedent("""\
             Pass option(s) directly to pandas when reading input-file with syntax: -O 'opt=value, ...'"""),
                         nargs='+', type=key_value_pair, metavar='KEY=VALUE')

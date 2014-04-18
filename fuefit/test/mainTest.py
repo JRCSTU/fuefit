@@ -24,6 +24,13 @@ class Test(unittest.TestCase):
         self._failPandas = ['', 'no_value', 'spa ced', 'spaced key = key', '3number=val']
         self._goodPandas = ['k=v', ' k = v ', 'k = spaced value', 'Num_3_key = spaced value']
 
+        self._failFormatsMsg = 'invalid choice:'
+        self._failFormats = [None, '', 'BAD', 'CSV BAD']
+        self._goodFormats = ['AUTO', 'CSV', 'XLS']
+
+
+    def test0(self):
+        fuefit_main('-i mainTest.py -f TXT -f CSV -I k=v k2=kv -I k3=v3 -i test_table.csv'.split())
 
 
     def checkArgsParser_exits(self, cmdline, exit_code, **kw):
@@ -52,7 +59,7 @@ class Test(unittest.TestCase):
                      'STDERR': mystderr.getvalue(),
                      'OPTS': opts,
                  })
-                raise AssertionError(json.dumps(d, indent=2))
+                raise AssertionError(d)
         return opts, mystdout, mystderr
 
 
@@ -69,11 +76,21 @@ class Test(unittest.TestCase):
         mystderr = io.StringIO()
         opts = None  # @UnusedVariable
         with redirected(stdout=mystdout, stderr=mystderr, **kw):
-            if (also_validate_args):
-                opts = fuefit_main(cmdline)
-            else:
-                parser = setup_args_parser('test_main')
-                opts = parser.parse_args(cmdline)
+            try:
+                if (also_validate_args):
+                    opts = fuefit_main(cmdline)
+                else:
+                    parser = setup_args_parser('test_main')
+                    opts = parser.parse_args(cmdline)
+            except SystemExit as ex:
+                d = OrderedDict({
+                     'EX': ex,
+                     'CMDLNE': cmdline,
+                     'STDOUT': mystdout.getvalue(),
+                     'STDERR': mystderr.getvalue(),
+                     'OPTS': opts,
+                 })
+                raise AssertionError(d)
 
         return opts, mystdout, mystderr
 
@@ -119,7 +136,7 @@ class Test(unittest.TestCase):
         self.checkArgsParser_exits(cmdline.split() + bads +[opt] + bads, exit_code)
 
 
-    def checkParseOpt_good(self, opt, goods):
+    def checkParseOpt_good(self, opt, goods, testNArgs=True):
         cmdline = '-i mainTest.py %s ' % opt
 
         for opt in goods:
@@ -130,8 +147,10 @@ class Test(unittest.TestCase):
             self.assertFalse(mystdout.getvalue(), mystdout.getvalue())
 
         ## Test multiple goods in 1 line
-        self.checkArgsParser_ok(cmdline.split() + goods)
-        self.checkArgsParser_ok(cmdline.split() + goods  +[opt] + goods)
+        if testNArgs:
+            self.checkArgsParser_ok(cmdline.split() + goods)
+            self.checkArgsParser_ok(cmdline.split() + goods  +[opt] + goods)
+
 
     def testColumnNames_fail(self):
         self.checkParseOpt_fail('-c', self._failColumns, self._failColumnsMsg)
@@ -153,6 +172,52 @@ class Test(unittest.TestCase):
         self.checkParseOpt_fail('-O', self._failPandas, self._failPandasMsg)
     def testPandasOutputs_good(self):
         self.checkParseOpt_good('-O', self._goodPandas)
+
+    def testIFormat_fail(self):
+        self.checkParseOpt_fail('-f', self._failFormats, self._failFormatsMsg)
+    def testIFormat_good(self):
+        self.checkParseOpt_good('-f', self._goodFormats, testNArgs=False)
+
+    def testOFormat_fail(self):
+        self.checkParseOpt_fail('-t', self._failFormats, self._failFormatsMsg)
+    def testOFormat_good(self):
+        self.checkParseOpt_good('-t', self._goodFormats, testNArgs=False)
+
+
+    def testNumOfFileOpts_fail(self):
+        exitcode = 3
+        cmdlines = [
+               '-i mainTest.py -I k=v -I k=v',
+               '-i mainTest.py -I k=v k2=v2 -I k=v',
+               '-i mainTest.py -i mainTest.py -I k=v k2=v2 -I k=v k3=v3 -I k=v ',
+               '-i mainTest.py -I k=v k2=v2 -i mainTest.py -I k=v k3=v3 -I k=v ',
+
+               '-i mainTest.py -c col1 -c col2',
+               '-i mainTest.py -c col1 -i mainTest.py -c col2 -c col3 ',
+
+               '-i mainTest.py -c col1 -c col2',
+               '-i mainTest.py -c col1 -i mainTest.py --icolumns col2 -c col3 ',
+
+               '-i mainTest.py -f AUTO -f CSV',
+               '-i mainTest.py -f TXT -i mainTest.py -f XLS --iformat CSV ',
+       ]
+        for cmdline in cmdlines:
+            print(cmdline)
+            self.checkMain_exits(cmdline.split(), exitcode)
+
+    def testNumOfFileOpts_good(self):
+        cmdlines = [
+               '-i mainTest.py',
+               '-i mainTest.py -I k=v',
+               '-i mainTest.py -i mainTest.py -I k=v  -I k=v  ',
+               '-i mainTest.py -I k=v k2=v2  -i mainTest.py -I k=v k3=v3 ',
+               '-i mainTest.py -I k=v k2=v2 -i mainTest.py -I k=v k3=v3 -I k=v -i mainTest.py -i mainTest.py -I k5=5',
+               '-i mainTest.py -i mainTest.py -i mainTest.py',
+               '-i mainTest.py -I k=v k2=v2 -i mainTest.py -i mainTest.py',
+       ]
+        for cmdline in cmdlines:
+            print(cmdline)
+            self.checkMain_ok(cmdline.split())
 
 
 if __name__ == "__main__":
