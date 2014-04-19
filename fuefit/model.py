@@ -257,6 +257,35 @@ def base_model():
 
     return instance
 
+
+def merge(a, b, path=[]):
+    ''''merges b into a'''
+
+    from collections.abc import Mapping
+
+    for key in b:
+        bv = b[key]
+        if key in a:
+            av = a[key]
+            if isinstance(av, Mapping) != isinstance(bv, Mapping):
+                raise ValueError("Dict-values conflict at '%s'! a(%s) != b(%s)" %
+                                ('/'.join(path + [str(key)]), type(av), type(bv)))
+            elif av == bv:
+                continue # same leaf value
+            elif isinstance(av, Mapping):
+                merge(av, bv, path + [str(key)])
+                continue
+        a[key] = bv
+    return a
+
+# works
+# print(merge({1:{"a":"A"},2:{"b":"B"}}, {2:{"c":"C"},3:{"d":"D"}}))
+# # has conflict
+# merge({1:{"a":"A"},2:{"b":"B"}}, {1:{"a":"A"},2:{"b":"C"}})
+
+
+
+
 if __name__ == "__main__":
     import json
     print("Model: %s" % json.dumps(model_schema(), indent=2))

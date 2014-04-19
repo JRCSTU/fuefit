@@ -20,15 +20,28 @@
 """The command-line entry-point for using all functionality of fuefit tool. """
 
 import sys, os
+import traceback
+import logging
 import argparse
+from argparse import RawTextHelpFormatter
 from textwrap import dedent
 import re
-import fuefit
-from argparse import RawTextHelpFormatter
+import functools
+import json
+import jsonschema as jsons
+import jsonpointer as jsonp
 
-DEBUG= False
+from . import model, _version
+
+
+DEBUG   = True
 TESTRUN = False
 PROFILE = False
+
+log = None
+
+## When option `-m MODEL_PATH=VALUE` contains a relative path the following is preppended.
+_model_default_prefix = '/engine/'
 
 _key_value_regex = re.compile(r'^\s*([A-Za-z]\w*)\s*=\s*(.*)$')
 def key_value_pair(arg):
@@ -53,7 +66,7 @@ def column_specifier(arg):
 
 
 def main(argv=None):
-    """The command-line entry-point for using all functionality of fuefit tool.
+    """Calculates an engine-map by fitting data-points vectors.
 
     REMARKS:
     --------
@@ -93,7 +106,7 @@ def main(argv=None):
             %(prog)s -o engine_map.txt -O encoding=UTF-8 -i=engine_data -f csv -I 'sep=;' -I encoding=UTF-8
     """
 
-    global DEBUG
+    global log, DEBUG
 
     program_name    = 'fuefit' #os.path.basename(sys.argv[0])
 
@@ -105,17 +118,38 @@ def main(argv=None):
 
         opts = parser.parse_args(argv)
 
-        if opts.debug:
-            DEBUG = opts.debug
-            print("debug = %d" % DEBUG)
+        DEBUG = bool(opts.debug)
+
+        if (DEBUG):
+            logging.basicConfig(level=logging.DEBUG)
+        else:
+            logging.basicConfig(level=logging.INFO)
+        log = logging.getLogger(__file__)
+        log.info("opts: %s", opts)
+
         if opts.verbose > 0:
-            print("verbosity level = %d" % opts.verbose)
+            log.info("verbosity level = %d", opts.verbose)
 
         opts = validate_opts(opts)
+        mdl = build_and_validate_model(opts)
 
-    except (ValueError) as e:
+        if (DEBUG):
+            log.info("Input Model: %s", json.dumps(mdl, indent=2))
+
+    except (SystemExit) as ex:
+        if DEBUG:
+            traceback.print_exception()
+        raise
+    except (ValueError) as ex:
+        if DEBUG:
+            raise
         indent = len(program_name) * " "
-        parser.exit(3, "%s: %s\n%s  for help use --help"%(program_name, repr(e), indent))
+        parser.exit(3, "%s: %s\n%s  for help use --help\n"%(program_name, ex, indent))
+    except jsons.ValidationError as ex:
+        if DEBUG:
+            raise
+        indent = len(program_name) * " "
+        parser.exit(4, "%s: Model validation failed due to: %s\n%s  for help use --help\n"%(program_name, ex, indent))
 
 
 def validate_opts(opts):
@@ -137,8 +171,28 @@ def validate_opts(opts):
 
     return opts
 
+def build_and_validate_model(opts):
+    mdl = model.base_model()
+
+#     ## TODO: Merge models.
+#     if (opts.model):
+#         model.merge(mdl, opts.model)
+
+    model_overrides = opts.m
+    if (model_overrides):
+        model_overrides = functools.reduce(lambda x,y: x+y, model_overrides)
+        for (json_path, value) in model_overrides:
+            if (not json_path.startswith('/')):
+                json_path = _model_default_prefix + json_path
+            jsonp.set_pointer(mdl, json_path, value)
+
+    validator = model.model_validator()
+    validator.validate(mdl)
+
+    return mdl
+
 def setup_args_parser(program_name):
-    version_string  = '%%prog %s' % (fuefit._version)
+    version_string  = '%%prog %s' % (_version)
     doc_lines       = main.__doc__.splitlines()
     desc            = doc_lines[0]
     epilog          = dedent('\n'.join(doc_lines[1:]))
@@ -211,18 +265,15 @@ def setup_args_parser(program_name):
             pass option(s) directly to pandas when reading input-file(s)."""),
                         action='append', nargs='+',
                         type=key_value_pair, metavar='KEY=VALUE')
-    grp_input.add_argument('--model', help=dedent("""\
-            read model base-values as JSON.
-            Specific values can be overriden by options below.",
-            """))
     grp_input.add_argument('-m', help=dedent("""\
             override a model scalar values using an absolute or relative path.
             Relative paths are resolved against '/engine', for instance,
-              -Mrpm_idle=850 -M/engine/p_max=
+              -Mrpm_idle=850   -M/engine/p_max=660
             would set the following model's property:
                 {
                   "engine": {
                       "rpm_idle": 850,
+                      "p_max": 660,
                       ...
                   }
                 }
@@ -230,7 +281,7 @@ def setup_args_parser(program_name):
                 https://python-json-pointer.readthedocs.org/en/latest/tutorial.html
             """),
                         action='append', nargs='+',
-                        metavar='MODEL_PATH=VALUE')
+                        type=key_value_pair, metavar='MODEL_PATH=VALUE')
     grp_input.add_argument('-M', help=dedent("""\
             get help description for the specfied model path.
             If no path specified, gets the default model-base. """),

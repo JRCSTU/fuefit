@@ -5,8 +5,7 @@ Created on Apr 17, 2014
 '''
 import unittest
 from collections import OrderedDict
-import json
-from .redirect import redirected
+from .redirect import redirected  # @UnresolvedImport
 
 from ..main import main as fuefit_main, setup_args_parser
 
@@ -20,9 +19,9 @@ class Test(unittest.TestCase):
                 'quant (open units']
         self._goodColumns = ['quant', 'spaced quant', 'quant (units)', 'quant (spaced units)', 'Pnorm (kJ / sec)']
 
-        self._failPandasMsg = 'Not a KEY=VALUE syntax'
-        self._failPandas = ['', 'no_value', 'spa ced', 'spaced key = key', '3number=val']
-        self._goodPandas = ['k=v', ' k = v ', 'k = spaced value', 'Num_3_key = spaced value']
+        self._failKVPairsMsg = 'Not a KEY=VALUE syntax'
+        self._failKVPairs = ['', 'no_value', 'spa ced', 'spaced key = key', '3number=val']
+        self._goodKVPairs = ['k=v', ' k = v ', 'k = spaced value', 'Num_3_key = spaced value']
 
         self._failFormatsMsg = 'invalid choice:'
         self._failFormats = [None, '', 'BAD', 'CSV BAD']
@@ -151,6 +150,10 @@ class Test(unittest.TestCase):
             self.checkArgsParser_ok(cmdline.split() + goods)
             self.checkArgsParser_ok(cmdline.split() + goods  +[opt] + goods)
 
+    def testModelOverrides_fail(self):
+        self.checkParseOpt_fail('-m', self._failKVPairs, self._failKVPairsMsg)
+    def testModelOverrides_good(self):
+        self.checkParseOpt_good('-m', self._goodKVPairs)
 
     def testColumnNames_fail(self):
         self.checkParseOpt_fail('-c', self._failColumns, self._failColumnsMsg)
@@ -164,14 +167,14 @@ class Test(unittest.TestCase):
 
 
     def testPandasInputs_fail(self):
-        self.checkParseOpt_fail('-I', self._failPandas, self._failPandasMsg)
+        self.checkParseOpt_fail('-I', self._failKVPairs, self._failKVPairsMsg)
     def testPandasInputs_good(self):
-        self.checkParseOpt_good('-I', self._goodPandas)
+        self.checkParseOpt_good('-I', self._goodKVPairs)
 
     def testPandasOutputs_fail(self):
-        self.checkParseOpt_fail('-O', self._failPandas, self._failPandasMsg)
+        self.checkParseOpt_fail('-O', self._failKVPairs, self._failKVPairsMsg)
     def testPandasOutputs_good(self):
-        self.checkParseOpt_good('-O', self._goodPandas)
+        self.checkParseOpt_good('-O', self._goodKVPairs)
 
     def testIFormat_fail(self):
         self.checkParseOpt_fail('-f', self._failFormats, self._failFormatsMsg)
