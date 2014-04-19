@@ -2,3 +2,4 @@ include COPYING.txt
 include fuefit/test/*.csv
 include fuefit/test/*.txt
 include fuefit/test/*.xls*
+recursive-include Docs/*.pdf
