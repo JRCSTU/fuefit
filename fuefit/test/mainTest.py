@@ -105,7 +105,7 @@ class Test(unittest.TestCase):
         self.assertIsNone(opts)
         self.assertFalse(mystderr.getvalue(), mystderr.getvalue())
         ## On errors, help-msg is not printed.
-        self.assertTrue(mystdout.getvalue().find(fuefit_main.__doc__.splitlines()[0]) > 0, mystdout.getvalue())
+        self.assertTrue(mystdout.getvalue().find(fuefit_main.__doc__.splitlines()[0]) > 0, mystdout.getvalue())  # @UndefinedVariable
 
 
     def testReqOpt(self):

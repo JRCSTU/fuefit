@@ -141,7 +141,7 @@ setup(
     install_requires = [
         'numpy',
         'jsonschema',
-#         'jsonpointer',
+        'jsonpointer',
     ],
     test_requires = [
         'pandas',

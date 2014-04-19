@@ -57,7 +57,7 @@ def main(argv=None):
 
     REMARKS:
     --------
-        * All string-values are case-insensitive.
+        * All string-values are case-sensitive.
 
     EXAMPLES:
     ---------
@@ -68,11 +68,11 @@ def main(argv=None):
 
         then the next command  calculates and writes the fitted engine map's parameters
         as JSON into 'engine_map.json' file:
-            %(prog)s --in-file engine_fc.csv -out-file engine_map
+            %(prog)s -m fuel=PETROL --in-file engine_fc.csv -out-file engine_map
         and if header-row did not exist, it should become:
-            %(prog)s -i engine_fc.csv -o engine_map --icolumns CM PMF PME
+            %(prog)s -m fuel=DIESEL -i engine_fc.csv -o engine_map --icolumns CM PMF PME
         and if instead of PME we had a column with normalized-Power in Watts (instead of kW):
-            %(prog)s -i engine_fc.csv -o engine_map  -c CM  PMF 'Pnorm (w)'
+            %(prog)s -m fuel=PETROL -i engine_fc.csv -o engine_map  -c CM  PMF 'Pnorm (w)'
 
         Now, if input vectors are in 2 separate files, the 1st, 'engine_1.xlsx',
         having 5 columns with different headers than expected, like this:
@@ -82,7 +82,7 @@ def main(argv=None):
 
         and the 2nd having 2 columns with no headers at all and the 1st one being 'Pnorm',
         then it would take the following to read them:
-            %(prog)s -o engine_map \
+            %(prog)s -o engine_map -m fuel=PETROL \
                     -i=engine_1.xlsx \
                     -c X   X   N   'Fuel consumption'  X \
                     -r X   X   RPM 'FC(g/s)'           X \
@@ -145,13 +145,16 @@ def setup_args_parser(program_name):
 
     parser = argparse.ArgumentParser(prog=program_name, description=desc, epilog=epilog, add_help=False,
                                      formatter_class=RawTextHelpFormatter)
-    grp_input = parser.add_argument_group('Input', 'Options controlling reading of input-file(s).')
+
+
+    grp_input = parser.add_argument_group('Input', 'Options controlling reading of input-file(s) and for specifying model values.')
     grp_input.add_argument('-i', '--ifile', help=dedent("""\
             the input-file(s) with the data-points (vectors).
             If more than one --ifile given, the number --iformat, --icolumns, --irenames and -I options
             must either match it, be 1 (meaning use them for all files), or be totally absent
             (meaning use defaults for all files); the order is important only within same options.
             The number of data-points (i.e. rows excluding header) for all data-files must be equal.
+            Use '-' to specify reading <stdin>.
             Default: %(default)s"""),
                         action='append',
                         type=argparse.FileType('r'), required=True,
@@ -168,9 +171,9 @@ def setup_args_parser(program_name):
             on each run exactly one from each of the 3 first categories must be present:
             1. engine-speed:
                 RPM      (rad/min)
-                RPMnorm  (rad/min)  : normalized against RPMnorm * RPM_IDLE + (RPM_RATED - RPM_RATED)
+                RPMnorm  (rad/min)  : normalized against RPMnorm * RPM_IDLE + (RPM_RATED - RPM_IDLE)
                 Omega    (rad/sec)
-                CM       (m/sec)
+                CM       (m/sec)    : Mean Piston speed
             2. work-capability:
                 P        (kW)
                 Pnorm    (kW)       : normalized against P_MAX
@@ -194,19 +197,45 @@ def setup_args_parser(program_name):
                         action='append', nargs='+',
                         type=column_specifier, metavar='COLUMN_SPEC')
     grp_input.add_argument('-f', '--iformat', help=dedent("""\
-            the format of input data file(s).
+            sets the format of input data file(s).
             It can be one of: %(choices)s
             When AUTO, format deduced fro the filename's extension (ie use it with Excel files).
             Different JSON sub-formats are supported through the use of the 'orient' keyword of Pandas
-            (use the -I option to pass it).  For more infos read the documentation of the read_json() method:
+            (use the -I option to pass it).
+            For more infos read the documentation of the read_json() method:
                 http://pandas.pydata.org/pandas-docs/stable/generated/pandas.io.json.read_json.html
             Default: %(default)s"""),
                         choices=[ 'AUTO', 'CSV', 'TXT', 'XLS', 'JSON'],
                         action='append', metavar='FORMAT')
     grp_input.add_argument('-I', help=dedent("""\
-            Pass option(s) directly to pandas when reading input-file with syntax: -I 'opt=value, ...'"""),
+            pass option(s) directly to pandas when reading input-file(s)."""),
                         action='append', nargs='+',
                         type=key_value_pair, metavar='KEY=VALUE')
+    grp_input.add_argument('--model', help=dedent("""\
+            read model base-values as JSON.
+            Specific values can be overriden by options below.",
+            """))
+    grp_input.add_argument('-m', help=dedent("""\
+            override a model scalar values using an absolute or relative path.
+            Relative paths are resolved against '/engine', for instance,
+              -Mrpm_idle=850 -M/engine/p_max=
+            would set the following model's property:
+                {
+                  "engine": {
+                      "rpm_idle": 850,
+                      ...
+                  }
+                }
+            For the path syntax, see json-pointer spec:
+                https://python-json-pointer.readthedocs.org/en/latest/tutorial.html
+            """),
+                        action='append', nargs='+',
+                        metavar='MODEL_PATH=VALUE')
+    grp_input.add_argument('-M', help=dedent("""\
+            get help description for the specfied model path.
+            If no path specified, gets the default model-base. """),
+                        action='append', nargs='*',
+                        type=key_value_pair, metavar='MODEL_PATH')
 
 
     grp_output = parser.add_argument_group('Output', 'Options controlling writting of output-file.')
@@ -224,33 +253,9 @@ def setup_args_parser(program_name):
             See documentation for -f option."""),
                         choices=[ 'AUTO', 'CSV', 'TXT', 'XLS', 'JSON'],
                         action='append', metavar='FORMAT')
-    grp_input.add_argument('-O', help=dedent("""\
-            Pass option(s) directly to pandas when reading input-file with syntax: -O 'opt=value, ...'"""),
+    grp_output.add_argument('-O', help=dedent("""\
+            Pass option(s) directly to pandas when writting output-file."""),
                         nargs='+', type=key_value_pair, metavar='KEY=VALUE')
-
-
-    grp_model = parser.add_argument_group('Model', 'Options specifying calculation constants and scalar model-values.')
-    grp_model.add_argument('--model', help=dedent("""\
-            read model base-values as JSON.
-            Specific values can be overriden by options below.",
-            """))
-    grp_model.add_argument('--fuel', help="the engine's fuel-type used for selecting specific-temperature.  Default: %(default)s",
-                        default='PETROL', choices=['PETROL', 'DIESEL'])
-    grp_model.add_argument('--rpm-idle', help=dedent("""\
-            the engine's n_idle.
-            Required if RPMnorm exists in input-file's or example-map columns."""))
-    grp_model.add_argument('--rpm-max', help=dedent("""\
-            the engine's revolutions where rated power is attained.
-            Required if RPMnorm exists in input-file's or example-map columns."""))
-    grp_model.add_argument('--p-max', help=dedent("""\
-            the engine's rated-power.
-            Required if Pnorm or FCnorm exists in input-file's or example-map's columns."""))
-    grp_model.add_argument('--stroke', help=dedent("""\
-            the engine's stroke distance (default units: mm).
-            Required if CM is not among the inputs or requested to generate example-map with RPM column."""))
-    grp_model.add_argument('--capacity', help=dedent("""\
-            the engine's capacity (default units: cm^2).
-            Required if PMF is not among the inputs or requested to generate example-map with FC column."""))
 
 
     grp_various = parser.add_argument_group('Various', 'Options controlling various other aspects.')
