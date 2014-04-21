@@ -7,10 +7,13 @@ import unittest
 from collections import OrderedDict
 from .redirect import redirected  # @UnresolvedImport
 
-from ..main import (main, build_args_parser, validate_file_opts, parse_key_value_pair, parse_many_file_args)
+from ..main import (main, build_args_parser, validate_file_opts, parse_key_value_pair, parse_many_file_args,
+    build_model, validate_model, FileSpec)
 import argparse
 import functools
 from os.path import os
+from fuefit.main import json_dumps
+import logging
 
 
 class Test(unittest.TestCase):
@@ -40,8 +43,8 @@ class Test(unittest.TestCase):
         }
 
         self._failFormatsMsg = 'invalid choice:'
-        self._failFormats = ['format=', 'format=BAD', 'format=CSV BAD']
-        self._goodFormats = ['format=AUTO', 'format=CSV', 'format=XLS']
+        self._failFormats = ['file_frmt=', 'file_frmt=BAD', 'file_frmt=CSV BAD']
+        self._goodFormats = ['file_frmt=AUTO', 'file_frmt=CSV', 'file_frmt=XLS']
 
 
     def get_args_parser(self):
@@ -180,12 +183,12 @@ class Test(unittest.TestCase):
         cases = [
             [['']],
             [['missing.file']],
-            [[test_fnames[0], 'format=BAD']],
+            [[test_fnames[0], 'file_frmt=BAD']],
             [[test_fnames[0], 'model_path=']],
             [[test_fnames[0], 'model_path=rel_path']],
             [[test_fnames[0], '2_bad=key']],
-            [['-']],            # missing format
-            [[test_fnames[1]]], # missing format
+            [['-']],            # missing file_frmt
+            [[test_fnames[1]]], # missing file_frmt
         ]
         for many_file_args in cases:
             with self.assertRaises(argparse.ArgumentTypeError, msg=many_file_args):
@@ -199,15 +202,15 @@ class Test(unittest.TestCase):
         test_fnames = self._test_fnames
         cases = [
             (('r', 'w', 'a'), [[test_fnames[0]]]),
-            (('r', 'w', 'a'), [[test_fnames[0], 'format=AUTO']]),
-            (('r', 'w', 'a'), [[test_fnames[0], 'format=CSV', 'model_path=/gjhgj']]),
+            (('r', 'w', 'a'), [[test_fnames[0], 'file_frmt=AUTO']]),
+            (('r', 'w', 'a'), [[test_fnames[0], 'file_frmt=CSV', 'model_path=/gjhgj']]),
             (('r', 'w', 'a'), [[test_fnames[0], 'some=other', 'keys+=4', 'fun:=[1, {"a":2}]']]),
-            (('r', 'w', 'a'), [[test_fnames[1], 'format=CSV']]),
-            (('r', 'w', 'a'), [['any_fname.haha', 'format=CLIPBOARD']]),
+            (('r', 'w', 'a'), [[test_fnames[1], 'file_frmt=CSV']]),
+            (('r', 'w', 'a'), [['any_fname.haha', 'file_frmt=CLIPBOARD']]),
 
-            (('r', 'w'), [['-', 'format=JSON']]),
-            (('r', 'w'), [['-', 'format=CSV', 'model_path=/gjhgj']]),
-            (('r', 'w'), [['-', 'format=CLIPBOARD']]),
+            (('r', 'w'), [['-', 'file_frmt=JSON']]),
+            (('r', 'w'), [['-', 'file_frmt=CSV', 'model_path=/gjhgj']]),
+            (('r', 'w'), [['-', 'file_frmt=CLIPBOARD']]),
         ]
         for (open_modes, many_file_args) in cases:
             for open_mode in open_modes:
@@ -251,7 +254,16 @@ class Test(unittest.TestCase):
             opts = argparse.Namespace(**opts)
             validate_file_opts(opts)
 
+    def testBuildModel(self):
+        fname = 'test_table.csv'
+        opts = {'m':None, }
+        infiles = [
+            FileSpec(open(fname, 'r'), fname, 'CSV', '/engine_points', None, {})
+        ]
+        opts = argparse.Namespace(**opts)
+        mdl = build_model(opts, infiles)
 
+        print(json_dumps(mdl))
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']

@@ -19,28 +19,144 @@
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 """The command-line entry-point for using all functionality of fuefit tool. """
 
-import sys, os
-import traceback
-import collections
-import logging
-import argparse
 from argparse import RawTextHelpFormatter
-from textwrap import dedent
-import re
+import argparse
+import collections
 import functools
 import json
-import jsonschema as jsons
+import logging
+import re
+import sys, os
+from textwrap import dedent
+import traceback
+
 import jsonpointer as jsonp
+import jsonschema as jsons
 import pandas as pd
 
 from . import model, _version
 
 
 DEBUG   = False
+logging.basicConfig(level=logging.DEBUG)
+log     = logging.getLogger(__file__)
 
-log = None
+def main(argv=None):
+    """Calculates an engine-map by fitting data-points vectors, use --help for gettting help.
 
-## The value of format=VALUE to decide which pandas.read_XXX() method to use.
+    REMARKS:
+    --------
+        * All string-values are case-sensitive.
+        * Boolean string-values are case insensitive:
+            False  : false, off, no,  == 0
+            True   : true,  on,  yes, != 0
+        * In KEY=VALUE pairs, the values are passed as string.  For other types,
+          substitute '=' with:.
+            +=     : integer
+            *=     : float
+            ?=     : boolean
+            :=     : parsed as json
+            ;=     : parsed as python (with eval())
+
+    EXAMPLES:
+    ---------
+    Assuming a CSV-file 'engine.csv' like this:
+            CM,PME,PMF
+            12,0.14,180
+            ...
+
+        ## Calculate and print fitted engine map's parameters
+        #     for a PETROL vehicle with the above engine-point's CSV-table:
+        >> %(prog)s -m fuel=PETROL -I engine.csv
+
+        ## Assume PME column contained normalized-Power in Watts,
+        #    instead of P in kW:
+        >> %(prog)s -m fuel=PETROL -I engine.csv  -irenames X X 'Pnorm (w)'
+
+        ## Read the same table above but without header-row and
+        #    store results into Excel file:
+        >> %(prog)s -m fuel=PETROL -I engine.csv --icolumns CM PME PMF -O engine_map.xlsx
+
+        ## Supply as inline-json more model-values required for columns [RPM, P, FC]
+        #    read from <stdin> as json 2D-array of values (no headers).
+        #    and store results in UTF-8 regardless of platform's default encoding:
+        >> %(prog)s -m '/engine:={"fuel":"PETROL", "stroke":15, "capacity":1359}' \\
+                -I - file_frmt=JSON orient=values -c RPM P FC \\
+                -O engine_map.txt encoding=UTF-8
+
+
+    Now, if input vectors are in 2 separate files, the 1st, 'engine_1.xlsx',
+    having 5 columns with different headers than expected, like this:
+        OTHER1   OTHER2       N        "Fuel waste"   OTHER3
+        0       -1            12       0.14           "some text"
+        ...
+
+    and the 2nd having 2 columns with no headers at all and
+    the 1st column being 'Pnorm', then it, then use the following command:
+
+        >> %(prog)s -O engine_map -m fuel=PETROL \\
+                -I=engine_1.xlsx \\
+                -c X   X   N   'Fuel consumption'  X \\
+                -r X   X   RPM 'FC(g/s)'           X \\
+                -I=engine_2.csv \\
+                -c Pnorm X
+    """
+
+    global log, DEBUG
+
+    program_name    = 'fuefit' #os.path.basename(sys.argv[0])
+
+    if argv is None:
+        argv = sys.argv[1:]
+
+    doc_lines       = main.__doc__.splitlines()
+    desc            = doc_lines[0]
+    epilog          = dedent('\n'.join(doc_lines[1:]))
+    parser = build_args_parser(program_name, _version, desc, epilog)
+
+    try:
+
+        opts = parser.parse_args(argv)
+
+        DEBUG = bool(opts.debug)
+
+        if (DEBUG):
+            log.setLevel(logging.DEBUG)
+        else:
+            log.setLevel(logging.INFO)
+        log.info("Args: argv\nOpts: %s", opts)
+
+        opts = validate_file_opts(opts)
+
+        infiles     = parse_many_file_args(opts.I, 'r')
+        log.info("Input-files: %s", infiles)
+
+        outfiles    = parse_many_file_args(opts.O, 'w')
+        log.info("Output-files: %s", outfiles)
+
+        mdl = build_model(opts, infiles)
+        log.info("Input Model: %s", json_dumps(mdl))
+        mdl = validate_model(mdl)
+
+
+    except (SystemExit) as ex:
+        if DEBUG:
+            log.error(traceback.format_exception())
+        raise
+    except (ValueError) as ex:
+        if DEBUG:
+            log.error(traceback.format_exception())
+        indent = len(program_name) * " "
+        parser.exit(3, "%s: %s\n%s  for help use --help\n"%(program_name, ex, indent))
+    except jsons.ValidationError as ex:
+        if DEBUG:
+            log.error(traceback.format_exception())
+        indent = len(program_name) * " "
+        parser.exit(4, "%s: Model validation failed due to: %s\n%s  for help use --help\n"%(program_name, ex, indent))
+
+
+
+## The value of file_frmt=VALUE to decide which pandas.read_XXX() method to use.
 _pandas_formats = collections.OrderedDict([
     ('AUTO',None),
     ('CSV', pd.read_csv),
@@ -75,12 +191,12 @@ _model_default_prefix = '/engine/'
 
 def _json_default(o):
     if (isinstance(o, pd.DataFrame)):
-        return pd.DataFrame.to_json(o)
+        return json.loads(pd.DataFrame.to_json(o))
     else:
         return repr(o)
 
 def json_dumps(obj):
-    json.dumps(obj, indent=2, default=_json_default)
+    return json.dumps(obj, indent=2, default=_json_default)
 
 
 def str2bool(v):
@@ -132,120 +248,7 @@ def parse_column_specifier(arg):
         raise argparse.ArgumentTypeError("Not a COLUMN_SPEC syntax: %s"%arg)
 
 
-FileSpec = collections.namedtuple('FileSpec', ('fname', 'file', 'format', 'path', 'append', 'kws'))
-
-def main(argv=None):
-    """Calculates an engine-map by fitting data-points vectors, use --help for gettting help.
-
-    REMARKS:
-    --------
-        * All string-values are case-sensitive.
-        * Boolean string-values are case insensitive:
-            False  : false, off, no,  == 0
-            True   : true,  on,  yes, != 0
-        * In KEY=VALUE pairs, the values are passed as string.  For other types,
-          substitute '=' with:.
-            +=     : integer
-            *=     : float
-            ?=     : boolean
-            :=     : parsed as json
-            ;=     : parsed as python (with eval())
-
-    EXAMPLES:
-    ---------
-    Assuming a CSV-file 'engine.csv' like this:
-            CM,PME,PMF
-            12,0.14,180
-            ...
-
-        ## Calculate and print fitted engine map's parameters
-        #     for a PETROL vehicle with the above engine-point's CSV-table:
-        >> %(prog)s -m fuel=PETROL -I engine.csv
-
-        ## Assume PME column contained normalized-Power in Watts,
-        #    instead of P in kW:
-        >> %(prog)s -m fuel=PETROL -I engine.csv  -irenames X X 'Pnorm (w)'
-
-        ## Read the same table above but without header-row and
-        #    store results into Excel file:
-        >> %(prog)s -m fuel=PETROL -I engine.csv --icolumns CM PME PMF -O engine_map.xlsx
-
-        ## Supply as inline-json more model-values required for columns [RPM, P, FC]
-        #    read from <stdin> as json 2D-array of values (no headers).
-        #    and store results in UTF-8 regardless of platform's default encoding:
-        >> %(prog)s -m '/engine:={"fuel":"PETROL", "stroke":15, "capacity":1359}' \\
-                -I - format=JSON orient=values -c RPM P FC \\
-                -O engine_map.txt encoding=UTF-8
-
-
-    Now, if input vectors are in 2 separate files, the 1st, 'engine_1.xlsx',
-    having 5 columns with different headers than expected, like this:
-        OTHER1   OTHER2       N        "Fuel waste"   OTHER3
-        0       -1            12       0.14           "some text"
-        ...
-
-    and the 2nd having 2 columns with no headers at all and
-    the 1st column being 'Pnorm', then it, then use the following command:
-
-        >> %(prog)s -O engine_map -m fuel=PETROL \\
-                -I=engine_1.xlsx \\
-                -c X   X   N   'Fuel consumption'  X \\
-                -r X   X   RPM 'FC(g/s)'           X \\
-                -I=engine_2.csv \\
-                -c Pnorm X
-    """
-
-    global log, DEBUG
-
-    program_name    = 'fuefit' #os.path.basename(sys.argv[0])
-
-    if argv is None:
-        argv = sys.argv[1:]
-
-    doc_lines       = main.__doc__.splitlines()
-    desc            = doc_lines[0]
-    epilog          = dedent('\n'.join(doc_lines[1:]))
-    parser = build_args_parser(program_name, _version, desc, epilog)
-
-    try:
-
-        opts = parser.parse_args(argv)
-
-        DEBUG = bool(opts.debug)
-
-        if (DEBUG):
-            logging.basicConfig(level=logging.DEBUG)
-        else:
-            logging.basicConfig(level=logging.INFO)
-        log = logging.getLogger(__file__)
-        log.info("Args: argv\nOpts: %s", opts)
-
-        opts = validate_file_opts(opts)
-
-        infiles     = parse_many_file_args(opts.I, 'r')
-        log.info("Input-files: %s", json_dumps(infiles))
-
-        outfiles    = parse_many_file_args(opts.O, 'w')
-        log.info("Output-files: %s", json_dumps(outfiles))
-
-        mdl = build_and_validate_model(opts, infiles)
-        log.info("Input Model: %s", json_dumps(mdl))
-
-    except (SystemExit) as ex:
-        if DEBUG:
-            log.error(traceback.format_exception())
-        raise
-    except (ValueError) as ex:
-        if DEBUG:
-            log.error(traceback.format_exception())
-        indent = len(program_name) * " "
-        parser.exit(3, "%s: %s\n%s  for help use --help\n"%(program_name, ex, indent))
-    except jsons.ValidationError as ex:
-        if DEBUG:
-            log.error(traceback.format_exception())
-        indent = len(program_name) * " "
-        parser.exit(4, "%s: Model validation failed due to: %s\n%s  for help use --help\n"%(program_name, ex, indent))
-
+FileSpec = collections.namedtuple('FileSpec', ('fname', 'file', 'frmt', 'path', 'append', 'kws'))
 
 def validate_file_opts(opts):
     ## Check number of input-files <--> related-opts
@@ -277,10 +280,10 @@ def parse_many_file_args(many_file_args, filetype):
         kv_pairs = [parse_key_value_pair(kv) for kv in kv_args]
         pandas_kws = dict(kv_pairs)
 
-        if ('format' in pandas_kws):
-            frmt = pandas_kws.pop('format')
+        if ('file_frmt' in pandas_kws):
+            frmt = pandas_kws.pop('file_frmt')
             if (frmt not in _pandas_formats):
-                raise argparse.ArgumentTypeError("Unsupported pandas-format: %s\n  Set 'format=XXX' to one of %s" % (frmt, list(_pandas_formats.keys())[1:]))
+                raise argparse.ArgumentTypeError("Unsupported pandas file_frmt: %s\n  Set 'file_frmt=XXX' to one of %s" % (frmt, list(_pandas_formats.keys())[1:]))
 
         if (frmt == 'CLIPBOARD'):
             file    = None
@@ -288,10 +291,10 @@ def parse_many_file_args(many_file_args, filetype):
         else:
             if (frmt == _default_pandas_format):
                 if ('-' == fname):
-                    raise argparse.ArgumentTypeError("With <stdio> a concrete pandas-format is required! \n  Set 'format=XXX' to one of %s" % (list(_pandas_formats.keys())[1:]))
+                    raise argparse.ArgumentTypeError("With <stdio> a concrete file_frmt is required! \n  Set 'file_frmt=XXX' to one of %s" % (list(_pandas_formats.keys())[1:]))
                 frmt = get_file_format_from_extension(fname)
                 if (not frmt):
-                    raise argparse.ArgumentTypeError("File(%s) has unknown extension, pandas-format is required! \n  Set 'format=XXX' to one of %s" % (fname, list(_pandas_formats.keys())[1:]))
+                    raise argparse.ArgumentTypeError("File(%s) has unknown extension, file_frmt is required! \n  Set 'file_frmt=XXX' to one of %s" % (fname, list(_pandas_formats.keys())[1:]))
             file = argparse.FileType(filetype)(fname)
 
 
@@ -309,12 +312,21 @@ def parse_many_file_args(many_file_args, filetype):
     return [parse_file_args(*file_args) for file_args in many_file_args]
 
 
-def build_and_validate_model(opts, infiles):
+def load_file_as_df(filespec):
+# FileSpec(fname, file, frmt, path, append, kws)
+    method = _pandas_formats[filespec.frmt]
+    df = method(filespec.file, **filespec.kws)
+
+    return df
+
+def build_model(opts, infiles):
+
     mdl = model.base_model()
 
-#     ## TODO: Merge models.
-#     if (opts.model):
-#         model.merge(mdl, opts.model)
+    for filespec in infiles:
+        df = load_file_as_df(filespec)
+        log.info("+-input-file(%s):\n%s", filespec.fname, df)
+        jsonp.set_pointer(mdl, filespec.path, df)
 
     model_overrides = opts.m
     if (model_overrides):
@@ -324,6 +336,10 @@ def build_and_validate_model(opts, infiles):
                 json_path = _model_default_prefix + json_path
             jsonp.set_pointer(mdl, json_path, value)
 
+    return mdl
+
+
+def validate_model(mdl):
     validator = model.model_validator()
     validator.validate(mdl)
 
@@ -347,11 +363,11 @@ def build_args_parser(program_name, version, desc, epilog):
                     http://pandas.pydata.org/pandas-docs/stable/io.html
               See REMARKS below for the parsing of KEY-VAULE pairs.
             * The following keys are consumed before reaching pandas:
-            ** format = [ AUTO | CSV | TXT | XLS | JSON | CLIPBOARD ]
+            ** file_frmt = [ AUTO | CSV | TXT | XLS | JSON | CLIPBOARD ]
                     selects which pandas.read_XXX() method to use.
-                    When AUTO (default), file-format deduced from filename's extension
-                    (ie use it with Excel files). For  JSON, different sub-formats are selected
-                    through the 'orient' keyword of Pandas, specified with a later key-value pair.
+                    When AUTO (default), deduced from filename's extension (ie Excel files).
+                    For  JSON, different sub-formats are selected through the 'orient' keyword
+                    of Pandas, specified with a key-value pair.
                     When CLIPBOARD, file ignored
             ** model_path = MODEL_PATH
                     specifies the destination (or source) of the dataframe within the model
@@ -363,7 +379,7 @@ def build_args_parser(program_name, version, desc, epilog):
               must either match them, be 1 (meaning use them for all files), or be totally absent
               (meaning use defaults for all files). """),
                         action='append', nargs='+',
-                        default=[('- format=%s model_path=%s'%(_default_pandas_format, _default_df_dest)).split()],
+                        default=[('- file_frmt=%s model_path=%s'%(_default_pandas_format, _default_df_dest)).split()],
                         metavar='ARG')
     grp_io.add_argument('-c', '--icolumns', help=dedent("""\
             describes the contents and the units of input file(s) (see --I).
@@ -440,7 +456,7 @@ def build_args_parser(program_name, version, desc, epilog):
                     specify whether to augment pre-existing files, or overwrite them.
             * Default: %(default)s] """),
                         action='append', nargs='+',
-                        default=[('- format=%s model_path=%s file_append=%s'%(_default_pandas_format, _default_df_source,  _default_append)).split()],
+                        default=[('- file_frmt=%s model_path=%s file_append=%s'%(_default_pandas_format, _default_df_source,  _default_append)).split()],
                         metavar='ARG')
 
 
