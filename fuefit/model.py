@@ -20,7 +20,7 @@
 '''wltc module: Model json-all_schemas for WLTC gear-shift calculator.'''
 
 
-def model_schema():
+def model_schema(additional_properties = False):
     """The json-schema for input/output of the fuefit experiment.
 
     :return :dict:
@@ -31,13 +31,13 @@ def model_schema():
     schema = {
         "$schema": "http://json-schema.org/draft-04/schema#",
         "title": model_schema.__doc__,
-        "type": "object", "additionalProperties": False,
+        "type": "object", "additionalProperties": additional_properties,
         "required": ["engine"],
         "properties": {
             "engine": {
                 "title": "engine model",
-                "type": "object", "additionalProperties": False,
-                "required": ["fuel", "p_max", "rpm_idle", "rpm_rated"],
+                "type": "object", "additionalProperties": additional_properties,
+                "required": ["fuel"],
                 "description": "The engine attributes and  data-points vectors required for generating a fitted fuel-map.",
                 "properties": {
                     "fuel": {
@@ -99,7 +99,7 @@ def model_schema():
             }, # engine
 #             "params": {
 #                 "title": "experiment parameters and constants",
-#                 "type": "object", "additionalProperties": False,
+#                 "type": "object", "additionalProperties": additional_properties,
 #                 "required": [
 #                 ],
 #                 "properties": {
@@ -258,23 +258,56 @@ def base_model():
     return instance
 
 
-def merge(a, b, path=[]):
-    ''''merges b into a'''
+try:
+    from enum import Enum       # @UnresolvedImport
+except:
+    from enum34 import Enum     # @UnresolvedImport
 
-    from collections.abc import Mapping
+class MergeMode(Enum):
+    REPLACE       = 1
+    APPEND_HEAD   = 2
+    APPEND_TAIL   = 3
+    OVERLAP_HEAD  = 4
+    OVERLAP_TAIL  = 5
+
+from collections.abc import Sequence as _seqtype
+from collections.abc import Mapping  as _maptype
+
+def islist(obj):
+    return isinstance(obj, _seqtype) and not isinstance(obj, str)
+
+def merge(a, b, path=[], list_merge_mode = MergeMode.REPLACE, raise_struct_mismatches = False):
+    ''''Merges b into a.
+
+    List merge modes: REPLACE, APPEND_HEAD, APPEND_TAIL, OVERLAP_HEAD, OVERLAP_TAIL
+    '''
+
+    def issue_struct_mismatch(mismatch_type, key, a_value, b_value):
+        raise ValueError("%s-values conflict at '%s'! a(%s) != b(%s)" %
+                                (mismatch_type, '/'.join(path + [str(key)]), type(av), type(bv)))
 
     for key in b:
         bv = b[key]
         if key in a:
             av = a[key]
-            if isinstance(av, Mapping) != isinstance(bv, Mapping):
-                raise ValueError("Dict-values conflict at '%s'! a(%s) != b(%s)" %
-                                ('/'.join(path + [str(key)]), type(av), type(bv)))
-            elif av == bv:
+            if av == bv:
                 continue # same leaf value
-            elif isinstance(av, Mapping):
+
+            if raise_struct_mismatches:
+                if isinstance(av, _maptype) != isinstance(bv, _maptype):
+                    issue_struct_mismatch('Dict', key, av, bv)
+                elif islist(av) != islist(bv):
+                    issue_struct_mismatch('List', key, av, bv)
+
+            if isinstance(av, _maptype):
                 merge(av, bv, path + [str(key)])
                 continue
+
+            if islist(av) and list_merge_mode > MergeMode.REPLACE:
+                # TODO: merge/append lists
+                #continue
+                pass
+
         a[key] = bv
     return a
 
