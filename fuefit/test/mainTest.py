@@ -10,12 +10,19 @@ from .redirect import redirected  # @UnresolvedImport
 from ..main import (main, build_args_parser, validate_file_opts, parse_key_value_pair, parse_many_file_args)
 import argparse
 import functools
+from os.path import os
 
 
 class Test(unittest.TestCase):
 
     def setUp(self):
         unittest.TestCase.setUp(self)
+
+        self._test_fnames = ('temp.csv', 'strange.ext')
+        for tfn in self._test_fnames:
+            if (not os.path.exists(tfn)):
+                tf = open(tfn, "w")
+                tf.close()
 
         _exit_code = None
         _exit_msg = None
@@ -160,7 +167,8 @@ class Test(unittest.TestCase):
     def testKVPairs_fail(self):
         self._failKVPairs
         for opt in self._failKVPairs:
-            self.assertRaises(argparse.ArgumentTypeError, parse_key_value_pair, opt)
+            with self.assertRaises(argparse.ArgumentTypeError, msg=opt):
+                parse_key_value_pair(opt)
     def testKVPairs_good(self):
         self._goodKVPairs
         for (arg, val) in self._goodKVPairs.items():
@@ -168,27 +176,42 @@ class Test(unittest.TestCase):
             self.assertEqual(v, val, arg)
 
     def testFileSpec_fail(self):
+        test_fnames = self._test_fnames
         cases = [
             [['']],
             [['missing.file']],
-            [['mainTest.py', 'format=BAD']],
-            [['mainTest.py', 'model_path=']],
-            [['mainTest.py', 'model_path=rel_path']],
-            [['mainTest.py', '2_bad=key']],
+            [[test_fnames[0], 'format=BAD']],
+            [[test_fnames[0], 'model_path=']],
+            [[test_fnames[0], 'model_path=rel_path']],
+            [[test_fnames[0], '2_bad=key']],
+            [['-']],            # missing format
+            [[test_fnames[1]]], # missing format
         ]
         for many_file_args in cases:
-            self.assertRaises(argparse.ArgumentTypeError, parse_many_file_args, many_file_args, 'r')
+            with self.assertRaises(argparse.ArgumentTypeError, msg=many_file_args):
+                parse_many_file_args(many_file_args, 'r')
 
-        self.assertRaises(argparse.ArgumentTypeError, parse_many_file_args, functools.reduce(lambda x, y: x+y, cases), 'r')
+        all_cases = functools.reduce(lambda x, y: x+y, cases)
+        with self.assertRaises(argparse.ArgumentTypeError, msg=all_cases):
+            parse_many_file_args(all_cases, 'r')
 
     def testFileSpec_good(self):
+        test_fnames = self._test_fnames
         cases = [
-            [['mainTest.py', 'format=AUTO']],
-            [['mainTest.py', 'format=CSV', 'model_path=/gjhgj']],
-            [['mainTest.py', 'some=other', 'keys+=4', 'fun:=[1, {"a":2}]']],
+            (('r', 'w', 'a'), [[test_fnames[0]]]),
+            (('r', 'w', 'a'), [[test_fnames[0], 'format=AUTO']]),
+            (('r', 'w', 'a'), [[test_fnames[0], 'format=CSV', 'model_path=/gjhgj']]),
+            (('r', 'w', 'a'), [[test_fnames[0], 'some=other', 'keys+=4', 'fun:=[1, {"a":2}]']]),
+            (('r', 'w', 'a'), [[test_fnames[1], 'format=CSV']]),
+            (('r', 'w', 'a'), [['any_fname.haha', 'format=CLIPBOARD']]),
+
+            (('r', 'w'), [['-', 'format=JSON']]),
+            (('r', 'w'), [['-', 'format=CSV', 'model_path=/gjhgj']]),
+            (('r', 'w'), [['-', 'format=CLIPBOARD']]),
         ]
-        for many_file_args in cases:
-            parse_many_file_args(many_file_args, 'r')
+        for (open_modes, many_file_args) in cases:
+            for open_mode in open_modes:
+                res = parse_many_file_args(many_file_args, open_mode)
 
         argparse.ArgumentTypeError(parse_many_file_args, functools.reduce(lambda x, y: x+y, cases), 'r')
 
@@ -213,7 +236,8 @@ class Test(unittest.TestCase):
        ]
         for opts in cases:
             opts = argparse.Namespace(**opts)
-            self.assertRaises(argparse.ArgumentTypeError, validate_file_opts, opts)
+            with self.assertRaises(argparse.ArgumentTypeError, msg=opts):
+                validate_file_opts(opts)
 
     def testNumOfFileOpts_good(self):
         cases = [

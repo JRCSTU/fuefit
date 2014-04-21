@@ -41,21 +41,36 @@ DEBUG   = False
 log = None
 
 ## The value of format=VALUE to decide which pandas.read_XXX() method to use.
-pandas_formats = {
-    'AUTO':None,
-    'CSV': pd.read_csv,
-    'TXT': pd.read_csv,
-    'XLS': pd.read_excel,
-    'JSON': pd.read_json,
-    'CLIPBOARD': pd.read_clipboard,
+_pandas_formats = collections.OrderedDict([
+    ('AUTO',None),
+    ('CSV', pd.read_csv),
+    ('TXT', pd.read_csv),
+    ('XLS', pd.read_excel),
+    ('JSON', pd.read_json),
+    ('CLIPBOARD', pd.read_clipboard),
+])
+_known_file_exts = {
+    'XLSX':'XLS'
 }
+def get_file_format_from_extension(fname):
+    ext = os.path.splitext(fname)[1]
+    if (ext):
+        ext = ext.upper()[1:]
+        if (ext in _known_file_exts):
+            return _known_file_exts[ext]
+        if (ext in _pandas_formats):
+            return ext
+
+    return None
+
 
 _default_pandas_format  = 'AUTO'
 _default_df_dest        = '/engine_points'
 _default_df_source      = '/engine_map'
 _default_append         = False
 
-## When option `-m MODEL_PATH=VALUE` contains a relative path the following is preppended.
+## When option `-m MODEL_PATH=VALUE` contains a relative path,
+# the following is preppended:
 _model_default_prefix = '/engine/'
 
 def _json_default(o):
@@ -117,7 +132,7 @@ def parse_column_specifier(arg):
         raise argparse.ArgumentTypeError("Not a COLUMN_SPEC syntax: %s"%arg)
 
 
-FileSpec = collections.namedtuple('FileSpec', ('fname', 'path', 'format', 'append', 'kws'))
+FileSpec = collections.namedtuple('FileSpec', ('fname', 'file', 'format', 'path', 'append', 'kws'))
 
 def main(argv=None):
     """Calculates an engine-map by fitting data-points vectors, use --help for gettting help.
@@ -155,8 +170,8 @@ def main(argv=None):
         #    store results into Excel file:
         >> %(prog)s -m fuel=PETROL -I engine.csv --icolumns CM PME PMF -O engine_map.xlsx
 
-        ## Supply more model-values required for columns [RPM, P, FC]
-        #    read from <stdin> as json 2D-array of values (no header).
+        ## Supply as inline-json more model-values required for columns [RPM, P, FC]
+        #    read from <stdin> as json 2D-array of values (no headers).
         #    and store results in UTF-8 regardless of platform's default encoding:
         >> %(prog)s -m '/engine:={"fuel":"PETROL", "stroke":15, "capacity":1359}' \\
                 -I - format=JSON orient=values -c RPM P FC \\
@@ -255,19 +270,30 @@ def validate_file_opts(opts):
 
 def parse_many_file_args(many_file_args, filetype):
     def parse_file_args(fname, *kv_args):
-        frmt  = _default_pandas_format
+        frmt    = _default_pandas_format
         dest    = _default_df_dest
         append  = _default_append
-
-        fname = argparse.FileType(filetype)(fname)
 
         kv_pairs = [parse_key_value_pair(kv) for kv in kv_args]
         pandas_kws = dict(kv_pairs)
 
         if ('format' in pandas_kws):
             frmt = pandas_kws.pop('format')
-            if (frmt not in pandas_formats):
-                raise argparse.ArgumentTypeError('Unsupported pandas-format: %s\n  Use one of %s' % (frmt, pandas_formats.keys()))
+            if (frmt not in _pandas_formats):
+                raise argparse.ArgumentTypeError("Unsupported pandas-format: %s\n  Set 'format=XXX' to one of %s" % (frmt, list(_pandas_formats.keys())[1:]))
+
+        if (frmt == 'CLIPBOARD'):
+            file    = None
+            fname   = '<CLIPBOARD>'
+        else:
+            if (frmt == _default_pandas_format):
+                if ('-' == fname):
+                    raise argparse.ArgumentTypeError("With <stdio> a concrete pandas-format is required! \n  Set 'format=XXX' to one of %s" % (list(_pandas_formats.keys())[1:]))
+                frmt = get_file_format_from_extension(fname)
+                if (not frmt):
+                    raise argparse.ArgumentTypeError("File(%s) has unknown extension, pandas-format is required! \n  Set 'format=XXX' to one of %s" % (fname, list(_pandas_formats.keys())[1:]))
+            file = argparse.FileType(filetype)(fname)
+
 
         if ('model_path' in pandas_kws):
             dest = pandas_kws.pop('model_path')
@@ -278,7 +304,7 @@ def parse_many_file_args(many_file_args, filetype):
             append = pandas_kws.pop('append')
             append = str2bool(append)
 
-        return FileSpec(fname, frmt, dest, append, pandas_kws) # TODO: Use named tuple.
+        return FileSpec(fname, file, frmt, dest, append, pandas_kws)
 
     return [parse_file_args(*file_args) for file_args in many_file_args]
 
@@ -321,11 +347,12 @@ def build_args_parser(program_name, version, desc, epilog):
                     http://pandas.pydata.org/pandas-docs/stable/io.html
               See REMARKS below for the parsing of KEY-VAULE pairs.
             * The following keys are consumed before reaching pandas:
-            ** format = [ AUTO | CSV | TXT | XLS | JSON ]
+            ** format = [ AUTO | CSV | TXT | XLS | JSON | CLIPBOARD ]
                     selects which pandas.read_XXX() method to use.
                     When AUTO (default), file-format deduced from filename's extension
                     (ie use it with Excel files). For  JSON, different sub-formats are selected
                     through the 'orient' keyword of Pandas, specified with a later key-value pair.
+                    When CLIPBOARD, file ignored
             ** model_path = MODEL_PATH
                     specifies the destination (or source) of the dataframe within the model
                     as json-pointer path (see -m option).
@@ -388,6 +415,7 @@ def build_args_parser(program_name, version, desc, epilog):
                           ...
                       }
                     }
+            * Any values from -m options are applied AFTER any files read by -I option.
             * See REMARKS below for the parsing of KEY-VAULE pairs.
             """),
                         action='append', nargs='+',
@@ -404,11 +432,12 @@ def build_args_parser(program_name, version, desc, epilog):
 
 
     grp_io.add_argument('-O', help=dedent("""\
-            an output-file to write results into
-            * The syntax is indentical to -O, plus another key-value pair:
+            specifies output-file(s) to write model-portions into after calculations.
+            The syntax is indentical to -I, with these differences:
+            * When FILENAME is '-', <stdout> is used.
+            * One extra key-value pair:
             ** file_append = [ TRUE | FALSE ]
-                    Used for output-files only to specify whether to augment pre-existing files,
-                    or overwrite them.
+                    specify whether to augment pre-existing files, or overwrite them.
             * Default: %(default)s] """),
                         action='append', nargs='+',
                         default=[('- format=%s model_path=%s file_append=%s'%(_default_pandas_format, _default_df_source,  _default_append)).split()],

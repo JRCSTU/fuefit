@@ -22,7 +22,7 @@ Overview:
 =========
 
 Fuefit accepts as input data-points for RPM, Power and Fuel-Consumprtion
-(or equivalent quantities such as CM, PME/Torwue and PMF) and spits-out
+(or equivalent quantities such as CM, PME/Torque and PMF) and spits-out
 fitted fuel-maps according to the formula:
 
    (a + b*cm + c*cm**2)*pmf + (a2 + b2*cm)*pmf**2 + loss0 + loss2*cm**2\n",
@@ -51,16 +51,16 @@ A usage example::
         }
     }
 
-    >> experiment = fuefit.Experiment(model)
+    >> experiment = fuefit.Experiment()
 
-    >> model = experiment.run()
+    >> model = experiment.run(model)
 
-    >> print(model['engine']
+    >> print(model['engine'])
 
 
 For information on the model-data, check the schema::
 
-    print(fuefit.instances.model_schema())
+    print(fuefit.model.model_schema())
 
 
 
