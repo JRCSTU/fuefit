@@ -19,8 +19,46 @@
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 import sys, os
+import itertools
 import argparse
 from textwrap import dedent
 from argparse import RawDescriptionHelpFormatter
-
+import pandas as pd
+import json
 from ._version import __version_info__
+
+
+##############
+#  Utilities
+#
+
+def _json_default(o):
+    if (isinstance(o, pd.DataFrame)):
+        return json.loads(pd.DataFrame.to_json(o))
+    else:
+        return repr(o)
+
+def json_dumps(obj):
+    return json.dumps(obj, indent=2, default=_json_default)
+
+
+def str2bool(v):
+    vv = v.lower()
+    if (vv in ("yes", "true", "on")):
+        return True
+    if (vv in ("no", "false", "off")):
+        return False
+    try:
+        return float(v)
+    except:
+        raise argparse.ArgumentTypeError('Invalid boolean(%s)!' % v)
+
+def pairwise(t):
+    '''From http://stackoverflow.com/questions/4628290/pairs-from-single-list'''
+    it1 = iter(t)
+    it2 = iter(t)
+    try:
+        next(it2)
+    except:
+        return []
+    return zip(it1, it2)

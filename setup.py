@@ -140,8 +140,10 @@ setup(
     long_description = __doc__,
     install_requires = [
         'numpy',
+        'pandas',
         'jsonschema',
         'jsonpointer',
+        'networkx',
     ],
     test_requires = [
         'pandas',
