@@ -141,6 +141,7 @@ setup(
     install_requires = [
         'numpy',
         'pandas',
+        'xlrd',
         'jsonschema',
         'jsonpointer',
         'networkx',
