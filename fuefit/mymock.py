@@ -59,10 +59,10 @@ else:
     if sys.version_info[:2] >= (3, 3):
         wraps = original_wraps
     else:
-        def wraps(func):
+        def wraps(func_fact):
             def inner(f):
-                f = original_wraps(func)(f)
-                f.__wrapped__ = func
+                f = original_wraps(func_fact)(f)
+                f.__wrapped__ = func_fact
                 return f
             return inner
 
@@ -148,39 +148,39 @@ DescriptorTypes = (
 )
 
 
-def _getsignature(func, skipfirst, instance=False):
+def _getsignature(func_fact, skipfirst, instance=False):
     if inspect is None:
         raise ImportError('inspect module not available')
 
-    if isinstance(func, ClassTypes) and not instance:
+    if isinstance(func_fact, ClassTypes) and not instance:
         try:
-            func = func.__init__
+            func_fact = func_fact.__init__
         except AttributeError:
             return
         skipfirst = True
-    elif not isinstance(func, FunctionTypes):
+    elif not isinstance(func_fact, FunctionTypes):
         # for classes where instance is True we end up here too
         try:
-            func = func.__call__
+            func_fact = func_fact.__call__
         except AttributeError:
             return
 
     if inPy3k:
         try:
-            argspec = inspect.getfullargspec(func)
+            argspec = inspect.getfullargspec(func_fact)
         except TypeError:
             # C function / method, possibly inherited object().__init__
             return
         regargs, varargs, varkw, defaults, kwonly, kwonlydef, ann = argspec
     else:
         try:
-            regargs, varargs, varkwargs, defaults = inspect.getargspec(func)
+            regargs, varargs, varkwargs, defaults = inspect.getargspec(func_fact)
         except TypeError:
             # C function / method, possibly inherited object().__init__
             return
 
     # instance methods and classmethods need to lose the self argument
-    if getattr(func, self, None) is not None:
+    if getattr(func_fact, self, None) is not None:
         regargs = regargs[1:]
     if skipfirst:
         # this condition and the above one are never both True - why?
@@ -194,36 +194,36 @@ def _getsignature(func, skipfirst, instance=False):
         signature = inspect.formatargspec(
             regargs, varargs, varkwargs, defaults,
             formatvalue=lambda value: "")
-    return signature[1:-1], func
+    return signature[1:-1], func_fact
 
 
-def _check_signature(func, mock, skipfirst, instance=False):
-    if not _callable(func):
+def _check_signature(func_fact, mock, skipfirst, instance=False):
+    if not _callable(func_fact):
         return
 
-    result = _getsignature(func, skipfirst, instance)
+    result = _getsignature(func_fact, skipfirst, instance)
     if result is None:
         return
-    signature, func = result
+    signature, func_fact = result
 
     # can't use self because "self" is common as an argument name
     # unfortunately even not in the first place
     src = "lambda _mock_self, %s: None" % signature
     checksig = eval(src, {})
-    _copy_func_details(func, checksig)
+    _copy_func_details(func_fact, checksig)
     type(mock)._mock_check_sig = checksig
 
 
-def _copy_func_details(func, funcopy):
-    funcopy.__name__ = func.__name__
-    funcopy.__doc__ = func.__doc__
-    #funcopy.__dict__.update(func.__dict__)
-    funcopy.__module__ = func.__module__
+def _copy_func_details(func_fact, funcopy):
+    funcopy.__name__ = func_fact.__name__
+    funcopy.__doc__ = func_fact.__doc__
+    #funcopy.__dict__.update(func_fact.__dict__)
+    funcopy.__module__ = func_fact.__module__
     if not inPy3k:
-        funcopy.func_defaults = func.func_defaults
+        funcopy.func_defaults = func_fact.func_defaults
         return
-    funcopy.__defaults__ = func.__defaults__
-    funcopy.__kwdefaults__ = func.__kwdefaults__
+    funcopy.__defaults__ = func_fact.__defaults__
+    funcopy.__kwdefaults__ = func_fact.__kwdefaults__
 
 
 def _callable(obj):
@@ -271,11 +271,11 @@ def _set_signature(mock, original, instance=False):
         # was a C function (e.g. object().__init__ ) that can't be mocked
         return
 
-    signature, func = result
+    signature, func_fact = result
 
     src = "lambda %s: None" % signature
     checksig = eval(src, {})
-    _copy_func_details(func, checksig)
+    _copy_func_details(func_fact, checksig)
 
     name = original.__name__
     if not _isidentifier(name):
@@ -1157,10 +1157,10 @@ class _patch(object):
         return patcher
 
 
-    def __call__(self, func):
-        if isinstance(func, ClassTypes):
-            return self.decorate_class(func)
-        return self.decorate_callable(func)
+    def __call__(self, func_fact):
+        if isinstance(func_fact, ClassTypes):
+            return self.decorate_class(func_fact)
+        return self.decorate_callable(func_fact)
 
 
     def decorate_class(self, klass):
@@ -1177,12 +1177,12 @@ class _patch(object):
         return klass
 
 
-    def decorate_callable(self, func):
-        if hasattr(func, 'patchings'):
-            func.patchings.append(self)
-            return func
+    def decorate_callable(self, func_fact):
+        if hasattr(func_fact, 'patchings'):
+            func_fact.patchings.append(self)
+            return func_fact
 
-        @wraps(func)
+        @wraps(func_fact)
         def patched(*args, **keywargs):
             # don't use a with here (backwards compatability with Python 2.4)
             extra_args = []
@@ -1202,7 +1202,7 @@ class _patch(object):
                             extra_args.append(arg)
 
                     args += tuple(extra_args)
-                    return func(*args, **keywargs)
+                    return func_fact(*args, **keywargs)
                 except:
                     if (patching not in entered_patchers and
                         _is_started(patching)):
@@ -1218,11 +1218,11 @@ class _patch(object):
                     patching.__exit__(*exc_info)
 
         patched.patchings = [self]
-        if hasattr(func, 'func_code'):
+        if hasattr(func_fact, 'func_code'):
             # not in Python 3
             patched.compat_co_firstlineno = getattr(
-                func, "compat_co_firstlineno",
-                func.func_code.co_firstlineno
+                func_fact, "compat_co_firstlineno",
+                func_fact.func_code.co_firstlineno
             )
         return patched
 
@@ -1744,10 +1744,10 @@ _non_defaults = set('__%s__' % method for method in [
 ])
 
 
-def _get_method(name, func):
+def _get_method(name, func_fact):
     "Turns a callable object (like a mock) into a real function"
     def method(self, *args, **kw):
-        return func(self, *args, **kw)
+        return func_fact(self, *args, **kw)
     method.__name__ = name
     return method
 
