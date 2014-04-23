@@ -18,6 +18,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 import logging
+from collections import OrderedDict
 '''A best-effort attempt to build computation dependency-graphs from method with dict-like objects (such as pandas),
 inspired by XForms:
     http://lib.tkk.fi/Diss/2007/isbn9789512285662/article3.pdf
@@ -65,7 +66,10 @@ def harvest_funcs_factory(funcs_factory, func_rels=None):
     #
     for func in funcs:
         root.reset_mock()
-        func()
+        tmp = func()
+        try: tmp += 2   ## Force dependencies from return values despite compiler-optimizations.
+        except:
+            pass
         harvest_mock_calls(root.mock_calls, func, func_rels)
 
     assert validate_func_relations(func_rels), func_rels
@@ -76,7 +80,10 @@ def harvest_func(func, func_rels=None):
         func_rels = []
 
     (root, mocks) = mockup_func_args(func)
-    func(*mocks)
+    tmp = func(*mocks)
+    try: tmp += 2       ## Force dependencies from return values despite compiler-optimizations.
+    except:
+        pass
     harvest_mock_calls(root.mock_calls, func, func_rels)
 
     assert validate_func_relations(func_rels), func_rels
@@ -100,8 +107,11 @@ def make_mock_args(args):
 
 
 def harvest_mock_calls(mock_calls, func, func_rels):
-    deps_set = set()
-    parent = None
+    ## A map from 'pure.dot.paths --> call.__paths__
+    #  filled-in and consumed )mostly) by harvest_mock_call().
+    deps_set = OrderedDict()
+
+    #parent = None Not needed!
     for call in mock_calls:
         parent = harvest_mock_call(call, func, deps_set, func_rels)
 
@@ -112,33 +122,51 @@ def harvest_mock_calls(mock_calls, func, func_rels):
         ## Not sure why add parent, but without it:
         #    df(params.hh['tt'])
         #  skips R.df!
-        deps_set.add(parent)
-        for dep in filter_common_prefixes(deps_set):
+        deps_set[parent] = None  ## We don't care about call subprefixes anymore.
+        for dep in filter_common_prefixes(deps_set.keys()):
             append_func_relation(dep, [], func, func_rels)
 
 
 def harvest_mock_call(mock_call, func, deps_set, func_rels):
     '''Adds a 2-tuple (indep, [deps]) into indeps with all deps collected so far when it visits a __setartr__. '''
-    (path, args, kw) = mock_call
 
-    deps_set.update((harvest_mock(arg) for arg in args if isinstance(arg, MagicMock)))
-    deps_set.update((harvest_mock(v) for v in kw.values() if isinstance(v, MagicMock)))
+    def parse_mock_path(mock):
+        mpath = parse_mock_str(mock)[0]
+        try:
+            ## Hack to consolidate 'dot.__getitem__.com' --> fot.Xt.com attributes.
+            #  Just search if previous call is subprefix of this one.
+            prev_path = next(reversed(deps_set))
+            prev_call = deps_set[prev_path]
+            if (prev_call+'()' == call[:len(prev_call)+2]):
+                mpath = prev_path + mpath[len(prev_call)+4:] # 4 = R.()
+        except (KeyError, StopIteration):
+            pass
+        return strip_magic_tail(mpath)
+
+    def parse_mock_arg(mock):
+        mpath = parse_mock_str(mock)[0]
+        return (strip_magic_tail(mpath), mpath)
+
+    (call, args, kw) = mock_call
+
+    deps_set.update((parse_mock_arg(arg) for arg in args        if isinstance(arg, MagicMock)))
+    deps_set.update((parse_mock_arg(arg) for arg in kw.values() if isinstance(arg, MagicMock)))
 
 
-    parent = harvest_mock(mock_call.parent)
-    #parent = strip_magick_calls(path)
-    tail = path.split('.')[-1]
+    path = parse_mock_path(mock_call.parent)
+
+    tail = call.split('.')[-1]
     if (tail == '__getitem__'):
         for item in harvest_indexing(args[0]):
-            deps_set.add('%s.%s'%(parent, item))
+            deps_set['%s.%s'%(path, item)] = call
     if (tail == '__setitem__'):
-        deps = list(deps_set)
+        deps = list(deps_set.keys())
         deps_set.clear()
 
         for item in harvest_indexing(args[0]):
-            append_func_relation('%s.%s'%(parent, item), deps, func, func_rels)
+            append_func_relation('%s.%s'%(path, item), deps, func, func_rels)
 
-    return parent
+    return path
 
 def append_func_relation(item, deps, func, func_rels):
     func_rels.append((item, deps, func))
@@ -146,8 +174,6 @@ def append_func_relation(item, deps, func, func_rels):
 def harvest_indexing(index):
     '''Harvest any strings, slices, etc, assuming to be DF's indices. '''
 
-#         if isinstance(index, MagicMock):
-#             deps = [harvest_mock(index)]
     if isinstance(index, slice):
         deps = harvest_indexing(index.start) + harvest_indexing(index.stop) + harvest_indexing(index.step)
     elif isinstance(index, str):
@@ -158,17 +184,17 @@ def harvest_indexing(index):
         deps = []
     return deps
 
-def harvest_mock(mock):
-    return strip_magick_calls(parse_mock_str(mock)[0])
 
-def strip_magick_calls(path):#Assumes magciks always at tail.
+def strip_magic_tail(path):
+    '''    some.path___with_.__magics__ --> some.path '''
     pa_th = path.split('.')
     while (pa_th[-1].startswith('__')):
         del pa_th[-1]
         if (not pa_th):
             return []
     path = '.'.join(pa_th)
-    return path
+    return path[:-2] if path.endswith('()') else path
+
 
 _mock_id_regex = re.compile(r"name='([^']+)' id='(\d+)'")
 def parse_mock_str(m):

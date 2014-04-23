@@ -52,6 +52,10 @@ class Test(unittest.TestCase):
         res = filter_common_prefixes(deps)
         self.assertEqual(res, ['a.b', 'a.c', 'a.d', 'ac', 'b.cc'])
 
+        deps = ['R.df.hh.tt', 'R.df.hh.ll', 'R.df.hh']
+        res = filter_common_prefixes(deps) 
+        self.assertEqual(res, ['R.df.hh.ll', 'R.df.hh.tt'])
+        
     def test_gen_all_prefix_pairs(self):
         path = 'R.foo.com'
         res = gen_all_prefix_pairs(path)
@@ -65,11 +69,18 @@ class Test(unittest.TestCase):
         deps = harvest_func(func)
         self.assertEqual(deps[0], ('R.df.hh.tt', [], func), deps)
 
-    def test_harvest_lambda_accessors(self):
-        func = lambda df: df.hh['tt'].ss['oo']
-
+    def test_harvest_lambda_successors(self):
+        func = lambda df: df.hh['tt'].ss
         deps = harvest_func(func)
-        self.assertEqual(deps[0], ('R.df.hh.tt.ss.oo', [], func), deps)
+        self.assertEqual(deps, [('R.df.hh.tt.ss', [], func)], deps)
+
+        func = lambda df: df.hh['tt'].ss('some_arg')
+        deps = harvest_func(func)
+        self.assertEqual(deps, [('R.df.hh.tt.ss', [], func)], deps)
+
+        func = lambda df: df.hh['tt'].ss['oo']
+        deps = harvest_func(func)
+        self.assertEqual(deps, [('R.df.hh.tt.ss.oo', [], func)], deps)
 
     def test_harvest_lambda_indirectIndex(self):
         func = lambda df, params: df(params.hh['tt'])
@@ -81,9 +92,8 @@ class Test(unittest.TestCase):
         func = lambda df, params: df.hh[['tt','ll']] + params.tt
         deps = harvest_func(func)
         self.assertEqual(deps[0], ('R.df.hh.ll', [], func), deps)
-        self.assertEqual(deps[1], ('R.df.hh.tt', [], func), deps)
-        self.assertEqual(deps[2], ('R.params.tt', [], func), deps)
-        self.assertEqual(len(deps), 3, deps)
+        items = [item for (item, _, _) in deps]
+        self.assertEqual(items, ['R.df.hh.ll', 'R.df.hh.tt', 'R.params.tt'], deps)
 
     def test_harvest_lambda_sliceIndex(self):
         func = lambda df, params: df.hh['tt':'ll', 'ii']
