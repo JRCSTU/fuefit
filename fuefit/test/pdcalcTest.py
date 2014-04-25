@@ -17,7 +17,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
-'''Check cmdline parsing and model building.
+'''Check pdcalc's function-dependencies exploration, reporting and classes .
 
 Created on Apr 23, 2014
 
@@ -26,9 +26,15 @@ Created on Apr 23, 2014
 import unittest
 import networkx as nx
 
-from fuefit.pdcalc import build_func_dependencies_graph, harvest_func, harvest_funcs_factory, filter_common_prefixes, gen_all_prefix_pairs
+from fuefit.pdcalc import build_func_dependencies_graph, harvest_func, harvest_funcs_factory, filter_common_prefixes, gen_all_prefix_pairs,\
+    FuncsExplorer, FuncRelations
 
-def def_calculations(params, engine, df):
+def lstr(lst):
+    return '\n'.join([str(e) for e in lst])
+
+
+
+def funcs_fact(params, engine, df):
     from math import pi
 
     def f1(): engine['fuel_lhv'] = params['fuel'][engine['fuel']]['lhv']
@@ -43,6 +49,15 @@ def def_calculations(params, engine, df):
 
     return (f1, f2, f3, f4, f5, f6, f7, f8, f9)
 
+def funcs_fact2(dfin, engine, dfout):
+    def f0(): return dfin.cm + dfin.pmf + dfin.pme
+
+    def f1(): engine['eng_map_params']      = dfin.cm + dfin.pmf + dfin.pme
+    def f2(): dfout['eng_map'] = engine['eng_map_params']
+
+    return (f0, f1, f2)
+
+
 
 class Test(unittest.TestCase):
 
@@ -53,9 +68,9 @@ class Test(unittest.TestCase):
         self.assertEqual(res, ['a.b', 'a.c', 'a.d', 'ac', 'b.cc'])
 
         deps = ['R.df.hh.tt', 'R.df.hh.ll', 'R.df.hh']
-        res = filter_common_prefixes(deps) 
+        res = filter_common_prefixes(deps)
         self.assertEqual(res, ['R.df.hh.ll', 'R.df.hh.tt'])
-        
+
     def test_gen_all_prefix_pairs(self):
         path = 'R.foo.com'
         res = gen_all_prefix_pairs(path)
@@ -63,13 +78,13 @@ class Test(unittest.TestCase):
 
 
 
-    def test_harvest_lambda(self):
+    def testLambda(self):
         func = lambda df: df.hh['tt']
 
         deps = harvest_func(func)
         self.assertEqual(deps[0], ('R.df.hh.tt', [], func), deps)
 
-    def test_harvest_lambda_successors(self):
+    def testLambda_successors(self):
         func = lambda df: df.hh['tt'].ss
         deps = harvest_func(func)
         self.assertEqual(deps, [('R.df.hh.tt.ss', [], func)], deps)
@@ -82,20 +97,20 @@ class Test(unittest.TestCase):
         deps = harvest_func(func)
         self.assertEqual(deps, [('R.df.hh.tt.ss.oo', [], func)], deps)
 
-    def test_harvest_lambda_indirectIndex(self):
+    def testLambda_indirectIndex(self):
         func = lambda df, params: df(params.hh['tt'])
         deps = harvest_func(func); print(deps)
         self.assertEqual(deps[0], ('R.df', [], func), deps)
         self.assertEqual(deps[1], ('R.params.hh.tt', [], func), deps)
 
-    def test_harvest_lambda_multiIndex(self):
+    def testLambda_multiIndex(self):
         func = lambda df, params: df.hh[['tt','ll']] + params.tt
         deps = harvest_func(func)
         self.assertEqual(deps[0], ('R.df.hh.ll', [], func), deps)
         items = [item for (item, _, _) in deps]
         self.assertEqual(items, ['R.df.hh.ll', 'R.df.hh.tt', 'R.params.tt'], deps)
 
-    def test_harvest_lambda_sliceIndex(self):
+    def testLambda_sliceIndex(self):
         func = lambda df, params: df.hh['tt':'ll', 'ii']
         deps = harvest_func(func)
         self.assertEqual(deps[0], ('R.df.hh.ii', [], func), deps)
@@ -103,7 +118,29 @@ class Test(unittest.TestCase):
         self.assertEqual(deps[2], ('R.df.hh.tt', [], func), deps)
         self.assertEqual(len(deps), 3, deps)
 
-        func = lambda df, params: df.hh[['tt','ll', 'i', params.b]]['g'] + params.tt
+    def testLambda_mixIndex(self):
+        func = lambda df, params: df.hh['tt':'ll', 'i', params.b] + params.tt
+        deps = harvest_func(func)
+        items = [item for (item, _, _) in deps]
+        self.assertEqual(items, ['R.df.hh.i', 'R.df.hh.ll', 'R.df.hh.tt', 'R.params.b', 'R.params.tt'], deps)
+
+    @unittest.expectedFailure
+    def testLambda_mixIndexSuccesor(self):
+        func = lambda df, params: df.hh['tt':'ll', 'i', params.b]['g'] + params.tt
+        deps = harvest_func(func)
+        items = [item for (item, _, _) in deps]
+        ## Cannot generate all combinations, but the last one!!
+        self.assertEqual(items, ['R.df.hh.i.g', 'R.df.hh.ll.g', 'R.df.hh.tt.g', 'R.params.b', 'R.params.tt'], deps)
+
+
+    def testFunc_sliceIndex(self):
+        def func(df, params): df.hh['tt':'ll', 'ii']
+        deps = harvest_func(func)
+        self.assertEqual(deps[0], ('R.df.hh.ii', [], func), deps)
+        self.assertEqual(deps[1], ('R.df.hh.ll', [], func), deps)
+        self.assertEqual(deps[2], ('R.df.hh.tt', [], func), deps)
+        self.assertEqual(len(deps), 3, deps)
+
 
     def test_harvest_funcs_factory(self):
         def func_fact(df, params):
@@ -115,8 +152,32 @@ class Test(unittest.TestCase):
             return (f0, f1, f2, f3)
 
         deps = harvest_funcs_factory(func_fact)
-#         self.assertEqual(deps[0][0], 'R.df.hh.tt.kk.ll', deps)
-#         self.assertEqual(deps[0][1], 'R.params.OO.PP.aa', deps)
+        # self.assertEqual(deps[0][0], 'R.df.hh.tt.kk.ll', deps)
+        # self.assertEqual(deps[0][1], 'R.params.OO.PP.aa', deps)
+
+        self.assertEqual(deps[1][0], 'R.df.hh.tt', deps)
+        self.assertEqual(deps[2][0], 'R.df.hh.ll', deps)
+        self.assertEqual(deps[3][0], 'R.df.hh.i', deps)
+        self.assertEqual(deps[1][1], ['R.params.tt'], deps)
+
+        self.assertEqual(deps[4][0], 'R.df.hh.tt', deps)
+        self.assertEqual(deps[5][0], 'R.df.hh.ll', deps)
+        self.assertEqual(deps[6][0], 'R.df.hh.i', deps)
+
+        self.assertEqual(deps[7][0], 'R.df.hh.tt', deps)
+
+    def test_harvest_lambas_factory(self):
+        def func_fact(df, params):
+            return [
+                lambda: df.hh['tt'].kk['ll'] + params.OO['PP'].aa,
+                lambda: df.hh[['tt','ll', 'i']] + params.tt,
+                lambda: df.hh['tt':'ll', 'i'] + params.tt,
+                lambda: df.hh['tt'],
+            ]
+
+        deps = harvest_funcs_factory(func_fact)
+        self.assertEqual(deps[1][0], 'R.df.hh.tt.kk.ll', deps)
+        self.assertEqual(deps[2][1], 'R.params.OO.PP.aa', deps)
 
         self.assertEqual(deps[1][0], 'R.df.hh.tt', deps)
         self.assertEqual(deps[2][0], 'R.df.hh.ll', deps)
@@ -130,23 +191,30 @@ class Test(unittest.TestCase):
         self.assertEqual(deps[7][0], 'R.df.hh.tt', deps)
 
 
+
     def testGatherDeps_smoke(self):
-        deps = harvest_funcs_factory(def_calculations)
+        deps = harvest_funcs_factory(funcs_fact)
         print('\n'.join([str(s) for s in deps]))
 
 
     def testGatherDepsAndBuldGraph_smoke(self):
-        deps = harvest_funcs_factory(def_calculations)
+        deps = harvest_funcs_factory(funcs_fact)
         print('\n'.join([str(s) for s in deps]))
 
         g = build_func_dependencies_graph(deps)
         print(g.edge)
-        print(nx.topological_sort(g))
-    #     print(nx.topological_sort_recursive(g))
+        print('topological:', '\n'.join(nx.topological_sort(g)))
+        print('topological_recusrive:', '\n'.join(nx.topological_sort_recursive(g)))
         for line in sorted(nx.generate_edgelist(g)):
             print(line)
 
-
+    def testSmoke_FuncExplorer_renamedArg(self):
+        fexp = FuncsExplorer()
+        fexp.harvest_funcs_factory(funcs_fact, renames=[None, None, 'dfin'])
+        fexp.harvest_funcs_factory(funcs_fact2, )
+        web = fexp.build_web()
+        print("RELS:\n", lstr(fexp.rels))
+        print('ORDERED:\n', lstr(web.ordered(True)))
 
 
 if __name__ == "__main__":

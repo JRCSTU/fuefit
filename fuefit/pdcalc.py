@@ -17,19 +17,19 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
-import logging
-from collections import OrderedDict
 '''A best-effort attempt to build computation dependency-graphs from method with dict-like objects (such as pandas),
 inspired by XForms:
     http://lib.tkk.fi/Diss/2007/isbn9789512285662/article3.pdf
 '''
 # from unittest.mock import MagicMock
-from fuefit.mymock import MagicMock
-from collections.abc import Iterable
+import logging
+from collections import OrderedDict, defaultdict
+from collections.abc import Mapping, Iterable
 import itertools as it
 import functools as ft
 import networkx as nx
 import re
+from fuefit.mymock import MagicMock
 
 
 _root_name = 'R'
@@ -51,14 +51,14 @@ def get_mock_factory():
 make_mock = get_mock_factory()
 
 
-def harvest_funcs_factory(funcs_factory, func_rels=None):
-    if not func_rels:
+def harvest_funcs_factory(funcs_factory, root=None, renames=None, func_rels=None):
+    if func_rels is  None:
         func_rels = []
 
     ## Invoke funcs_factory with "rooted" mockups as args
     #    to collect mock_calls.
     #
-    (root, mocks) = mockup_func_args(funcs_factory)
+    (root, mocks) = mockup_func_args(funcs_factory, root=root, renames=renames)
     funcs = funcs_factory(*mocks)
 
     ## Harvest func deps as a list of 3-tuple (item, deps, funx)
@@ -75,13 +75,13 @@ def harvest_funcs_factory(funcs_factory, func_rels=None):
     assert validate_func_relations(func_rels), func_rels
     return func_rels
 
-def harvest_func(func, func_rels=None):
-    if not func_rels:
+def harvest_func(func, root=None, renames=None, func_rels=None):
+    if func_rels is None:
         func_rels = []
 
-    (root, mocks) = mockup_func_args(func)
+    (root, mocks) = mockup_func_args(func, root=root, renames=renames)
     tmp = func(*mocks)
-    try: tmp += 2       ## Force dependencies from return values despite compiler-optimizations.
+    try: tmp += 2   ## Force dependencies from return values despite compiler-optimizations.
     except:
         pass
     harvest_mock_calls(root.mock_calls, func, func_rels)
@@ -90,19 +90,33 @@ def harvest_func(func, func_rels=None):
     return func_rels
 
 
-def mockup_func_args(func):
+def mockup_func_args(func, renames=None, root=None):
+    '''    renames: list or dict with renames, same len as func's args.'''
     import inspect
 
     argspec = inspect.getfullargspec(func)
     if (argspec.varargs or argspec.varkw):
         log.warning('Ignoring any dependencies from *varags or **keywords!')
-    return make_mock_args(argspec.args)
+    func_args = argspec.args
 
-def make_mock_args(args):
-    root = make_mock(name=_root_name)
-    mocks = [make_mock() for arg in args]
-    for (mock, arg) in zip(mocks, args):
-        root.attach_mock(mock, arg)
+    ## Apply any override arg-names.
+    #
+    if renames:
+        if isinstance(renames, Mapping):
+            new_args = {arg:arg for arg in func_args}
+            new_args.update(renames)
+            new_args = new_args.keys()
+        else:
+            new_args = [arg if arg else farg for (farg, arg) in zip(func_args, renames)]
+        if len(func_args) != len(new_args):
+            raise ValueError("Argument-renames mismatched function(%s)!\n  Expected(%s), got(%s), result(%s)."%(func, func_args, renames, new_args))
+        func_args = new_args
+
+    if not root:
+        root = make_mock(name=_root_name)
+    mocks = [make_mock() for cname in func_args]
+    for (mock, cname) in zip(mocks, func_args):
+        root.attach_mock(mock, cname)
     return (root, mocks)
 
 
@@ -111,21 +125,25 @@ def harvest_mock_calls(mock_calls, func, func_rels):
     #  filled-in and consumed )mostly) by harvest_mock_call().
     deps_set = OrderedDict()
 
-    #parent = None Not needed!
+    #last_path = None Not needed!
     for call in mock_calls:
-        parent = harvest_mock_call(call, func, deps_set, func_rels)
+        last_path = harvest_mock_call(call, func, deps_set, func_rels)
 
     ## Any remaining deps came from a last not-assignment (a statement) in func.
     #  Add them as non-dependent items.
     #
     if deps_set:
-        ## Not sure why add parent, but without it:
-        #    df(params.hh['tt'])
-        #  skips R.df!
-        deps_set[parent] = None  ## We don't care about call subprefixes anymore.
+        deps_set[last_path] = None  ## We don't care about call dep-subprefixes(the value) anymore.
+#         if ret is None:
+#             item = last_path
+#         else:
+#             item = parse_mock_arg(ret)
         for dep in filter_common_prefixes(deps_set.keys()):
             append_func_relation(dep, [], func, func_rels)
 
+def parse_mock_arg(mock):
+    mpath = parse_mock_str(mock)[0]
+    return (strip_magic_tail(mpath), mpath)
 
 def harvest_mock_call(mock_call, func, deps_set, func_rels):
     '''Adds a 2-tuple (indep, [deps]) into indeps with all deps collected so far when it visits a __setartr__. '''
@@ -143,10 +161,6 @@ def harvest_mock_call(mock_call, func, deps_set, func_rels):
             pass
         return strip_magic_tail(mpath)
 
-    def parse_mock_arg(mock):
-        mpath = parse_mock_str(mock)[0]
-        return (strip_magic_tail(mpath), mpath)
-
     (call, args, kw) = mock_call
 
     deps_set.update((parse_mock_arg(arg) for arg in args        if isinstance(arg, MagicMock)))
@@ -158,13 +172,15 @@ def harvest_mock_call(mock_call, func, deps_set, func_rels):
     tail = call.split('.')[-1]
     if (tail == '__getitem__'):
         for item in harvest_indexing(args[0]):
-            deps_set['%s.%s'%(path, item)] = call
-    if (tail == '__setitem__'):
+            new_path = '%s.%s'%(path, item)
+            deps_set[new_path] = call
+    elif (tail == '__setitem__'):
         deps = list(deps_set.keys())
         deps_set.clear()
 
         for item in harvest_indexing(args[0]):
-            append_func_relation('%s.%s'%(path, item), deps, func, func_rels)
+            new_path ='%s.%s'%(path, item)
+            append_func_relation(new_path, deps, func, func_rels)
 
     return path
 
@@ -213,20 +229,40 @@ def validate_func_relations(func_rels):
 def build_func_dependencies_graph(func_rels):
     G = nx.DiGraph()
 
-    paths = set()
-    for (path, deps, func_fact) in func_rels:
-        paths.add(path)
+    (func_rels, all_paths) = consolidate_relations(func_rels)
+
+    for (path, (deps, funcs)) in func_rels.items():
         if (deps):
             deps = filter_common_prefixes(deps)
-            G.add_edges_from([(path, dep, {'func_fact': func_fact}) for dep in deps])
+            G.add_edges_from([(path, dep, {'funcs': funcs}) for dep in deps])
 
     ## Add all LSide 'R.dotted.objects' segments,
-    #     even without any func attribute.
+    #     even without any funcs attribute.
     #
-    for path in set(paths):
+    for path in set(all_paths):
         G.add_edges_from(gen_all_prefix_pairs(path))
 
     return G
+
+
+def consolidate_relations(relations):
+    rels = defaultdict()
+    rels.default_factory = lambda: (set(), set())
+
+    ## Join all item's  deps & funcs
+    #
+    for (item, deps, func) in relations:
+        (pdes, pfuncs) = rels[item]
+        pdes.update(deps)
+        pfuncs.add(func)
+
+    ## Gather all paths and remove self-dependencies.
+    #
+    all_paths = set()
+    for (path, (deps, _)) in rels.items():
+        deps.discard(path)
+
+    return (rels, all_paths)
 
 
 def gen_all_prefix_pairs(path):
@@ -267,3 +303,37 @@ def filter_common_prefixes(deps):
 
     return ndeps
 
+
+class FuncsExplorer:
+    def __init__(self):
+        self.rels = []
+        self.root = make_mock(name=_root_name)
+
+    def harvest_func(self, func, renames=None):
+        harvest_func(func, root=self.root, func_rels=self.rels, renames=renames)
+
+    def harvest_funcs_factory(self, funcs_factory, renames=None):
+        harvest_funcs_factory(funcs_factory, root=self.root, func_rels=self.rels, renames=renames)
+
+    def add_func_rel(self, item, deps=None, func=None):
+        if not deps:
+            deps = []
+        append_func_relation(item, deps, func, self.rels)
+
+    def build_web(self):
+        graph = build_func_dependencies_graph(self.rels)
+        return FuncRelations(graph)
+
+
+
+class FuncRelations:
+    def __init__(self, graph):
+        self.graph = graph
+        self.graph_r = graph.reverse()
+
+    def ordered(self, reverse=False):
+        '''    reversed: when True, bring calculation order. otherwise, dependency-order.
+        if reverse:
+            return nx.topological_sort(self.graph_r)
+        else:
+            return nx.topological_sort(self.graph)
