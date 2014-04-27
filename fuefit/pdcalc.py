@@ -28,11 +28,13 @@ from collections.abc import Mapping, Iterable
 import itertools as it
 import functools as ft
 import networkx as nx
+from networkx.exception import NetworkXError
 import re
 from fuefit.mymock import MagicMock
 
 
 _root_name = 'R'
+_root_len = len(_root_name)+1
 log = logging.getLogger(__file__)
 
 
@@ -156,7 +158,7 @@ def harvest_mock_call(mock_call, func, deps_set, func_rels):
             prev_path = next(reversed(deps_set))
             prev_call = deps_set[prev_path]
             if (prev_call+'()' == call[:len(prev_call)+2]):
-                mpath = prev_path + mpath[len(prev_call)+4:] # 4 = R.()
+                mpath = prev_path + mpath[len(prev_call)+_root_len+2:] # 4 = R.()
         except (KeyError, StopIteration):
             pass
         return strip_magic_tail(mpath)
@@ -226,23 +228,28 @@ def validate_func_relations(func_rels):
     return True
 
 
-def build_func_dependencies_graph(func_rels):
-    G = nx.DiGraph()
+def build_func_dependencies_graph(func_rels, graph = None):
+    if graph is None:
+        graph = nx.DiGraph()
 
     (func_rels, all_paths) = consolidate_relations(func_rels)
 
     for (path, (deps, funcs)) in func_rels.items():
         if (deps):
             deps = filter_common_prefixes(deps)
-            G.add_edges_from([(path, dep, {'funcs': funcs}) for dep in deps])
+            graph.add_edges_from([(path, dep, {'funcs': funcs}) for dep in deps])
 
     ## Add all LSide 'R.dotted.objects' segments,
     #     even without any funcs attribute.
     #
     for path in set(all_paths):
-        G.add_edges_from(gen_all_prefix_pairs(path))
+        graph.add_edges_from(gen_all_prefix_pairs(path))
 
-    return G
+    cycles = list(nx.simple_cycles(graph))
+    if cycles:
+        raise ValueError('Cyclic dependencies! %s', cycles)
+
+    return graph
 
 
 def consolidate_relations(relations):
@@ -252,8 +259,9 @@ def consolidate_relations(relations):
     ## Join all item's  deps & funcs
     #
     for (item, deps, func) in relations:
-        (pdes, pfuncs) = rels[item]
-        pdes.update(deps)
+
+        (pdes, pfuncs) = rels[item[_root_len:]]
+        pdes.update([d[_root_len:] for d in deps])
         pfuncs.add(func)
 
     ## Gather all paths and remove self-dependencies.
@@ -261,6 +269,9 @@ def consolidate_relations(relations):
     all_paths = set()
     for (path, (deps, _)) in rels.items():
         deps.discard(path)
+        all_paths.update(deps)
+    all_paths.update(rels.keys())
+
 
     return (rels, all_paths)
 
@@ -305,6 +316,11 @@ def filter_common_prefixes(deps):
 
 
 class FuncsExplorer:
+    '''Discovers functions-relationships and produces FuncRelations (see build_web()) to inspect them.
+
+    The name of the arguments must correlate between different functions
+    '''
+
     def __init__(self):
         self.rels = []
         self.root = make_mock(name=_root_name)
@@ -321,19 +337,40 @@ class FuncsExplorer:
         append_func_relation(item, deps, func, self.rels)
 
     def build_web(self):
-        graph = build_func_dependencies_graph(self.rels)
+        graph = build_func_dependencies_graph(self.rels, graph=FuncRelations())
         return FuncRelations(graph)
 
 
 
-class FuncRelations:
-    def __init__(self, graph):
-        self.graph = graph
-        self.graph_r = graph.reverse()
+class FuncRelations(nx.DiGraph):
+    def __init__(self, *args, **kws):
+        nx.DiGraph.__init__(self, *args, **kws)
 
     def ordered(self, reverse=False):
-        '''    reversed: when True, bring calculation order. otherwise, dependency-order.
+        '''    reversed: when True, bring calculation order. otherwise, dependency-order.'''
         if reverse:
-            return nx.topological_sort(self.graph_r)
+            return nx.topological_sort(self)
         else:
-            return nx.topological_sort(self.graph)
+            return nx.topological_sort(self)
+
+
+    def find_funcs_sequence(self, source, dest):
+        '''Returns the functions required to calculate 'dest' from 'source' appropriately ordered.
+
+            source: a list of nodes (existent or not) to search for all paths between them.
+            dest:   a list of nodes to search for all paths between them.
+        '''
+
+        #recalc = self.ordered(True)
+
+
+        try:
+            for n in dest:
+                deps = nx.bfs_predecessors(self, n)
+                fan_in = deps.keys()
+                g = self.subgraph(fan_in)
+                gl = nx.topological_sort(g)
+                print(n, gl)
+        except (KeyError, NetworkXError) as ex:
+            unknown = [d for d in dest if d not in self]
+            raise ValueError('Unknown OUT-args(%s)!' % unknown) from ex
