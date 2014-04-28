@@ -204,39 +204,12 @@ class Test(unittest.TestCase):
         print('\n'.join([str(s) for s in deps]))
 
         g = build_func_dependencies_graph(deps)
-        print(g.edge)
-        print('topological:', '\n'.join(nx.topological_sort(g)))
-        print('topological_recusrive:', '\n'.join(nx.topological_sort_recursive(g)))
-        for line in sorted(nx.generate_edgelist(g)):
-            print(line)
+#         print(g.edge)
+#         print('topological:', '\n'.join(nx.topological_sort(g)))
+#         print('topological_recusrive:', '\n'.join(nx.topological_sort_recursive(g)))
+#         for line in sorted(nx.generate_edgelist(g)):
+#             print(line)
 
-    def testSmoke_FuncExplorer_renamedArg(self):
-        fexp = FuncsExplorer()
-        fexp.harvest_funcs_factory(funcs_fact, renames=[None, None, 'dfin'])
-        fexp.harvest_funcs_factory(funcs_fact2, )
-        web = fexp.build_web()
-#         print("RELS:\n", lstr(fexp.rels))
-#         print('ORDERED:\n', lstr(web.ordered(True)))
-        self.assertEqual(len(web), 29)
-
-        return web
-
-    def testSmoke_FuncRelations_findFuncSeq(self):
-        web = self.testSmoke_FuncExplorer_renamedArg()
-
-        inp = ('dfin.fc_norm', 'dfin.XX')
-        out = ('dfout.fc', 'dfout.rpm')
-        web.find_funcs_sequence(inp, out)
-        with self.assertRaisesRegex(ValueError, 'dfout\.BAD'):
-            web.find_funcs_sequence(('dfin.fc_norm', 'dfin.XX'), ('dfout.fc', 'dfout.BAD'))
-
-
-def make_graph():
-    fexp = FuncsExplorer()
-    fexp.harvest_funcs_factory(funcs_fact, renames=[None, None, 'dfin'])
-    fexp.harvest_funcs_factory(funcs_fact2, )
-    web = fexp.build_web()
-    return web
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']

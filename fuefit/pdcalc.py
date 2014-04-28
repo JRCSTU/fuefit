@@ -315,6 +315,97 @@ def filter_common_prefixes(deps):
     return ndeps
 
 
+def find_connecting_subgraph1(graph, sources, dests):
+    '''Limit graph to all those nodes reaching from 'sources' to 'dests'.
+
+        sources: a list of nodes (existent or not) to search for all paths originating from them
+        dests:   a list of nodes to search for all paths leading to them them
+        return: a 2-tuple with the graph and its nodes topologically-ordered
+    '''
+
+    try:
+        ## Limit graph to nodes prior to 'dests'.
+        #
+        pre_nodes = list(dests) + [nx.bfs_predecessors(graph, d).keys() for d in dests]
+        pre_nodes = it.chain(*pre_nodes)
+        g = graph.subgraph(pre_nodes)
+    except (KeyError, NetworkXError) as ex:
+        unknown = [d for d in dests if d not in graph]
+        raise ValueError('Unknown OUT-args(%s)!' % unknown) from ex
+    else:
+        ## Clip all nodes topologically-before 'sources'.
+        #
+        pre_nodes = nx.topological_sort_recursive(g)
+        for (i, node) in enumerate(pre_nodes):
+            if node in sources:
+                pre_nodes = pre_nodes[i:]
+                break
+        g = g.subgraph(pre_nodes)
+
+        return (g, nx.topological_sort_recursive(g))
+
+
+def find_connecting_nodes(graph, sources, dests):
+    '''Limit graph to all those nodes reaching from 'sources' to 'dests'.
+
+        sources: a list of nodes (existent or not) to search for all paths originating from them
+        dests:   a list of nodes to search for all paths leading to them them
+        return: a 2-tuple with the graph and its nodes topologically-ordered
+    '''
+
+    ## Find nodes leading to 'dests' but not to 'sources'.
+    #
+    try:
+        to_dest = set(list(dests)  + list(all_predecessors(graph, dests)))
+    except (KeyError, NetworkXError) as ex:
+        unknown = [node for node in dests if node not in graph]
+        raise ValueError('Unknown OUT-args(%s)!' % unknown) from ex
+    else:
+        ## Allow non-existent sources, and filter any sources after dests.
+        sources = [node for node in sources if node in to_dest]
+
+        to_source = set(sources + list(all_predecessors(graph, sources)))
+
+
+        between_nodes = to_dest - to_source
+        g = graph.subgraph(between_nodes)
+
+        return (g, nx.topological_sort_recursive(g))
+
+def all_predecessors(graph, nodes):
+    '''return: generator of nodes'''
+
+    pnodes = [nx.bfs_predecessors(graph, node).keys() for node in nodes]
+    return it.chain(*pnodes)
+
+def all_successors(graph, nodes):
+    '''return: generator of nodes'''
+
+    pnodes = [nx.bfs_successors(graph, node).keys() for node in nodes]
+    return it.chain(*pnodes)
+
+
+# def limit_graph_to_predecessors(graph, nodes):
+#     ## Limit graph only to nodes's ancestors.
+#     #
+#     pre_nodes = list(nodes) + [nx.bfs_predecessors(graph, node).keys() for node in nodes]
+#     pre_nodes = it.chain(*pre_nodes)
+#     g = graph.subgraph(pre_nodes)
+#     return pre_nodes
+#
+#
+# def clips_graph_before(graph, nodes):
+#     ## Clip any nodes topologically-before 'nodes'.
+#     #
+#     pre_nodes = nx.topological_sort(g)
+#     for (i, node) in enumerate(pre_nodes):
+#         if node in nodes:
+#             pre_nodes = pre_nodes[i:]
+#             break
+
+
+
+
 class FuncsExplorer:
     '''Discovers functions-relationships and produces FuncRelations (see build_web()) to inspect them.
 
@@ -361,16 +452,8 @@ class FuncRelations(nx.DiGraph):
             dest:   a list of nodes to search for all paths between them.
         '''
 
-        #recalc = self.ordered(True)
 
-
-        try:
-            for n in dest:
-                deps = nx.bfs_predecessors(self, n)
-                fan_in = deps.keys()
-                g = self.subgraph(fan_in)
-                gl = nx.topological_sort(g)
-                print(n, gl)
-        except (KeyError, NetworkXError) as ex:
-            unknown = [d for d in dest if d not in self]
-            raise ValueError('Unknown OUT-args(%s)!' % unknown) from ex
+        ## Limit graph to absolutely neccessary nodes.
+        #
+        (g, pre_nodes) = find_connecting_subgraph(self, source, dest)
+        return (g, pre_nodes)
