@@ -17,6 +17,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
+from networkx.classes.digraph import DiGraph
 '''Check pdcalc's function-dependencies exploration, reporting and classes .
 
 Created on Apr 23, 2014
@@ -27,7 +28,7 @@ import unittest
 import networkx as nx
 
 from fuefit.pdcalc import build_func_dependencies_graph, harvest_func, harvest_funcs_factory, filter_common_prefixes, gen_all_prefix_pairs,\
-    FuncsExplorer, FuncRelations, find_connecting_subgraph
+    FuncsExplorer, FuncRelations, find_connecting_nodes, get_funcs_in_calculation_order
 
 def lstr(lst):
     return '\n'.join([str(e) for e in lst])
@@ -85,21 +86,29 @@ class Test(unittest.TestCase):
             web.find_funcs_sequence(('dfin.fc_norm', 'dfin.XX'), ('dfout.fc', 'dfout.BAD'))
 
 
-    def test_find_connecting_subgraph(self):
+    def test_find_connecting_nodes_smoke(self):
         web = self.build_web()
 
         inp = ('dfin.fc', 'dfin.fc_norm', 'dfin.XX')
         out = ('dfout.fc', 'dfout.rpm')
-        (g, pre_nodes) = find_connecting_subgraph(web, inp, out)
+        cn_nodes = find_connecting_nodes(web, inp, out)
+        self.assertTrue('dfin.fc_norm' not in cn_nodes)
 
-        print(inp, out)
-        print(pre_nodes)
-        print(nx.topological_sort(g))
+        g = web.subgraph(cn_nodes)
+        funcs = get_funcs_in_calculation_order(g)
+        print(funcs)
 
-        self.assertTrue('dfin.fc_norm' not in g)
-        self.assertEqual(pre_nodes, nx.topological_sort_recursive(g))
+    def test_find_connecting_nodes_good(self):
+        web = DiGraph()
+        web.add_edges_from([(1,2), (2,3), (2,4), (4,5)])
 
-        print(len(web), len(pre_nodes))
+        inp = (1, 4, 5)
+        out = (2,)
+        cn_nodes = find_connecting_nodes(web, inp, out)
+        self.assertTrue(5 not in cn_nodes, cn_nodes)
+        self.assertTrue(1 not in cn_nodes, cn_nodes)
+        self.assertTrue(4 in cn_nodes, cn_nodes)
+
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']

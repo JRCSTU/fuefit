@@ -234,13 +234,13 @@ def build_func_dependencies_graph(func_rels, graph = None):
 
     (func_rels, all_paths) = consolidate_relations(func_rels)
 
-    for (path, (deps, funcs)) in func_rels.items():
+    for (path, (deps, func)) in func_rels.items():
         if (deps):
             deps = filter_common_prefixes(deps)
-            graph.add_edges_from([(path, dep, {'funcs': funcs}) for dep in deps])
+            graph.add_edges_from([(path, dep, {'func': func}) for dep in deps])
 
     ## Add all LSide 'R.dotted.objects' segments,
-    #     even without any funcs attribute.
+    #     even without any func attribute.
     #
     for path in set(all_paths):
         graph.add_edges_from(gen_all_prefix_pairs(path))
@@ -253,13 +253,14 @@ def build_func_dependencies_graph(func_rels, graph = None):
 
 
 def consolidate_relations(relations):
+    '''(item1, deps, func), (item1, ...) --> {item1, (set(deps), set(funcs))}'''
+
     rels = defaultdict()
     rels.default_factory = lambda: (set(), set())
 
-    ## Join all item's  deps & funcs
+    ## Join all item's  deps & funcs, and strip root-name.
     #
     for (item, deps, func) in relations:
-
         (pdes, pfuncs) = rels[item[_root_len:]]
         pdes.update([d[_root_len:] for d in deps])
         pfuncs.add(func)
@@ -315,36 +316,6 @@ def filter_common_prefixes(deps):
     return ndeps
 
 
-def find_connecting_subgraph1(graph, sources, dests):
-    '''Limit graph to all those nodes reaching from 'sources' to 'dests'.
-
-        sources: a list of nodes (existent or not) to search for all paths originating from them
-        dests:   a list of nodes to search for all paths leading to them them
-        return: a 2-tuple with the graph and its nodes topologically-ordered
-    '''
-
-    try:
-        ## Limit graph to nodes prior to 'dests'.
-        #
-        pre_nodes = list(dests) + [nx.bfs_predecessors(graph, d).keys() for d in dests]
-        pre_nodes = it.chain(*pre_nodes)
-        g = graph.subgraph(pre_nodes)
-    except (KeyError, NetworkXError) as ex:
-        unknown = [d for d in dests if d not in graph]
-        raise ValueError('Unknown OUT-args(%s)!' % unknown) from ex
-    else:
-        ## Clip all nodes topologically-before 'sources'.
-        #
-        pre_nodes = nx.topological_sort_recursive(g)
-        for (i, node) in enumerate(pre_nodes):
-            if node in sources:
-                pre_nodes = pre_nodes[i:]
-                break
-        g = g.subgraph(pre_nodes)
-
-        return (g, nx.topological_sort_recursive(g))
-
-
 def find_connecting_nodes(graph, sources, dests):
     '''Limit graph to all those nodes reaching from 'sources' to 'dests'.
 
@@ -361,16 +332,13 @@ def find_connecting_nodes(graph, sources, dests):
         unknown = [node for node in dests if node not in graph]
         raise ValueError('Unknown OUT-args(%s)!' % unknown) from ex
     else:
-        ## Allow non-existent sources, and filter any sources after dests.
+        ## Filter-out non-existent sources (to allow them), and any sources after dests.
         sources = [node for node in sources if node in to_dest]
 
-        to_source = set(sources + list(all_predecessors(graph, sources)))
+        to_source = set(all_predecessors(graph, sources))
 
+        return to_dest - to_source
 
-        between_nodes = to_dest - to_source
-        g = graph.subgraph(between_nodes)
-
-        return (g, nx.topological_sort_recursive(g))
 
 def all_predecessors(graph, nodes):
     '''return: generator of nodes'''
@@ -378,30 +346,17 @@ def all_predecessors(graph, nodes):
     pnodes = [nx.bfs_predecessors(graph, node).keys() for node in nodes]
     return it.chain(*pnodes)
 
-def all_successors(graph, nodes):
-    '''return: generator of nodes'''
-
-    pnodes = [nx.bfs_successors(graph, node).keys() for node in nodes]
-    return it.chain(*pnodes)
 
 
-# def limit_graph_to_predecessors(graph, nodes):
-#     ## Limit graph only to nodes's ancestors.
-#     #
-#     pre_nodes = list(nodes) + [nx.bfs_predecessors(graph, node).keys() for node in nodes]
-#     pre_nodes = it.chain(*pre_nodes)
-#     g = graph.subgraph(pre_nodes)
-#     return pre_nodes
-#
-#
-# def clips_graph_before(graph, nodes):
-#     ## Clip any nodes topologically-before 'nodes'.
-#     #
-#     pre_nodes = nx.topological_sort(g)
-#     for (i, node) in enumerate(pre_nodes):
-#         if node in nodes:
-#             pre_nodes = pre_nodes[i:]
-#             break
+def get_funcs_in_calculation_order(graph):
+    order = reversed(nx.topological_sort(graph))
+    funcs = [d['func'] for (_, _, d) in graph.edges_iter(order, True) if d] # a list of sets
+    funcs = list(it.chain(*funcs))
+
+    ## Remove duplicates whilist preserving order.
+    funcs = list(OrderedDict.fromkeys(funcs))
+
+    return funcs
 
 
 
@@ -455,5 +410,5 @@ class FuncRelations(nx.DiGraph):
 
         ## Limit graph to absolutely neccessary nodes.
         #
-        (g, pre_nodes) = find_connecting_subgraph(self, source, dest)
+        (g, pre_nodes) = find_connecting_nodes(self, source, dest)
         return (g, pre_nodes)
