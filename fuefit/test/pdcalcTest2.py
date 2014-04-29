@@ -57,7 +57,7 @@ def funcs_fact2(dfin, engine, dfout):
     def f2(): dfout['rpm','p','fc'] = engine['eng_map_params']
     def f3(): dfout['fc_norm'] = dfout.fc / dfout.p
 
-    return (f0, f1, f2, f3)
+    return (f1, f2, f3)
 
 
 
@@ -82,8 +82,9 @@ class Test(unittest.TestCase):
     def testSmoke_FuncRelations_fail(self):
         web = self.build_web()
 
+        args = []
         with self.assertRaisesRegex(ValueError, 'dfout\.BAD'):
-            web.find_funcs_sequence(('dfin.fc_norm', 'dfin.XX'), ('dfout.fc', 'dfout.BAD'))
+            web.run_funcs(args, ('dfin.fc_norm', 'dfin.XX'), ('dfout.fc', 'dfout.BAD'))
 
 
     def test_find_connecting_nodes_smoke(self):

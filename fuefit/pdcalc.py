@@ -93,31 +93,34 @@ def harvest_func(func, root=None, renames=None, func_rels=None):
 
 
 def mockup_func_args(func, renames=None, root=None):
-    '''    renames: list or dict with renames, same len as func's args.'''
+    '''    renames: list with renamed-args (same len as func's args) or dict(arg --> new_name)'''
     import inspect
 
     argspec = inspect.getfullargspec(func)
     if (argspec.varargs or argspec.varkw):
         log.warning('Ignoring any dependencies from *varags or **keywords!')
-    func_args = argspec.args
+    arg_names = argspec.args
 
     ## Apply any override arg-names.
     #
     if renames:
         if isinstance(renames, Mapping):
-            new_args = {arg:arg for arg in func_args}
-            new_args.update(renames)
-            new_args = new_args.keys()
+            new_args = OrderedDict(zip(arg_names, arg_names))
+            for k, v in renames.items():
+                if k in new_args:
+                    new_args[k] = v
+            new_args = list(new_args.values())
         else:
-            new_args = [arg if arg else farg for (farg, arg) in zip(func_args, renames)]
-        if len(func_args) != len(new_args):
-            raise ValueError("Argument-renames mismatched function(%s)!\n  Expected(%s), got(%s), result(%s)."%(func, func_args, renames, new_args))
-        func_args = new_args
+            new_args = [arg if arg else farg for (farg, arg) in zip(arg_names, renames)]
+            if len(arg_names) != len(new_args):
+                raise ValueError("Argument-renames mismatched function(%s)!\n  Expected(%s), got(%s), result(%s)."%(func, arg_names, renames, new_args))
+
+        arg_names = new_args
 
     if not root:
         root = make_mock(name=_root_name)
-    mocks = [make_mock() for cname in func_args]
-    for (mock, cname) in zip(mocks, func_args):
+    mocks = [make_mock() for cname in arg_names]
+    for (mock, cname) in zip(mocks, arg_names):
         root.attach_mock(mock, cname)
     return (root, mocks)
 
@@ -360,6 +363,27 @@ def get_funcs_in_calculation_order(graph):
 
 
 
+def build_func_args(func, args, root=None):
+    '''    args: list with args (same len as func's args) or dict(arg_name --> arg)'''
+    import inspect
+
+    argspec = inspect.getfullargspec(func)
+    if (argspec.varargs or argspec.varkw):
+        log.warning('Ignoring any dependencies from *varags or **keywords!')
+    arg_names = argspec.args
+
+    ## Apply any override arg-names.
+    #
+    if args:
+        if isinstance(args, Mapping):
+            args = [args[a] for a in arg_names]
+        else:
+            if len(arg_names) != len(args):
+                raise ValueError("Argument-args mismatched function(%s)!\n  Expected(%s), got(%s), result(%s)."%(func, arg_names, args, args))
+
+    return (root, mocks)
+
+
 
 class FuncsExplorer:
     '''Discovers functions-relationships and produces FuncRelations (see build_web()) to inspect them.
@@ -400,15 +424,25 @@ class FuncRelations(nx.DiGraph):
             return nx.topological_sort(self)
 
 
-    def find_funcs_sequence(self, source, dest):
-        '''Returns the functions required to calculate 'dest' from 'source' appropriately ordered.
+    def run_funcs(self, args, sources, dests):
+        '''Limit graph to all those nodes reaching from 'sources' to 'dests'.
 
-            source: a list of nodes (existent or not) to search for all paths between them.
-            dest:   a list of nodes to search for all paths between them.
+            :args: a map of all arg-names to dict-like values, as fed to FuncExplorer
+            :sources: a list of nodes (existent or not) to search for all paths originating from them
+            :dests:   a list of nodes to search for all paths leading to them them
+
+        Example::
+
+            args = {'dfin': df, 'dfout':some.dict}
         '''
 
 
-        ## Limit graph to absolutely neccessary nodes.
-        #
-        (g, pre_nodes) = find_connecting_nodes(self, source, dest)
-        return (g, pre_nodes)
+        cn_nodes = find_connecting_nodes(self, sources, dests)
+
+        g = self.subgraph(cn_nodes)
+        funcs = get_funcs_in_calculation_order(g)
+
+        for f in funcs:
+            pass
+
+        return (g, cn_nodes)
