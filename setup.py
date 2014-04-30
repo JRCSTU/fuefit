@@ -143,6 +143,7 @@ setup(
         'numpy',
         'pandas',
         'xlrd',
+        'scipy',
         'jsonschema',
         'jsonpointer',
         'networkx',

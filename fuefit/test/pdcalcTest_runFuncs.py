@@ -34,9 +34,9 @@ from fuefit.pdcalc import FuncsExplorer, FuncRelations, research_calculation_rou
 def lstr(lst):
     return '\n'.join([str(e) for e in lst])
 
-def df(d):
+def DF(d):
     return pd.DataFrame(d)
-def sr(d):
+def SR(d):
     return pd.Series(d)
 
 def funcs_fact(params, engine, dfin, dfout):
@@ -48,7 +48,7 @@ def funcs_fact(params, engine, dfin, dfout):
     def f4(): dfin['fc']      = dfin.fc_norm * engine.p_max
     def f5(): dfin['rps']     = dfin.rpm / 60
     def f6(): dfin['torque']  = (dfin.p * 1000) / (dfin.rps * 2 * pi)
-    def f7(): dfin['pme']     = (dfin.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-3)
+    def f7(): dfin['pme']     = (dfin.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-6)
     def f8(): dfin['pmf']     = ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-3)) * (dfin.fc / (3600 * dfin.rps * 2 * pi)) * 10e-5
     def f9(): dfin['cm']      = dfin.rps * 2 * engine.stroke / 1000
 
@@ -66,7 +66,7 @@ def funcs_fact(params, engine, dfin, dfout):
 
 def get_params():
     return {
-        'fuel': {'diesel':{'lhv':123}}
+        'fuel': {'diesel':{'lhv':42700}, }, 'petrol':{'lhv':43000}
     }
 
 def get_engine():
@@ -88,8 +88,10 @@ class Test(unittest.TestCase):
         l.addHandler(logging.StreamHandler())
 
 
-    def build_web(self):
+    def build_web(self, extra_rels=None):
         fexp = FuncsExplorer(funcs_fact)
+        if extra_rels:
+            fexp.add_func_rel('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv'))
         web = fexp.build_web()
 
         return web
@@ -212,10 +214,24 @@ class Test(unittest.TestCase):
     def testSmoke_FuncRelations_good(self):
         web = self.build_web()
 
-        params = sr(get_params())
-        engine = sr(get_engine())
-        dfin =  df({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]}) # TODO: CHeck dotted.var.names.
-        dfout = df({})
+        params = SR(get_params())
+        engine = SR(get_engine())
+        dfin =  DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]}) # TODO: Check dotted.var.names.
+        dfout = DF({})
+        args = [params, engine, dfin, dfout]
+
+        #inp = ('dfin.fc', 'dfin.fc_norm')
+        #web.run_funcs(args, out, inp)
+        out = ('dfout.rpm', 'dfout.fc_norm')
+        web.run_funcs(args, out)
+
+    def testSmoke_FuncRelations_goodExtraRels(self):
+        web = self.build_web()
+
+        params = SR(get_params())
+        engine = SR(get_engine())
+        dfin =  DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]}) # TODO: CHeck dotted.var.names.
+        dfout = DF({})
         args = [params, engine, dfin, dfout]
 
         #inp = ('dfin.fc', 'dfin.fc_norm')

@@ -21,12 +21,10 @@
 inspired by XForms:
     http://lib.tkk.fi/Diss/2007/isbn9789512285662/article3.pdf
 '''
-# from unittest.mock import MagicMock
 import logging
 from collections import OrderedDict, defaultdict
 from collections.abc import Mapping, Iterable
 import itertools as it
-import functools as ft
 import inspect
 import networkx as nx
 import pandas as pd
@@ -42,16 +40,6 @@ log = logging.getLogger(__file__)
 
 def get_mock_factory():
     return MagicMock
-#     pyver = sys.version_info[:2]
-#     if (pyver[0] >=3 and pyver[1] >=4):
-#         return MagicMock
-#     else:
-## Workaround missing __truediv__() BUG fixed in 3.4: http://bugs.python.org/issue20968
-#
-#         class DepGrapher(MagicMock):
-#             def __truediv__(self, other):
-#                 return self.__div__(other)
-#         return DepGrapher
 make_mock = get_mock_factory()
 
 
@@ -236,18 +224,12 @@ def build_func_dependencies_graph(func_rels, graph = None):
     if graph is None:
         graph = nx.DiGraph()
 
-    (func_rels, all_paths) = consolidate_relations(func_rels)
+    func_rels = consolidate_relations(func_rels)
 
     for (path, (deps, funcs)) in func_rels.items():
         if (deps):
             deps = filter_common_prefixes(deps)
             graph.add_edges_from([(path, dep, {'funcs': funcs}) for dep in deps])
-
-    ## Add all LSide 'R.dotted.objects' segments,
-    #     even without any funcs attribute.
-    #
-#     for path in set(all_paths):
-#         graph.add_edges_from(gen_all_prefix_pairs(path))
 
     cycles = list(nx.simple_cycles(graph))
     if cycles:
@@ -269,16 +251,7 @@ def consolidate_relations(relations):
         pdes.update([d[_root_len:] for d in deps])
         pfuncs.add(func)
 
-    ## Gather all paths and remove self-dependencies.
-    #
-    all_paths = set()
-    for (path, (deps, _)) in rels.items():
-        deps.discard(path)
-        all_paths.update(deps)
-    all_paths.update(rels.keys())
-
-
-    return (rels, all_paths)
+    return rels
 
 
 def gen_all_prefix_pairs(path):
@@ -401,32 +374,11 @@ def tell_paths_from_args(func_args, arg_paths_extractor_func=default_arg_paths_e
     '''func_args: an args-map {name: arg} as returned by inspect.signature(func).bind(*args).arguments: BoundArguments'''
 
     if paths is None:
-        paths = list()
+        paths = []
     for (name, arg) in func_args.items():
         arg_paths_extractor_func(name, arg, paths)
 
     return paths
-
-
-# def build_func_args(func, args):
-#     '''    args: list with args (same len as func's args) or dict(arg_name --> arg)'''
-#
-#     argspec = inspect.getfullargspec(func)
-#     if (argspec.varargs or argspec.varkw):
-#         log.warning('Ignoring any dependencies from *varags or **keywords!')
-#     arg_names = argspec.args
-#
-#     ## Apply any override arg-names.
-#     #
-#     if args:
-#         if isinstance(args, Mapping):
-#             args = [args[a] for a in arg_names]
-#         else:
-#             if len(arg_names) != len(args):
-#                 raise ValueError("Argument-args mismatched function(%s)!\n  Expected(%s), got(%s), result(%s)."%(func, arg_names, args, args))
-#
-#     return args
-
 
 
 class FuncsExplorer:
@@ -441,10 +393,8 @@ class FuncsExplorer:
         log.debug('DEPS collected(%i): %s', len(self.rels), self.rels)
 
     def add_func_rel(self, item, deps=None, func=None, args=None):
-        '''deps: a list of integers, the indices of funcs returned by the factory'''
-        if deps:
-            deps = [(self.funcs_factory, d) for d in deps]
-        else:
+        '''func: a list of integers, the indices of funcs returned by the factory'''
+        if deps is None:
             deps = []
         append_func_relation(item, deps, func, self.rels)
 
@@ -486,12 +436,12 @@ class FuncRelations:
         log.info('CALCED data(%i): %s', len(ordered_nodes), ordered_nodes)
         log.debug('DEPS ordered(%i): %s', subgraph.size(), subgraph.edges(ordered_nodes, data=True))
 
-        dep_tuples = extract_funcs_from_edges(subgraph, ordered_nodes)
+        func_tuples = extract_funcs_from_edges(subgraph, ordered_nodes)
 
         ## Rerun funcs-factory with proper args.
         #
         all_funcs = self.funcs_factory(*args)
-        funcs = [all_funcs[n] for (_, n) in dep_tuples]
+        funcs = [all_funcs[n] for (_, n) in func_tuples]
         log.info('FUNCS to run(%i): %s', len(funcs), funcs)
 
 
@@ -501,55 +451,3 @@ class FuncRelations:
     def __str__(self):
         return "%s(nodes=%r)" % ('FuncRelations', self.graph.nodes())
 
-
-# class FuncReplayer:
-#     '''A wrapper for functions explored for relations, optionally allowing them to form a hierarchy of factories and produced functions.
-#
-#     It can be in 2 modes:
-#         * mock -mode: args given to function invocation are used normally,
-#         * replay: args given to constructor are used.
-#     Child-functions propagate mode-check to their parent factory.
-#     '''
-#
-#     def __init__(self, func, args, parent_fact_or_standalone):
-#         '''
-#         parent_fact_or_standalone: If None, `func` assumed a funcs-factory, if True, a standalone-func, otherwise
-#                                     `func` is a child-function and parent_fact_or_standalone must be another FuncReplayer.
-#         args: args on constructor are saved for later, and initially calls use the passed-in mock-args (when in mock_mode).
-#
-#         '''
-#
-#         self.func = func
-#         self.parent_fact_or_standalone = parent_fact_or_standalone
-#         if (not isinstance(parent_fact_or_standalone, FuncReplayer)):
-#             ## Only factories and standalone-funcs have mock_flags.
-#             self._is_mock_mode = True
-#
-#         sig = inspect.signature(func)
-#         sig.bind(args)
-#         self.sig = sig
-#
-#     def is_child_func(self):
-#         return not hasattr(self, '_is_mock_mode')
-#
-#     def is_standalone_func(self):
-#         return self.parent_fact_or_standalone == True
-#
-#     def is_funcs_factory(self):
-#         return self.parent_fact_or_standalone is None
-#
-#     def is_mock_mode(self):
-#         if self.is_child_func():
-#             return self.parent_fact_or_standalone._is_mock_mode
-#         return self._is_mock_mode
-#
-#     def reset_mock_mode(self):
-#         if self.is_child_func():
-#             raise RuntimeError('reset_mock_mode() invoked on child-function(%s)!'%self)
-#         self._is_mock_mode = False
-#
-#     def __call__(self, *args):
-#         if (self.is_mock_mode()):
-#             return self.func(*args)
-#         else:
-#             return self.func(*self.sig.args)

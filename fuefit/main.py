@@ -75,14 +75,14 @@ def main(argv=None):
 
         ## Read the same table above but without header-row and
         #    store results into Excel file:
-        >> %(prog)s -m fuel=PETROL -I engine.csv --icolumns CM PME PMF -df engine_map.xlsx
+        >> %(prog)s -m fuel=PETROL -I engine.csv --icolumns CM PME PMF -dfin engine_map.xlsx
 
         ## Supply as inline-json more model-values required for columns [RPM, P, FC]
         #    read from <stdin> as json 2D-array of values (no headers).
         #    and store results in UTF-8 regardless of platform's default encoding:
         >> %(prog)s -m '/engine:={"fuel":"PETROL", "stroke":15, "capacity":1359}' \\
                 -I - file_frmt=JSON orient=values -c RPM P FC \\
-                -df engine_map.txt encoding=UTF-8
+                -dfin engine_map.txt encoding=UTF-8
 
 
     Now, if input vectors are in 2 separate files, the 1st, 'engine_1.xlsx',
@@ -94,7 +94,7 @@ def main(argv=None):
     and the 2nd having 2 columns with no headers at all and
     the 1st column being 'Pnorm', then it, then use the following command:
 
-        >> %(prog)s -df engine_map -m fuel=PETROL \\
+        >> %(prog)s -dfin engine_map -m fuel=PETROL \\
                 -I=engine_1.xlsx \\
                 -c X   X   N   'Fuel consumption'  X \\
                 -r X   X   RPM 'FC(g/s)'           X \\
@@ -131,7 +131,7 @@ def main(argv=None):
         infiles     = parse_many_file_args(opts.I, 'r')
         log.info("Input-files: %s", infiles)
 
-        outfiles    = parse_many_file_args(opts.df, 'w')
+        outfiles    = parse_many_file_args(opts.DF, 'w')
         log.info("Output-files: %s", outfiles)
 
         mdl = build_model(opts, infiles)
@@ -296,18 +296,18 @@ def parse_many_file_args(many_file_args, filetype):
 def load_file_as_df(filespec):
 # FileSpec(fname, file, frmt, path, append, kws)
     method = _pandas_formats[filespec.frmt]
-    df = method(filespec.file, **filespec.kws)
+    dfin = method(filespec.file, **filespec.kws)
 
-    return df
+    return dfin
 
 def build_model(opts, infiles):
 
     mdl = model.base_model()
 
     for filespec in infiles:
-        df = load_file_as_df(filespec)
-        log.info("+-input-file(%s):\n%s", filespec.fname, df)
-        jsonp.set_pointer(mdl, filespec.path, df)
+        dfin = load_file_as_df(filespec)
+        log.info("+-input-file(%s):\n%s", filespec.fname, dfin)
+        jsonp.set_pointer(mdl, filespec.path, dfin)
 
     model_overrides = opts.m
     if (model_overrides):
@@ -428,7 +428,7 @@ def build_args_parser(program_name, version, desc, epilog):
                         type=parse_key_value_pair, metavar='MODEL_PATH')
 
 
-    grp_io.add_argument('-df', help=dedent("""\
+    grp_io.add_argument('-dfin', help=dedent("""\
             specifies output-file(s) to write model-portions into after calculations.
             The syntax is indentical to -I, with these differences:
             * When FILENAME is '-', <stdout> is used.
