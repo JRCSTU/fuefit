@@ -24,43 +24,46 @@ Created on Apr 23, 2014
 @author: ankostis
 '''
 import unittest
-import networkx as nx
+import logging
 
-from fuefit.pdcalc import build_func_dependencies_graph, harvest_func, harvest_funcs_factory, filter_common_prefixes, gen_all_prefix_pairs,\
-    FuncsExplorer, FuncRelations
+from fuefit.pdcalc import build_func_dependencies_graph, harvest_func, harvest_funcs_factory, filter_common_prefixes, \
+    gen_all_prefix_pairs
+
 
 def lstr(lst):
     return '\n'.join([str(e) for e in lst])
 
 
 
-def funcs_fact(params, engine, df):
+def funcs_fact(params, engine, dfin):
     from math import pi
 
     def f1(): engine['fuel_lhv'] = params['fuel'][engine['fuel']]['lhv']
-    def f2(): df['rpm']     = df.rpm_norm * (engine.rpm_rated - engine.rpm_idle) + engine.rpm_idle
-    def f3(): df['p']       = df.p_norm * engine.p_max
-    def f4(): df['fc']      = df.fc_norm * engine.p_max
-    def f5(): df['rps']     = df.rpm / 60
-    def f6(): df['torque']  = (df.p * 1000) / (df.rps * 2 * pi)
-    def f7(): df['pme']     = (df.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-3)
-    def f8(): df['pmf']     = ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-3)) * (df.fc / (3600 * df.rps * 2 * pi)) * 10e-5
-    def f9(): df['cm']      = df.rps * 2 * engine.stroke / 1000
+    def f2(): dfin['rpm']     = dfin.rpm_norm * (engine.rpm_rated - engine.rpm_idle) + engine.rpm_idle
+    def f3(): dfin['p']       = dfin.p_norm * engine.p_max
+    def f4(): dfin['fc']      = dfin.fc_norm * engine.p_max
+    def f5(): dfin['rps']     = dfin.rpm / 60
+    def f6(): dfin['torque']  = (dfin.p * 1000) / (dfin.rps * 2 * pi)
+    def f7(): dfin['pme']     = (dfin.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-3)
+    def f8(): dfin['pmf']     = ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-3)) * (dfin.fc / (3600 * dfin.rps * 2 * pi)) * 10e-5
+    def f9(): dfin['cm']      = dfin.rps * 2 * engine.stroke / 1000
 
     return (f1, f2, f3, f4, f5, f6, f7, f8, f9)
 
 def funcs_fact2(dfin, engine, dfout):
     def f0(): return dfin.cm + dfin.pmf + dfin.pme
 
-    def f1(): engine['eng_map_params']      = dfin.cm + dfin.pmf + dfin.pme
+    def f1(): engine['eng_map_params']      = f0()
     def f2(): dfout['rpm','p','fc'] = engine['eng_map_params']
     def f3(): dfout['fc_norm'] = dfout.fc / dfout.p
 
-    return (f0, f1, f2, f3)
+    return (f1, f2, f3)
 
 
 
 class Test(unittest.TestCase):
+    def setUp(self):
+        logging.basicConfig(level=logging.DEBUG)
 
     def test_filter_common_prefixes(self):
         filter_common_prefixes
@@ -153,8 +156,8 @@ class Test(unittest.TestCase):
             return (f0, f1, f2, f3)
 
         deps = harvest_funcs_factory(func_fact)
-        # self.assertEqual(deps[0][0], 'R.df.hh.tt.kk.ll', deps)
-        # self.assertEqual(deps[0][1], 'R.params.OO.PP.aa', deps)
+#         self.assertEqual(deps[0][0], 'R.df.hh.tt.kk.ll', deps)
+#         self.assertEqual(deps[0][1], 'R.params.OO.PP.aa', deps)
 
         self.assertEqual(deps[1][0], 'R.df.hh.tt', deps)
         self.assertEqual(deps[2][0], 'R.df.hh.ll', deps)
@@ -210,6 +213,30 @@ class Test(unittest.TestCase):
 #         for line in sorted(nx.generate_edgelist(g)):
 #             print(line)
 
+    def testGatherDepsAndBuldGraph_countNodes(self):
+        deps = harvest_funcs_factory(funcs_fact)
+        print('\n'.join([str(s) for s in deps]))
+
+        g = build_func_dependencies_graph(deps)
+        self.assertEqual(len(g), 20) #23 when adding.segments
+
+
+    def build_web(self):
+        rels = list()
+        harvest_funcs_factory(funcs_fact, renames=[None, None, 'dfin'], func_rels=rels)
+        harvest_funcs_factory(funcs_fact2, func_rels=rels)
+        graph = build_func_dependencies_graph(rels)
+
+        return graph
+
+    def testGatherDepsAndBuldGraph_multiFuncsFacts_countNodes(self):
+        import networkx as nx
+        web = self.build_web()
+        print("RELS:\n", lstr(web))
+        print('ORDERED:\n', lstr(nx.topological_sort(web)))
+        self.assertEqual(len(web), 25) #29 when adding.segments
+
+        return web
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']

@@ -27,7 +27,9 @@ from collections import OrderedDict, defaultdict
 from collections.abc import Mapping, Iterable
 import itertools as it
 import functools as ft
+import inspect
 import networkx as nx
+import pandas as pd
 from networkx.exception import NetworkXError
 import re
 from fuefit.mymock import MagicMock
@@ -66,13 +68,13 @@ def harvest_funcs_factory(funcs_factory, root=None, renames=None, func_rels=None
     ## Harvest func deps as a list of 3-tuple (item, deps, funx)
     #    by inspecting root after each func-call.
     #
-    for func in funcs:
+    for (n, func) in enumerate(funcs):
         root.reset_mock()
         tmp = func()
         try: tmp += 2   ## Force dependencies from return values despite compiler-optimizations.
         except:
             pass
-        harvest_mock_calls(root.mock_calls, func, func_rels)
+        harvest_mock_calls(root.mock_calls, (funcs_factory, n), func_rels)
 
     assert validate_func_relations(func_rels), func_rels
     return func_rels
@@ -94,7 +96,6 @@ def harvest_func(func, root=None, renames=None, func_rels=None):
 
 def mockup_func_args(func, renames=None, root=None):
     '''    renames: list with renamed-args (same len as func's args) or dict(arg --> new_name)'''
-    import inspect
 
     argspec = inspect.getfullargspec(func)
     if (argspec.varargs or argspec.varkw):
@@ -200,7 +201,7 @@ def harvest_indexing(index):
     elif isinstance(index, str):
         deps = [index]
     elif isinstance(index, Iterable):
-        deps = list(it.chain(*[harvest_indexing(indx) for indx in index]))
+        deps = [ii for i in index for ii in harvest_indexing(i)]
     else:
         deps = []
     return deps
@@ -237,16 +238,16 @@ def build_func_dependencies_graph(func_rels, graph = None):
 
     (func_rels, all_paths) = consolidate_relations(func_rels)
 
-    for (path, (deps, func)) in func_rels.items():
+    for (path, (deps, funcs)) in func_rels.items():
         if (deps):
             deps = filter_common_prefixes(deps)
-            graph.add_edges_from([(path, dep, {'func': func}) for dep in deps])
+            graph.add_edges_from([(path, dep, {'funcs': funcs}) for dep in deps])
 
     ## Add all LSide 'R.dotted.objects' segments,
-    #     even without any func attribute.
+    #     even without any funcs attribute.
     #
-    for path in set(all_paths):
-        graph.add_edges_from(gen_all_prefix_pairs(path))
+#     for path in set(all_paths):
+#         graph.add_edges_from(gen_all_prefix_pairs(path))
 
     cycles = list(nx.simple_cycles(graph))
     if cycles:
@@ -259,7 +260,7 @@ def consolidate_relations(relations):
     '''(item1, deps, func), (item1, ...) --> {item1, (set(deps), set(funcs))}'''
 
     rels = defaultdict()
-    rels.default_factory = lambda: (set(), set())
+    rels.default_factory = lambda: (set(), set()) # (deps, funcs)
 
     ## Join all item's  deps & funcs, and strip root-name.
     #
@@ -319,42 +320,57 @@ def filter_common_prefixes(deps):
     return ndeps
 
 
-def find_connecting_nodes(graph, sources, dests):
-    '''Limit graph to all those nodes reaching from 'sources' to 'dests'.
+def research_calculation_routes(graph, sources, dests):
+    '''Find nodes reaching 'dests' but not 'sources'.
 
         sources: a list of nodes (existent or not) to search for all paths originating from them
         dests:   a list of nodes to search for all paths leading to them them
         return: a 2-tuple with the graph and its nodes topologically-ordered
     '''
 
-    ## Find nodes leading to 'dests' but not to 'sources'.
+    ## Remove unrelated dests already present in sources.
     #
+    calc_out_nodes = set(dests)
+    calc_out_nodes -= set(sources)
+
+    calc_inp_nodes = set(graph.nbunch_iter(sources))
+
+    ## Deps graph: all INPUT's deps broken
+    #    To be used for planing functions_to_run.
+    #
+    deps_graph = graph.copy()
+    deps_graph.remove_edges_from(deps_graph.out_edges(calc_inp_nodes))
+
+    ## Data_to_be_calced: all INPUTs erased
+    #    To be used for topological-sorting.
+    #
+    data_graph = graph.copy()
+    data_graph.remove_nodes_from(calc_inp_nodes)
     try:
-        to_dest = set(list(dests)  + list(all_predecessors(graph, dests)))
+        calc_nodes = set(list(calc_out_nodes) + all_predecessors(data_graph, calc_out_nodes))
     except (KeyError, NetworkXError) as ex:
-        unknown = [node for node in dests if node not in graph]
+        unknown = [node for node in calc_out_nodes if node not in graph]
         raise ValueError('Unknown OUT-args(%s)!' % unknown) from ex
     else:
-        ## Filter-out non-existent sources (to allow them), and any sources after dests.
-        sources = [node for node in sources if node in to_dest]
-
-        to_source = set(all_predecessors(graph, sources))
-
-        return to_dest - to_source
-
+        return (calc_inp_nodes, calc_out_nodes, calc_nodes, deps_graph)
 
 def all_predecessors(graph, nodes):
-    '''return: generator of nodes'''
-
-    pnodes = [nx.bfs_predecessors(graph, node).keys() for node in nodes]
-    return it.chain(*pnodes)
+    return [k for node in nodes for k in nx.bfs_predecessors(graph, node).keys()]
 
 
+def establish_calculation_plan(graph, sources, dests):
+    (calc_inp_nodes, calc_out_nodes, calc_nodes, deps_graph) = \
+                                    research_calculation_routes(graph, sources, dests)
 
-def get_funcs_in_calculation_order(graph):
-    order = reversed(nx.topological_sort(graph))
-    funcs = [d['func'] for (_, _, d) in graph.edges_iter(order, True) if d] # a list of sets
-    funcs = list(it.chain(*funcs))
+    subgraph = graph.subgraph(calc_nodes)
+    order = list(reversed(nx.topological_sort(subgraph)))
+
+    return (calc_inp_nodes, calc_out_nodes, order, deps_graph)
+
+def extract_funcs_from_edges(graph, ordered_nodes):
+    funcs = [f for (_, _, d) in graph.edges_iter(ordered_nodes, True) if d
+            for f in d['funcs']] # a list of sets
+
 
     ## Remove duplicates whilist preserving order.
     funcs = list(OrderedDict.fromkeys(funcs))
@@ -363,86 +379,177 @@ def get_funcs_in_calculation_order(graph):
 
 
 
-def build_func_args(func, args, root=None):
-    '''    args: list with args (same len as func's args) or dict(arg_name --> arg)'''
-    import inspect
+def default_arg_paths_extractor(arg_name, arg, paths):
+    '''Add recursively all indexes found, skipping the inner-ones (ie 'df.some.key', but not 'df' & 'df.some'.
 
-    argspec = inspect.getfullargspec(func)
-    if (argspec.varargs or argspec.varkw):
-        log.warning('Ignoring any dependencies from *varags or **keywords!')
-    arg_names = argspec.args
+    BUT for pandas-series, their index (their infos-axis) gets appended only the 1st time
+    (not if invoked in recursion, from DataFrame columns).
+    '''
+    try:
+        for key in arg.keys():
+            path = '%s.%s'%(arg_name, key)
+            value = arg[key]
+            if (isinstance(value, pd.Series)):
+                paths.append(path) # do not recurse into series.
+            else:
+                default_arg_paths_extractor(path, value, paths)
+    except (AttributeError, KeyError):
+        paths.append(arg_name)
 
-    ## Apply any override arg-names.
-    #
-    if args:
-        if isinstance(args, Mapping):
-            args = [args[a] for a in arg_names]
-        else:
-            if len(arg_names) != len(args):
-                raise ValueError("Argument-args mismatched function(%s)!\n  Expected(%s), got(%s), result(%s)."%(func, arg_names, args, args))
 
-    return (root, mocks)
+def tell_paths_from_args(func_args, arg_paths_extractor_func=default_arg_paths_extractor, paths=None):
+    '''func_args: an args-map {name: arg} as returned by inspect.signature(func).bind(*args).arguments: BoundArguments'''
+
+    if paths is None:
+        paths = list()
+    for (name, arg) in func_args.items():
+        arg_paths_extractor_func(name, arg, paths)
+
+    return paths
+
+
+# def build_func_args(func, args):
+#     '''    args: list with args (same len as func's args) or dict(arg_name --> arg)'''
+#
+#     argspec = inspect.getfullargspec(func)
+#     if (argspec.varargs or argspec.varkw):
+#         log.warning('Ignoring any dependencies from *varags or **keywords!')
+#     arg_names = argspec.args
+#
+#     ## Apply any override arg-names.
+#     #
+#     if args:
+#         if isinstance(args, Mapping):
+#             args = [args[a] for a in arg_names]
+#         else:
+#             if len(arg_names) != len(args):
+#                 raise ValueError("Argument-args mismatched function(%s)!\n  Expected(%s), got(%s), result(%s)."%(func, arg_names, args, args))
+#
+#     return args
 
 
 
 class FuncsExplorer:
-    '''Discovers functions-relationships and produces FuncRelations (see build_web()) to inspect them.
+    '''Discovers functions-relationships and produces FuncRelations (see build_web()) to inspect them. '''
 
-    The name of the arguments must correlate between different functions
-    '''
-
-    def __init__(self):
+    def __init__(self, funcs_factory):
         self.rels = []
-        self.root = make_mock(name=_root_name)
+        self.funcs_factory = funcs_factory
 
-    def harvest_func(self, func, renames=None):
-        harvest_func(func, root=self.root, func_rels=self.rels, renames=renames)
+        root = make_mock(name=_root_name)
+        harvest_funcs_factory(funcs_factory, root=root, func_rels=self.rels)
+        log.debug('DEPS collected(%i): %s', len(self.rels), self.rels)
 
-    def harvest_funcs_factory(self, funcs_factory, renames=None):
-        harvest_funcs_factory(funcs_factory, root=self.root, func_rels=self.rels, renames=renames)
-
-    def add_func_rel(self, item, deps=None, func=None):
-        if not deps:
+    def add_func_rel(self, item, deps=None, func=None, args=None):
+        '''deps: a list of integers, the indices of funcs returned by the factory'''
+        if deps:
+            deps = [(self.funcs_factory, d) for d in deps]
+        else:
             deps = []
         append_func_relation(item, deps, func, self.rels)
 
     def build_web(self):
-        graph = build_func_dependencies_graph(self.rels, graph=FuncRelations())
-        return FuncRelations(graph)
+        graph = build_func_dependencies_graph(self.rels)
+        log.debug('GRAPH constructed(%i): %s', graph.size(), graph.edges(data=True))
+        return FuncRelations(self.funcs_factory, graph)
 
 
 
-class FuncRelations(nx.DiGraph):
-    def __init__(self, *args, **kws):
-        nx.DiGraph.__init__(self, *args, **kws)
 
-    def ordered(self, reverse=False):
-        '''    reversed: when True, bring calculation order. otherwise, dependency-order.'''
-        if reverse:
-            return nx.topological_sort(self)
-        else:
-            return nx.topological_sort(self)
+class FuncRelations:
+    '''Constructed by FuncsExplorer.'''
 
+    def __init__(self, funcs_factory, graph):
+        self.funcs_factory = funcs_factory
+        self.graph = graph
 
-    def run_funcs(self, args, sources, dests):
-        '''Limit graph to all those nodes reaching from 'sources' to 'dests'.
+    def run_funcs(self, args, dests, sources=None):
+        '''Limit graph to all those ordered_nodes reaching from 'sources' to 'dests'.
 
-            :args: a map of all arg-names to dict-like values, as fed to FuncExplorer
-            :sources: a list of nodes (existent or not) to search for all paths originating from them
-            :dests:   a list of nodes to search for all paths leading to them them
+            :sources: a list of ordered_nodes (existent or not) to search for all ordered_nodes originating from them
+            :dests:   a list of ordered_nodes to search for all ordered_nodes leading to them them
 
         Example::
 
             args = {'dfin': df, 'dfout':some.dict}
         '''
 
+        if (sources is None):
+            sources = tell_paths_from_args(inspect.signature(self.funcs_factory).bind(*args).arguments)
+            log.debug('EXISTING data(%i): %s', len(sources), sources)
 
-        cn_nodes = find_connecting_nodes(self, sources, dests)
+        log.debug('REQUESTED data(%i): %s', len(dests), dests)
 
-        g = self.subgraph(cn_nodes)
-        funcs = get_funcs_in_calculation_order(g)
+        (sources, dests, ordered_nodes, subgraph) = establish_calculation_plan(self.graph, sources, dests)
+        log.info('CALC_INP data(%i): %s', len(sources), sources)
+        log.info('CALC_OUT data(%i): %s', len(dests), dests)
+        log.info('CALCED data(%i): %s', len(ordered_nodes), ordered_nodes)
+        log.debug('DEPS ordered(%i): %s', subgraph.size(), subgraph.edges(ordered_nodes, data=True))
+
+        dep_tuples = extract_funcs_from_edges(subgraph, ordered_nodes)
+
+        ## Rerun funcs-factory with proper args.
+        #
+        all_funcs = self.funcs_factory(*args)
+        funcs = [all_funcs[n] for (_, n) in dep_tuples]
+        log.info('FUNCS to run(%i): %s', len(funcs), funcs)
+
 
         for f in funcs:
-            pass
+            f()
 
-        return (g, cn_nodes)
+    def __str__(self):
+        return "%s(nodes=%r)" % ('FuncRelations', self.graph.nodes())
+
+
+# class FuncReplayer:
+#     '''A wrapper for functions explored for relations, optionally allowing them to form a hierarchy of factories and produced functions.
+#
+#     It can be in 2 modes:
+#         * mock -mode: args given to function invocation are used normally,
+#         * replay: args given to constructor are used.
+#     Child-functions propagate mode-check to their parent factory.
+#     '''
+#
+#     def __init__(self, func, args, parent_fact_or_standalone):
+#         '''
+#         parent_fact_or_standalone: If None, `func` assumed a funcs-factory, if True, a standalone-func, otherwise
+#                                     `func` is a child-function and parent_fact_or_standalone must be another FuncReplayer.
+#         args: args on constructor are saved for later, and initially calls use the passed-in mock-args (when in mock_mode).
+#
+#         '''
+#
+#         self.func = func
+#         self.parent_fact_or_standalone = parent_fact_or_standalone
+#         if (not isinstance(parent_fact_or_standalone, FuncReplayer)):
+#             ## Only factories and standalone-funcs have mock_flags.
+#             self._is_mock_mode = True
+#
+#         sig = inspect.signature(func)
+#         sig.bind(args)
+#         self.sig = sig
+#
+#     def is_child_func(self):
+#         return not hasattr(self, '_is_mock_mode')
+#
+#     def is_standalone_func(self):
+#         return self.parent_fact_or_standalone == True
+#
+#     def is_funcs_factory(self):
+#         return self.parent_fact_or_standalone is None
+#
+#     def is_mock_mode(self):
+#         if self.is_child_func():
+#             return self.parent_fact_or_standalone._is_mock_mode
+#         return self._is_mock_mode
+#
+#     def reset_mock_mode(self):
+#         if self.is_child_func():
+#             raise RuntimeError('reset_mock_mode() invoked on child-function(%s)!'%self)
+#         self._is_mock_mode = False
+#
+#     def __call__(self, *args):
+#         if (self.is_mock_mode()):
+#             return self.func(*args)
+#         else:
+#             return self.func(*self.sig.args)

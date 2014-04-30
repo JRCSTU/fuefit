@@ -164,18 +164,18 @@ fig.subplots_adjust(wspace=0.15, hspace=0.25)
 
 # <codecell>
 
-def funcs_fact(params, engine, df):
+def funcs_fact(params, engine, dfin):
     from math import pi
 
     engine['engine.fuel_lhv']    = params[engine.fuel]
-    df['rpm']   = df.rpm_norm * (engine.rpm_rated - engine.rpm_idle) + engine.rpm_idle
-    df['p']     = df.p_norm * engine.p_max
-    df['fc']    = df.fc_norm * engine.p_max
-    df['rps']   = df.rpm / 60
-    df['torque'] = (df.p * 1000) / (df.rps * 2 * pi)
-    df['pme']   = (df.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-3)
-    df['pmf']   = ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-3)) * (df.fc / (3600 * df.rps * 2 * pi)) * 10e-5
-    df['cm']    = df.rps * 2 * engine.stroke / 1000
+    dfin['rpm']   = dfin.rpm_norm * (engine.rpm_rated - engine.rpm_idle) + engine.rpm_idle
+    dfin['p']     = dfin.p_norm * engine.p_max
+    dfin['fc']    = dfin.fc_norm * engine.p_max
+    dfin['rps']   = dfin.rpm / 60
+    dfin['torque'] = (dfin.p * 1000) / (dfin.rps * 2 * pi)
+    dfin['pme']   = (dfin.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-3)
+    dfin['pmf']   = ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-3)) * (dfin.fc / (3600 * dfin.rps * 2 * pi)) * 10e-5
+    dfin['cm']    = dfin.rps * 2 * engine.stroke / 1000
 
 
 def proc_vehicle(fn, model):

@@ -139,6 +139,7 @@ setup(
     ],
     long_description = __doc__,
     install_requires = [
+        'enum34',
         'numpy',
         'pandas',
         'xlrd',
