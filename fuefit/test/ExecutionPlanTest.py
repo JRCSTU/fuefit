@@ -28,8 +28,7 @@ import logging
 from networkx.classes.digraph import DiGraph
 import pandas as pd
 
-from fuefit.pdcalc import DependencyResolver, ExecutionPlan, research_calculation_routes, extract_funcs_from_edges,\
-    tell_paths_from_args
+from ..pdcalc import Dependencies, research_calculation_routes, tell_paths_from_args
 
 def lstr(lst):
     return '\n'.join([str(e) for e in lst])
@@ -89,7 +88,7 @@ class Test(unittest.TestCase):
 
 
     def build_web(self, extra_rels=None):
-        fexp = DependencyResolver(funcs_fact)
+        fexp = Dependencies(funcs_fact)
         if extra_rels:
             fexp.add_func_rel('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv'))
         web = fexp.build_web()

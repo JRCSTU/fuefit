@@ -390,7 +390,7 @@ def tell_paths_from_args(func_args, arg_paths_extractor_func=default_arg_paths_e
     return paths
 
 
-class DependencyResolver:
+class Dependencies:
     '''Discovers functions-relationships and produces ExecutionPlan (see build_web()) to inspect them. '''
 
     def __init__(self, funcs_factory):
@@ -416,7 +416,7 @@ class DependencyResolver:
 
 
 class ExecutionPlan:
-    '''Constructed by DependencyResolver.'''
+    '''Constructed by Dependencies.'''
 
     def __init__(self, funcs_factory, graph):
         self.funcs_factory = funcs_factory
