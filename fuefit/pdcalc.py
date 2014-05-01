@@ -48,22 +48,23 @@ def harvest_funcs_factory(funcs_factory, root=None, renames=None, func_rels=None
     if func_rels is  None:
         func_rels = []
 
-    ## Invoke funcs_factory with "rooted" mockups as args
+    ## Wrap and invoke funcs_factory with "rooted" mockups as args
     #    to collect mock_calls.
     #
-    (root, mocks) = mockup_func_args(funcs_factory, root=root, renames=renames)
-    funcs = funcs_factory(*mocks)
+    funcs_factory = wrap_funcs_factory(funcs_factory)
+    (root, mocks) = funcs_factory.mockup_func_args(root=root, renames=renames)
+    cfuncs = funcs_factory(*mocks)
 
-    ## Harvest func deps as a list of 3-tuple (item, deps, funx)
-    #    by inspecting root after each func-call.
+    ## Harvest cfunc deps as a list of 3-tuple (item, deps, funx)
+    #    by inspecting root after each cfunc-call.
     #
-    for (n, func) in enumerate(funcs):
+    for cfunc in cfuncs:
         root.reset_mock()
-        tmp = func()
+        tmp = cfunc()
         try: tmp += 2   ## Force dependencies from return values despite compiler-optimizations.
         except:
             pass
-        harvest_mock_calls(root.mock_calls, (funcs_factory, n), func_rels)
+        harvest_mock_calls(root.mock_calls, cfunc, func_rels)
 
     assert validate_func_relations(func_rels), func_rels
     return func_rels
@@ -72,7 +73,8 @@ def harvest_func(func, root=None, renames=None, func_rels=None):
     if func_rels is None:
         func_rels = []
 
-    (root, mocks) = mockup_func_args(func, root=root, renames=renames)
+    func = wrap_standalone_func(func)
+    (root, mocks) = func.mockup_func_args(root=root, renames=renames)
     tmp = func(*mocks)
     try: tmp += 2   ## Force dependencies from return values despite compiler-optimizations.
     except:
@@ -81,38 +83,6 @@ def harvest_func(func, root=None, renames=None, func_rels=None):
 
     assert validate_func_relations(func_rels), func_rels
     return func_rels
-
-
-def mockup_func_args(func, renames=None, root=None):
-    '''    renames: list with renamed-args (same len as func's args) or dict(arg --> new_name)'''
-
-    argspec = inspect.getfullargspec(func)
-    if (argspec.varargs or argspec.varkw):
-        log.warning('Ignoring any dependencies from *varags or **keywords!')
-    arg_names = argspec.args
-
-    ## Apply any override arg-names.
-    #
-    if renames:
-        if isinstance(renames, Mapping):
-            new_args = OrderedDict(zip(arg_names, arg_names))
-            for k, v in renames.items():
-                if k in new_args:
-                    new_args[k] = v
-            new_args = list(new_args.values())
-        else:
-            new_args = [arg if arg else farg for (farg, arg) in zip(arg_names, renames)]
-            if len(arg_names) != len(new_args):
-                raise ValueError("Argument-renames mismatched function(%s)!\n  Expected(%s), got(%s), result(%s)."%(func, arg_names, renames, new_args))
-
-        arg_names = new_args
-
-    if not root:
-        root = make_mock(name=_root_name)
-    mocks = [make_mock() for cname in arg_names]
-    for (mock, cname) in zip(mocks, arg_names):
-        root.attach_mock(mock, cname)
-    return (root, mocks)
 
 
 def harvest_mock_calls(mock_calls, func, func_rels):
@@ -379,26 +349,179 @@ def default_arg_paths_extractor(arg_name, arg, paths):
         paths.append(arg_name)
 
 
-def tell_paths_from_args(func_args, arg_paths_extractor_func=default_arg_paths_extractor, paths=None):
-    '''func_args: an args-map {name: arg} as returned by inspect.signature(func).bind(*args).arguments: BoundArguments'''
+def tell_paths_from_named_args(named_args, arg_paths_extractor_func=default_arg_paths_extractor, paths=None):
+    '''named_args: an args-map {name: arg} as returned by inspect.signature(func).bind(*args).arguments: BoundArguments'''
 
     if paths is None:
         paths = []
-    for (name, arg) in func_args.items():
+    for (name, arg) in named_args.items():
         arg_paths_extractor_func(name, arg, paths)
 
     return paths
 
 
+
+def wrap_standalone_func(func):
+    return DepFunc(func=func, is_funcs_factory=False)
+def wrap_funcs_factory(funcs_factory):
+    return DepFunc(func=funcs_factory, is_funcs_factory=True)
+class DepFunc:
+    '''A wrapper for functions explored for relations, optionally allowing them to form a hierarchy of factories and produced functions.
+
+    It can be in 3 types:
+        * 0, standalone function: args given to function invocation are used immediatelt,
+        * 10, functions-factory: args are stored and will be used by the child-funcs returned,
+        * 20, child-func: created internally, and no args given when invoced, will use parent-factory's args.
+
+    Use factory methods to create one of the first 2 types:
+        * pdcalc.wrap_standalone_func()
+        * pdcalc.wrap_funcs_factory()
+    '''
+    TYPES = ['standalone', 'funcs_factory', 'child_func']
+
+    def __init__(self, func, is_funcs_factory=False, _child_index=None):
+        self.func = func
+        if is_funcs_factory:            ## Factory
+            self._type = 1
+            self.child_funcs = None
+
+            assert _child_index == None, self
+        elif _child_index is not None:  ## Child
+            self._type = 2
+            self.child_index = _child_index
+
+            assert func.is_funcs_factory(), self
+            assert _child_index >= 0 and _child_index < len(func.child_funcs)
+        else:                           ## Standalone
+            self._type = 0
+
+            assert _child_index == None, self
+#         sig = inspect.signature(func)
+#         sig.bind(args)
+#         self.sig = sig
+
+    def get_type(self):
+        try:
+            t = DepFunc.TYPES(self._type)
+        except: # IndexError
+            t = 'BAD(%s)'%self._type
+        return t
+
+    def is_standalone_func(self):
+        return self._type == 0
+    def is_funcs_factory(self):
+        return self._type == 1
+    def is_child_func(self):
+        return self._type == 2
+
+    def reset(self):
+        if self.is_funcs_factory():
+            self.child_funcs = None
+    def is_funcs_factory_invoked(self):
+        assert self.is_funcs_factory(), self
+
+        return self.child_funcs is not None
+
+    def mockup_func_args(self, renames=None, root=None):
+        '''    renames: list with renamed-args (same len as func's args) or dict(arg --> new_name)'''
+        assert not self.is_child_func(), self
+
+        argspec = inspect.getfullargspec(self.func)
+        if (argspec.varargs or argspec.varkw):
+            log.warning('Ignoring any dependencies from *varags or **keywords!')
+        arg_names = argspec.args
+
+        ## Apply any override arg-names.
+        #
+        if renames:
+            if isinstance(renames, Mapping):
+                new_args = OrderedDict(zip(arg_names, arg_names))
+                for k, v in renames.items():
+                    if k in new_args:
+                        new_args[k] = v
+                new_args = list(new_args.values())
+            else:
+                new_args = [arg if arg else farg for (farg, arg) in zip(arg_names, renames)]
+                if len(arg_names) != len(new_args):
+                    raise ValueError("Argument-renames mismatched self.function(%s)!\n  Expected(%s), got(%s), result(%s)."%(self.func, arg_names, renames, new_args))
+
+            arg_names = new_args
+
+        if not root:
+            root = make_mock(name=_root_name)
+        mocks = [make_mock() for cname in arg_names]
+        for (mock, cname) in zip(mocks, arg_names):
+            root.attach_mock(mock, cname)
+        return (root, mocks)
+
+
+
+    def _invoke_func(self, *args):
+        '''To be used internally as it does not handle returned child_funcs.'''
+        assert not self.is_child_func(), self
+
+        args = build_func_args(self.func, args)
+        return self.func(*args)
+
+    def __call__(self, *args):
+        if self.is_standalone_func():           ## Standalone
+            return self._invoke_func(*args)
+
+        elif self.is_funcs_factory():           ## Factory
+            self.child_funcs = self._invoke_func(*args)
+            return [DepFunc(func=self, _child_index=i) for i in range(len(self.child_funcs))]
+
+        else:                                   ## Child
+            parent_fact = self.func
+            assert parent_fact.is_funcs_factory(), self
+
+            ## Use new args only if parent has been reset.
+            #
+            if args and not parent_fact.is_funcs_factory_invoked():
+                parent_fact(*args) ## Ignore returned depfuncs.
+
+            cfunc = parent_fact.child_funcs[self.child_index]
+            return cfunc()
+
+    def __str__(self):
+        return 'DepFunc<%s>(%s)'%(self.get_type(), self.func)
+
+
+
+def build_func_args(func, args):
+    '''    args: either a list with args (same len as func's args) or dict(arg_name --> arg)'''
+
+    argspec = inspect.getfullargspec(func)
+    if (argspec.varargs or argspec.varkw):
+        log.warning('Ignoring *varags(%s) or **keywords(%s) for func(%s)!', func, argspec.varargs, argspec.varkw)
+    arg_names = argspec.args
+
+    ## Apply any override arg-names.
+    #
+    if args:
+        if isinstance(args, Mapping):
+            args = [args[a] for a in arg_names]
+        else:
+            if len(arg_names) != len(args):
+                raise ValueError("Argument-args mismatched function(%s)!\n  Expected(%s), got(%s), result(%s)."%(func, arg_names, args, args))
+
+    return args
+
+
 class Dependencies:
     '''Discovers functions-relationships and produces ExecutionPlan (see build_web()) to inspect them. '''
 
-    def __init__(self, funcs_factory):
+    def __init__(self):
         self.rels = []
-        self.funcs_factory = funcs_factory
 
+    def add_funcs_factory(self, funcs_factory):
         root = make_mock(name=_root_name)
         harvest_funcs_factory(funcs_factory, root=root, func_rels=self.rels)
+        log.debug('DEPS collected(%i): %s', len(self.rels), self.rels)
+
+    def add_func(self, func):
+        root = make_mock(name=_root_name)
+        harvest_func(func, root=root, func_rels=self.rels)
         log.debug('DEPS collected(%i): %s', len(self.rels), self.rels)
 
     def add_func_rel(self, item, deps=None, func=None, args=None):
@@ -410,7 +533,7 @@ class Dependencies:
     def build_web(self):
         graph = build_func_dependencies_graph(self.rels)
         log.debug('GRAPH constructed(%i): %s', graph.size(), graph.edges(data=True))
-        return ExecutionPlan(self.funcs_factory, graph)
+        return ExecutionPlan(graph)
 
 
 
@@ -418,8 +541,7 @@ class Dependencies:
 class ExecutionPlan:
     '''Constructed by Dependencies.'''
 
-    def __init__(self, funcs_factory, graph):
-        self.funcs_factory = funcs_factory
+    def __init__(self, graph):
         self.graph = graph
         self.reset_plan()
 
@@ -427,11 +549,12 @@ class ExecutionPlan:
         self.plan = pd.Series(dict(calc_inp_nodes=[], calc_out_nodes=[], calc_nodes=[],
             missing_data=[] if DEBUG else None, deps_graph=[]))
 
-    def run_funcs(self, args, dests, sources=None):
+    def run_funcs(self, named_args, dests, sources=None):
         '''Limit graph to all those ordered_nodes reaching from 'sources' to 'dests'.
 
-            :sources: a list of ordered_nodes (existent or not) to search for all ordered_nodes originating from them
-            :dests:   a list of ordered_nodes to search for all ordered_nodes leading to them them
+            named_args: an args-map {name: arg} as returned by inspect.signature(func).bind(*args).arguments: BoundArguments
+            sources: a list of ordered_nodes (existent or not) to search for all ordered_nodes originating from them
+            dests:   a list of ordered_nodes to search for all ordered_nodes leading to them them
 
         Example::
 
@@ -441,36 +564,39 @@ class ExecutionPlan:
         plan = self.plan
 
         if (sources is None):
-            sources = tell_paths_from_args(inspect.signature(self.funcs_factory).bind(*args).arguments)
+            sources = tell_paths_from_named_args(named_args)
             log.debug('EXISTING data(%i): %s', len(sources), sources)
 
         log.debug('REQUESTED data(%i): %s', len(dests), dests)
 
-        (plan.calc_inp_nodes, plan.calc_out_nodes, unordered_calc_nodes, plan.deps_graph) = \
+        (calc_inp_nodes, calc_out_nodes, unordered_calc_nodes, deps_graph) = \
                                 research_calculation_routes(self.graph, sources, dests)
-        log.debug('CALC_INP data(%i): %s', len(plan.calc_inp_nodes), plan.calc_inp_nodes)
-        log.debug('CALC_OUT data(%i): %s', len(plan.calc_out_nodes), plan.calc_out_nodes)
+        plan.deps_graph = deps_graph
+        plan.calc_out_nodes = calc_out_nodes
+        plan.calc_inp_nodes = calc_inp_nodes
+        log.debug('CALC_INP data(%i): %s', len(calc_inp_nodes), calc_inp_nodes)
+        log.debug('CALC_OUT data(%i): %s', len(calc_out_nodes), calc_out_nodes)
 
-        plan.calc_nodes = establish_calculation_plan(self.graph, unordered_calc_nodes)
-        log.debug('CALCED data(%i): %s', len(plan.calc_nodes), plan.calc_nodes)
-        log.debug('DEPS ordered(%i): %s', plan.deps_graph.size(), plan.deps_graph.edges(plan.calc_nodes, data=True))
+        calc_nodes = establish_calculation_plan(self.graph, unordered_calc_nodes)
+        plan.calc_nodes = calc_nodes
+        log.debug('CALCED data(%i): %s', len(calc_nodes), calc_nodes)
+        log.debug('DEPS ordered(%i): %s', deps_graph.size(), deps_graph.edges(calc_nodes, data=True))
 
         if DEBUG:
-            plan.missing_inp_nodes = find_missing_input(plan.calc_inp_nodes, plan.deps_graph)
-            log.debug('MISSING? data(%i): %s', len(plan.missing_inp_nodes), plan.missing_inp_nodes)
+            missing_inp_nodes = find_missing_input(calc_inp_nodes, deps_graph)
+            plan.missing_inp_nodes = missing_inp_nodes
+            log.debug('MISSING? data(%i): %s', len(missing_inp_nodes), missing_inp_nodes)
+        else:
+            plan.missing_inp_nodes = None
 
-        func_tuples = extract_funcs_from_edges(plan.deps_graph, plan.calc_nodes)
+        funcs = extract_funcs_from_edges(deps_graph, calc_nodes)
+        plan.funcs = funcs
+        log.debug('FUNCS to run(%i): %s', len(funcs), funcs)
 
         log.info('Execution PLAN: %s', plan)
-        ## Rerun funcs-factory with proper args.
-        #
-        all_funcs = self.funcs_factory(*args)
-        funcs = [all_funcs[n] for (_, n) in func_tuples]
-        log.info('FUNCS to run(%i): %s', len(funcs), funcs)
-
 
         for f in funcs:
-            f()
+            ret = f(named_args)
 
     def __str__(self):
         return "%s(nodes=%r)" % ('ExecutionPlan', self.graph.nodes())

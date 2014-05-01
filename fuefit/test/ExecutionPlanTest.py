@@ -28,7 +28,7 @@ import logging
 from networkx.classes.digraph import DiGraph
 import pandas as pd
 
-from ..pdcalc import Dependencies, research_calculation_routes, tell_paths_from_args
+from ..pdcalc import Dependencies, research_calculation_routes, tell_paths_from_named_args
 
 def lstr(lst):
     return '\n'.join([str(e) for e in lst])
@@ -38,7 +38,7 @@ def DF(d):
 def SR(d):
     return pd.Series(d)
 
-def funcs_fact(params, engine, dfin, dfout):
+def funcs_fact1(params, engine, dfin):
     from math import pi
 
     def f1(): engine['fuel_lhv'] = params['fuel'][engine['fuel']]['lhv']
@@ -50,7 +50,9 @@ def funcs_fact(params, engine, dfin, dfout):
     def f7(): dfin['pme']     = (dfin.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-6)
     def f8(): dfin['pmf']     = ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-3)) * (dfin.fc / (3600 * dfin.rps * 2 * pi)) * 10e-5
     def f9(): dfin['cm']      = dfin.rps * 2 * engine.stroke / 1000
+    return (f1, f2, f3, f4, f5, f6, f7, f8, f9)
 
+def funcs_fact2(params, engine, dfin, dfout):
     ## Out of returned funcs!!
     def f10(): return dfin.cm + dfin.pmf + dfin.pme
 
@@ -61,7 +63,10 @@ def funcs_fact(params, engine, dfin, dfout):
         dfout['fc']     = engine['eng_map_params'] * 4
     def f13(): dfout['fc_norm']         = dfout.fc / dfout.p
 
-    return (f1, f2, f3, f4, f5, f6, f7, f8, f9, f11, f12, f13)
+    return (f11, f12, f13)
+
+def funcs_fact(params, engine, dfin, dfout):
+    return funcs_fact1(params, engine, dfin) + funcs_fact2(params, engine, dfin, dfout)
 
 def get_params():
     return {
@@ -88,7 +93,8 @@ class Test(unittest.TestCase):
 
 
     def build_web(self, extra_rels=None):
-        fexp = Dependencies(funcs_fact)
+        fexp = Dependencies()
+        fexp.add_funcs_factory(funcs_fact)
         if extra_rels:
             fexp.add_func_rel('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv'))
         web = fexp.build_web()
@@ -174,16 +180,16 @@ class Test(unittest.TestCase):
     def testSmoke_ExecutionPlan_fail(self):
         web = self.build_web()
 
-        args = []
+        args = {}
         inp = ('dfin.fc', 'dfin.fc_norm')
         out = ('dfout.fc', 'dfout.BAD')
         with self.assertRaisesRegex(ValueError, 'dfout\.BAD'):
             web.run_funcs(args, out, inp)
 
-    def test_tell_paths_from_args_dicts(self):
+    def test_tell_paths_from_named_args_dicts(self):
         d = {'arg1':{'a':1, 'b':2}, 'arg2':{11:11, 12:{13:13}}}
 
-        paths = tell_paths_from_args(d)
+        paths = tell_paths_from_named_args(d)
         self.assertTrue('arg1.a' in paths, paths)
         self.assertFalse('arg1.a.1' in paths, paths)
         self.assertTrue('arg1.b' in paths, paths)
@@ -193,18 +199,18 @@ class Test(unittest.TestCase):
         self.assertTrue('arg2.12.13' in paths, paths)
         self.assertFalse('arg2.12.13.13' in paths, paths)
 
-    def test_tell_paths_from_args_DF(self):
+    def test_tell_paths_from_named_args_DF(self):
         d = pd.DataFrame({'a':[1,2], 'b':[3,4]})
 
-        paths = tell_paths_from_args({'arg1':d})
+        paths = tell_paths_from_named_args({'arg1':d})
         self.assertTrue('arg1.a' in paths, paths)
         self.assertTrue('arg1.b' in paths, paths)
         self.assertEqual(len(paths), 2, paths)
 
-    def test_tell_paths_from_args_Series(self):
+    def test_tell_paths_from_named_args_Series(self):
         d = pd.Series({'a':[1,2], 'b':3})
 
-        paths = tell_paths_from_args({'arg1':d})
+        paths = tell_paths_from_named_args({'arg1':d})
         self.assertTrue('arg1.a' in paths, paths)
         self.assertTrue('arg1.b' in paths, paths)
         self.assertEqual(len(paths), 2, paths)
@@ -213,11 +219,12 @@ class Test(unittest.TestCase):
     def testSmoke_ExecutionPlan_good(self):
         web = self.build_web()
 
-        params = SR(get_params())
-        engine = SR(get_engine())
-        dfin =  DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]}) # TODO: Check dotted.var.names.
-        dfout = DF({})
-        args = [params, engine, dfin, dfout]
+        args = dict(
+            params = SR(get_params()),
+            engine = SR(get_engine()),
+            dfin =  DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]}), # TODO: Check dotted.var.names.
+            dfout = DF({})
+        )
 
         #inp = ('dfin.fc', 'dfin.fc_norm')
         #web.run_funcs(args, out, inp)
@@ -227,12 +234,30 @@ class Test(unittest.TestCase):
     def testSmoke_ExecutionPlan_goodExtraRels(self):
         web = self.build_web()
 
-        params = SR(get_params())
-        engine = SR(get_engine())
-        dfin =  DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]}) # TODO: CHeck dotted.var.names.
-        dfout = DF({})
-        args = [params, engine, dfin, dfout]
+        args = dict(
+            params = SR(get_params()),
+            engine = SR(get_engine()),
+            dfin =  DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]}), # TODO: CHeck dotted.var.names.
+            dfout = DF({}),
+        )
+        #inp = ('dfin.fc', 'dfin.fc_norm')
+        #web.run_funcs(args, out, inp)
+        out = ('dfout.rpm', 'dfout.fc_norm')
+        web.run_funcs(args, out)
 
+    def testSmoke_ExecutionPlan_multiFatcs_good(self):
+        fexp = Dependencies()
+        fexp.add_funcs_factory(funcs_fact1)
+        fexp.add_funcs_factory(funcs_fact2)
+        fexp.add_func_rel('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv'))
+        web = fexp.build_web()
+
+        args = dict(
+            params = SR(get_params()),
+            engine = SR(get_engine()),
+            dfin =  DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]}), # TODO: CHeck dotted.var.names.
+            dfout = DF({}),
+        )
         #inp = ('dfin.fc', 'dfin.fc_norm')
         #web.run_funcs(args, out, inp)
         out = ('dfout.rpm', 'dfout.fc_norm')

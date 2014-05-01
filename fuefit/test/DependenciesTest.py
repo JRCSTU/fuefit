@@ -86,40 +86,43 @@ class Test(unittest.TestCase):
         func = lambda dfin: dfin.hh['tt']
 
         deps = harvest_func(func)
-        self.assertEqual(deps[0], ('R.dfin.hh.tt', [], func), deps)
+        self.assertEqual(deps[0][0:2], ('R.dfin.hh.tt', []), deps)
 
     def testLambda_successors(self):
         func = lambda dfin: dfin.hh['tt'].ss
         deps = harvest_func(func)
-        self.assertEqual(deps, [('R.dfin.hh.tt.ss', [], func)], deps)
+        self.assertEqual(deps[0][0:2], ('R.dfin.hh.tt.ss', []), deps)
+        self.assertEqual(len(deps), 1, deps)
 
         func = lambda dfin: dfin.hh['tt'].ss('some_arg')
         deps = harvest_func(func)
-        self.assertEqual(deps, [('R.dfin.hh.tt.ss', [], func)], deps)
+        self.assertEqual(deps[0][0:2], ('R.dfin.hh.tt.ss', []), deps)
+        self.assertEqual(len(deps), 1, deps)
 
         func = lambda dfin: dfin.hh['tt'].ss['oo']
         deps = harvest_func(func)
-        self.assertEqual(deps, [('R.dfin.hh.tt.ss.oo', [], func)], deps)
+        self.assertEqual(deps[0][0:2], ('R.dfin.hh.tt.ss.oo', []), deps)
+        self.assertEqual(len(deps), 1, deps)
 
     def testLambda_indirectIndex(self):
         func = lambda dfin, params: dfin(params.hh['tt'])
         deps = harvest_func(func); print(deps)
-        self.assertEqual(deps[0], ('R.dfin', [], func), deps)
-        self.assertEqual(deps[1], ('R.params.hh.tt', [], func), deps)
+        self.assertEqual(deps[0][0:2], ('R.dfin', []), deps)
+        self.assertEqual(deps[1][0:2], ('R.params.hh.tt', []), deps)
 
     def testLambda_multiIndex(self):
         func = lambda dfin, params: dfin.hh[['tt','ll']] + params.tt
         deps = harvest_func(func)
-        self.assertEqual(deps[0], ('R.dfin.hh.ll', [], func), deps)
+        self.assertEqual(deps[0][0:2], ('R.dfin.hh.ll', []), deps)
         items = [item for (item, _, _) in deps]
         self.assertEqual(items, ['R.dfin.hh.ll', 'R.dfin.hh.tt', 'R.params.tt'], deps)
 
     def testLambda_sliceIndex(self):
         func = lambda dfin, params: dfin.hh['tt':'ll', 'ii']
         deps = harvest_func(func)
-        self.assertEqual(deps[0], ('R.dfin.hh.ii', [], func), deps)
-        self.assertEqual(deps[1], ('R.dfin.hh.ll', [], func), deps)
-        self.assertEqual(deps[2], ('R.dfin.hh.tt', [], func), deps)
+        self.assertEqual(deps[0][0:2], ('R.dfin.hh.ii', []), deps)
+        self.assertEqual(deps[1][0:2], ('R.dfin.hh.ll', []), deps)
+        self.assertEqual(deps[2][0:2], ('R.dfin.hh.tt', []), deps)
         self.assertEqual(len(deps), 3, deps)
 
     def testLambda_mixIndex(self):
@@ -140,9 +143,9 @@ class Test(unittest.TestCase):
     def testFunc_sliceIndex(self):
         def func(dfin, params): dfin.hh['tt':'ll', 'ii']
         deps = harvest_func(func)
-        self.assertEqual(deps[0], ('R.dfin.hh.ii', [], func), deps)
-        self.assertEqual(deps[1], ('R.dfin.hh.ll', [], func), deps)
-        self.assertEqual(deps[2], ('R.dfin.hh.tt', [], func), deps)
+        self.assertEqual(deps[0][0:2], ('R.dfin.hh.ii', []), deps)
+        self.assertEqual(deps[1][0:2], ('R.dfin.hh.ll', []), deps)
+        self.assertEqual(deps[2][0:2], ('R.dfin.hh.tt', []), deps)
         self.assertEqual(len(deps), 3, deps)
 
 
