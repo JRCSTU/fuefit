@@ -30,7 +30,8 @@ import networkx as nx
 import pandas as pd
 from networkx.exception import NetworkXError
 import re
-from fuefit.mymock import MagicMock
+from .mymock import MagicMock
+from . import DEBUG
 
 
 _root_name = 'R'
@@ -331,14 +332,22 @@ def all_predecessors(graph, nodes):
     return [k for node in nodes for k in nx.bfs_predecessors(graph, node).keys()]
 
 
-def establish_calculation_plan(graph, sources, dests):
-    (calc_inp_nodes, calc_out_nodes, calc_nodes, deps_graph) = \
-                                    research_calculation_routes(graph, sources, dests)
-
+def establish_calculation_plan(graph, calc_nodes):
     subgraph = graph.subgraph(calc_nodes)
-    order = list(reversed(nx.topological_sort(subgraph)))
+    ordered_calc_nodes = list(reversed(nx.topological_sort(subgraph)))
 
-    return (calc_inp_nodes, calc_out_nodes, order, deps_graph)
+    return ordered_calc_nodes
+
+
+def find_missing_input(calc_inp_nodes, graph):
+    '''Search for *tentatively* missing data.'''
+    calc_inp_nodes = set(calc_inp_nodes) # for efficiency below
+    missing_input_nodes = []
+    for node in nx.dfs_predecessors(graph):
+        if ( node not in calc_inp_nodes and graph.out_degree(node) == 0):
+            missing_input_nodes.append(node)
+    return missing_input_nodes
+
 
 def extract_funcs_from_edges(graph, ordered_nodes):
     funcs = [f for (_, _, d) in graph.edges_iter(ordered_nodes, True) if d
@@ -381,8 +390,8 @@ def tell_paths_from_args(func_args, arg_paths_extractor_func=default_arg_paths_e
     return paths
 
 
-class FuncsExplorer:
-    '''Discovers functions-relationships and produces FuncRelations (see build_web()) to inspect them. '''
+class DependencyResolver:
+    '''Discovers functions-relationships and produces ExecutionPlan (see build_web()) to inspect them. '''
 
     def __init__(self, funcs_factory):
         self.rels = []
@@ -401,17 +410,22 @@ class FuncsExplorer:
     def build_web(self):
         graph = build_func_dependencies_graph(self.rels)
         log.debug('GRAPH constructed(%i): %s', graph.size(), graph.edges(data=True))
-        return FuncRelations(self.funcs_factory, graph)
+        return ExecutionPlan(self.funcs_factory, graph)
 
 
 
 
-class FuncRelations:
-    '''Constructed by FuncsExplorer.'''
+class ExecutionPlan:
+    '''Constructed by DependencyResolver.'''
 
     def __init__(self, funcs_factory, graph):
         self.funcs_factory = funcs_factory
         self.graph = graph
+        self.reset_plan()
+
+    def reset_plan(self):
+        self.plan = pd.Series(dict(calc_inp_nodes=[], calc_out_nodes=[], calc_nodes=[],
+            missing_data=[] if DEBUG else None, deps_graph=[]))
 
     def run_funcs(self, args, dests, sources=None):
         '''Limit graph to all those ordered_nodes reaching from 'sources' to 'dests'.
@@ -423,6 +437,8 @@ class FuncRelations:
 
             args = {'dfin': df, 'dfout':some.dict}
         '''
+        self.reset_plan()
+        plan = self.plan
 
         if (sources is None):
             sources = tell_paths_from_args(inspect.signature(self.funcs_factory).bind(*args).arguments)
@@ -430,14 +446,22 @@ class FuncRelations:
 
         log.debug('REQUESTED data(%i): %s', len(dests), dests)
 
-        (sources, dests, ordered_nodes, subgraph) = establish_calculation_plan(self.graph, sources, dests)
-        log.info('CALC_INP data(%i): %s', len(sources), sources)
-        log.info('CALC_OUT data(%i): %s', len(dests), dests)
-        log.info('CALCED data(%i): %s', len(ordered_nodes), ordered_nodes)
-        log.debug('DEPS ordered(%i): %s', subgraph.size(), subgraph.edges(ordered_nodes, data=True))
+        (plan.calc_inp_nodes, plan.calc_out_nodes, unordered_calc_nodes, plan.deps_graph) = \
+                                research_calculation_routes(self.graph, sources, dests)
+        log.debug('CALC_INP data(%i): %s', len(plan.calc_inp_nodes), plan.calc_inp_nodes)
+        log.debug('CALC_OUT data(%i): %s', len(plan.calc_out_nodes), plan.calc_out_nodes)
 
-        func_tuples = extract_funcs_from_edges(subgraph, ordered_nodes)
+        plan.calc_nodes = establish_calculation_plan(self.graph, unordered_calc_nodes)
+        log.debug('CALCED data(%i): %s', len(plan.calc_nodes), plan.calc_nodes)
+        log.debug('DEPS ordered(%i): %s', plan.deps_graph.size(), plan.deps_graph.edges(plan.calc_nodes, data=True))
 
+        if DEBUG:
+            plan.missing_inp_nodes = find_missing_input(plan.calc_inp_nodes, plan.deps_graph)
+            log.debug('MISSING? data(%i): %s', len(plan.missing_inp_nodes), plan.missing_inp_nodes)
+
+        func_tuples = extract_funcs_from_edges(plan.deps_graph, plan.calc_nodes)
+
+        log.info('Execution PLAN: %s', plan)
         ## Rerun funcs-factory with proper args.
         #
         all_funcs = self.funcs_factory(*args)
@@ -449,5 +473,5 @@ class FuncRelations:
             f()
 
     def __str__(self):
-        return "%s(nodes=%r)" % ('FuncRelations', self.graph.nodes())
+        return "%s(nodes=%r)" % ('ExecutionPlan', self.graph.nodes())
 

@@ -28,7 +28,7 @@ import logging
 from networkx.classes.digraph import DiGraph
 import pandas as pd
 
-from fuefit.pdcalc import FuncsExplorer, FuncRelations, research_calculation_routes, extract_funcs_from_edges,\
+from fuefit.pdcalc import DependencyResolver, ExecutionPlan, research_calculation_routes, extract_funcs_from_edges,\
     tell_paths_from_args
 
 def lstr(lst):
@@ -89,7 +89,7 @@ class Test(unittest.TestCase):
 
 
     def build_web(self, extra_rels=None):
-        fexp = FuncsExplorer(funcs_fact)
+        fexp = DependencyResolver(funcs_fact)
         if extra_rels:
             fexp.add_func_rel('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv'))
         web = fexp.build_web()
@@ -172,7 +172,7 @@ class Test(unittest.TestCase):
         self.assertTrue(all_in & cn_nodes == all_in, cn_nodes)
 
 
-    def testSmoke_FuncRelations_fail(self):
+    def testSmoke_ExecutionPlan_fail(self):
         web = self.build_web()
 
         args = []
@@ -211,7 +211,7 @@ class Test(unittest.TestCase):
         self.assertEqual(len(paths), 2, paths)
 
 
-    def testSmoke_FuncRelations_good(self):
+    def testSmoke_ExecutionPlan_good(self):
         web = self.build_web()
 
         params = SR(get_params())
@@ -225,7 +225,7 @@ class Test(unittest.TestCase):
         out = ('dfout.rpm', 'dfout.fc_norm')
         web.run_funcs(args, out)
 
-    def testSmoke_FuncRelations_goodExtraRels(self):
+    def testSmoke_ExecutionPlan_goodExtraRels(self):
         web = self.build_web()
 
         params = SR(get_params())

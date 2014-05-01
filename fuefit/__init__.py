@@ -27,6 +27,8 @@ import pandas as pd
 import json
 from ._version import __version_info__
 
+DEBUG   = False
+
 
 ##############
 #  Utilities

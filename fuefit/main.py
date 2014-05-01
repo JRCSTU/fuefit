@@ -34,10 +34,9 @@ import jsonpointer as jsonp
 import jsonschema as jsons
 import pandas as pd
 
-from . import (model, _version, json_dumps, str2bool)
+from . import (_version, DEBUG, model, json_dumps, str2bool)
 
 
-DEBUG   = False
 logging.basicConfig(level=logging.DEBUG)
 log     = logging.getLogger(__file__)
 
@@ -75,14 +74,14 @@ def main(argv=None):
 
         ## Read the same table above but without header-row and
         #    store results into Excel file:
-        >> %(prog)s -m fuel=PETROL -I engine.csv --icolumns CM PME PMF -dfin engine_map.xlsx
+        >> %(prog)s -m fuel=PETROL -I engine.csv --icolumns CM PME PMF -I engine_map.xlsx
 
         ## Supply as inline-json more model-values required for columns [RPM, P, FC]
         #    read from <stdin> as json 2D-array of values (no headers).
         #    and store results in UTF-8 regardless of platform's default encoding:
         >> %(prog)s -m '/engine:={"fuel":"PETROL", "stroke":15, "capacity":1359}' \\
                 -I - file_frmt=JSON orient=values -c RPM P FC \\
-                -dfin engine_map.txt encoding=UTF-8
+                -O engine_map.txt encoding=UTF-8
 
 
     Now, if input vectors are in 2 separate files, the 1st, 'engine_1.xlsx',
@@ -94,7 +93,7 @@ def main(argv=None):
     and the 2nd having 2 columns with no headers at all and
     the 1st column being 'Pnorm', then it, then use the following command:
 
-        >> %(prog)s -dfin engine_map -m fuel=PETROL \\
+        >> %(prog)s -O engine_map -m fuel=PETROL \\
                 -I=engine_1.xlsx \\
                 -c X   X   N   'Fuel consumption'  X \\
                 -r X   X   RPM 'FC(g/s)'           X \\
@@ -102,7 +101,7 @@ def main(argv=None):
                 -c Pnorm X
     """
 
-    global log, DEBUG
+    global log
 
     program_name    = 'fuefit' #os.path.basename(sys.argv[0])
 
@@ -131,7 +130,7 @@ def main(argv=None):
         infiles     = parse_many_file_args(opts.I, 'r')
         log.info("Input-files: %s", infiles)
 
-        outfiles    = parse_many_file_args(opts.DF, 'w')
+        outfiles    = parse_many_file_args(opts.O, 'w')
         log.info("Output-files: %s", outfiles)
 
         mdl = build_model(opts, infiles)
@@ -278,15 +277,18 @@ def parse_many_file_args(many_file_args, filetype):
                     raise argparse.ArgumentTypeError("File(%s) has unknown extension, file_frmt is required! \n  Set 'file_frmt=XXX' to one of %s" % (fname, list(_pandas_formats.keys())[1:]))
             file = argparse.FileType(filetype)(fname)
 
-
-        if ('model_path' in pandas_kws):
+        try:
             dest = pandas_kws.pop('model_path')
             if (not dest.startswith('/')):
                 raise argparse.ArgumentTypeError('Only absolute dest-paths supported: %s' % (dest))
+        except KeyError:
+            pass
 
-        if ('file_append' in pandas_kws):
-            append = pandas_kws.pop('append')
+        try:
+            append = pandas_kws.pop('file_append')
             append = str2bool(append)
+        except KeyError:
+            pass
 
         return FileSpec(fname, file, frmt, dest, append, pandas_kws)
 
@@ -360,7 +362,7 @@ def build_args_parser(program_name, version, desc, epilog):
               must either match them, be 1 (meaning use them for all files), or be totally absent
               (meaning use defaults for all files). """),
                         action='append', nargs='+',
-                        default=[('- file_frmt=%s model_path=%s'%(_default_pandas_format, _default_df_dest)).split()],
+                        default=[('- file_frmt=%s model_path=%s'%('CSV', _default_df_dest)).split()],
                         metavar='ARG')
     grp_io.add_argument('-c', '--icolumns', help=dedent("""\
             describes the contents and the units of input file(s) (see --I).
@@ -428,7 +430,7 @@ def build_args_parser(program_name, version, desc, epilog):
                         type=parse_key_value_pair, metavar='MODEL_PATH')
 
 
-    grp_io.add_argument('-dfin', help=dedent("""\
+    grp_io.add_argument('-O', help=dedent("""\
             specifies output-file(s) to write model-portions into after calculations.
             The syntax is indentical to -I, with these differences:
             * When FILENAME is '-', <stdout> is used.
@@ -437,7 +439,7 @@ def build_args_parser(program_name, version, desc, epilog):
                     specify whether to augment pre-existing files, or overwrite them.
             * Default: %(default)s] """),
                         action='append', nargs='+',
-                        default=[('- file_frmt=%s model_path=%s file_append=%s'%(_default_pandas_format, _default_df_source,  _default_append)).split()],
+                        default=[('- file_frmt=%s model_path=%s file_append=%s'%('CSV', _default_df_source,  _default_append)).split()],
                         metavar='ARG')
 
 
