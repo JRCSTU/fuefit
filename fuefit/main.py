@@ -34,7 +34,7 @@ import jsonpointer as jsonp
 import jsonschema as jsons
 import pandas as pd
 
-from . import (_version, DEBUG, model, json_dumps, str2bool)
+from . import (_version, DEBUG, model, json_dumps, str2bool)  # @UnusedImport
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -101,7 +101,7 @@ def main(argv=None):
                 -c Pnorm X
     """
 
-    global log
+    global log, DEBUG
 
     program_name    = 'fuefit' #os.path.basename(sys.argv[0])
 

@@ -84,6 +84,13 @@ def get_engine():
         'stroke'    : 12,
     }
 
+def build_base_deps():
+    deps = Dependencies()
+    deps.add_funcs_factory(funcs_fact)
+
+    return deps
+
+
 class Test(unittest.TestCase):
     def setUp(self):
         logging.basicConfig(level=logging.DEBUG)
@@ -92,41 +99,34 @@ class Test(unittest.TestCase):
         l.addHandler(logging.StreamHandler())
 
 
-    def build_web(self, extra_rels=None):
-        fexp = Dependencies()
-        fexp.add_funcs_factory(funcs_fact)
-        if extra_rels:
-            fexp.add_func_rel('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv'))
-        web = fexp.build_web()
-
-        return web
-
-
     def testSmoke_FuncExplorer_countNodes(self):
-        web = self.build_web()
-#         print("RELS:\n", lstr(fexp.rels))
-#         print('ORDERED:\n', lstr(web.graph.ordered(True)))
-        self.assertEqual(len(web.graph), 25) #29 when adding.segments
+        deps = build_base_deps()
+        plan = deps.build_planner()
+#         print("RELS:\n", lstr(deps.rels))
+#         print('ORDERED:\n', lstr(plan.graph.ordered(True)))
+        self.assertEqual(len(plan.graph), 25) #29 when adding.segments
 
-        return web
+        return plan
 
     def test_find_connecting_nodes_smoke(self):
-        web = self.build_web()
+        deps = build_base_deps()
+        plan = deps.build_planner()
 
         inp = ('dfin.fc', 'dfin.fc_norm', 'dfin.XX')
         out = ('dfout.fc', 'dfout.rpm')
-        (_, _, cn_nodes, _) = research_calculation_routes(web.graph, inp, out)
+        (_, _, cn_nodes, _) = research_calculation_routes(plan.graph, inp, out)
         self.assertTrue('dfin.fc_norm' not in cn_nodes)
 
         #print(cn_nodes)
 
     def test_find_connecting_nodes_fail(self):
-        web = self.build_web()
+        deps = build_base_deps()
+        plan = deps.build_planner()
 
         inp = ('dfin.fc', 'dfin.fc_norm')
         out = ('dfout.fc', 'dfout.BAD')
         with self.assertRaisesRegex(ValueError, 'dfout\.BAD'):
-            research_calculation_routes(web.graph, inp, out)
+            research_calculation_routes(plan.graph, inp, out)
 
 
     def test_find_connecting_nodes_good(self):
@@ -178,13 +178,14 @@ class Test(unittest.TestCase):
 
 
     def testSmoke_ExecutionPlan_fail(self):
-        web = self.build_web()
+        deps = build_base_deps()
+        plan = deps.build_planner()
 
         args = {}
         inp = ('dfin.fc', 'dfin.fc_norm')
         out = ('dfout.fc', 'dfout.BAD')
         with self.assertRaisesRegex(ValueError, 'dfout\.BAD'):
-            web.run_funcs(args, out, inp)
+            plan.run_funcs(args, out, inp)
 
     def test_tell_paths_from_named_args_dicts(self):
         d = {'arg1':{'a':1, 'b':2}, 'arg2':{11:11, 12:{13:13}}}
@@ -217,7 +218,8 @@ class Test(unittest.TestCase):
 
 
     def testSmoke_ExecutionPlan_good(self):
-        web = self.build_web()
+        deps = build_base_deps()
+        plan = deps.build_planner()
 
         args = dict(
             params = SR(get_params()),
@@ -227,12 +229,16 @@ class Test(unittest.TestCase):
         )
 
         #inp = ('dfin.fc', 'dfin.fc_norm')
-        #web.run_funcs(args, out, inp)
+        #plan.run_funcs(args, out, inp)
         out = ('dfout.rpm', 'dfout.fc_norm')
-        web.run_funcs(args, out)
+        plan.run_funcs(args, out)
+
+        print(args)
 
     def testSmoke_ExecutionPlan_goodExtraRels(self):
-        web = self.build_web()
+        deps = build_base_deps()
+        deps.add_func_rel('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv'))
+        plan = deps.build_planner()
 
         args = dict(
             params = SR(get_params()),
@@ -241,16 +247,16 @@ class Test(unittest.TestCase):
             dfout = DF({}),
         )
         #inp = ('dfin.fc', 'dfin.fc_norm')
-        #web.run_funcs(args, out, inp)
+        #plan.run_funcs(args, out, inp)
         out = ('dfout.rpm', 'dfout.fc_norm')
-        web.run_funcs(args, out)
+        plan.run_funcs(args, out)
 
     def testSmoke_ExecutionPlan_multiFatcs_good(self):
-        fexp = Dependencies()
-        fexp.add_funcs_factory(funcs_fact1)
-        fexp.add_funcs_factory(funcs_fact2)
-        fexp.add_func_rel('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv'))
-        web = fexp.build_web()
+        deps = Dependencies()
+        deps.add_funcs_factory(funcs_fact1)
+        deps.add_funcs_factory(funcs_fact2)
+        deps.add_func_rel('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv'))
+        plan = deps.build_planner()
 
         args = dict(
             params = SR(get_params()),
@@ -259,9 +265,9 @@ class Test(unittest.TestCase):
             dfout = DF({}),
         )
         #inp = ('dfin.fc', 'dfin.fc_norm')
-        #web.run_funcs(args, out, inp)
+        #plan.run_funcs(args, out, inp)
         out = ('dfout.rpm', 'dfout.fc_norm')
-        web.run_funcs(args, out)
+        plan.run_funcs(args, out)
 
 
 if __name__ == "__main__":

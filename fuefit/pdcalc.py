@@ -509,7 +509,7 @@ def build_func_args(func, args):
 
 
 class Dependencies:
-    '''Discovers functions-relationships and produces ExecutionPlan (see build_web()) to inspect them. '''
+    '''Discovers functions-relationships and produces ExecutionPlanner (see build_planner()) to inspect them. '''
 
     def __init__(self):
         self.rels = []
@@ -530,15 +530,15 @@ class Dependencies:
             deps = []
         append_func_relation(item, deps, func, self.rels)
 
-    def build_web(self):
+    def build_planner(self):
         graph = build_func_dependencies_graph(self.rels)
         log.debug('GRAPH constructed(%i): %s', graph.size(), graph.edges(data=True))
-        return ExecutionPlan(graph)
+        return ExecutionPlanner(graph)
 
 
 
 
-class ExecutionPlan:
+class ExecutionPlanner:
     '''Constructed by Dependencies.'''
 
     def __init__(self, graph):
@@ -599,5 +599,5 @@ class ExecutionPlan:
             ret = f(named_args)
 
     def __str__(self):
-        return "%s(nodes=%r)" % ('ExecutionPlan', self.graph.nodes())
+        return "%s(nodes=%r)" % ('ExecutionPlanner', self.graph.nodes())
 
