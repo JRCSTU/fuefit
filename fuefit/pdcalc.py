@@ -39,12 +39,11 @@ _root_len = len(_root_name)+1
 log = logging.getLogger(__file__)
 
 
-def get_mock_factory():
-    return MagicMock
-make_mock = get_mock_factory()
+def make_mock(*args, **kwargs):
+    return MagicMock(*args, **kwargs)
 
 
-def harvest_funcs_factory(funcs_factory, root=None, renames=None, func_rels=None):
+def harvest_funcs_factory(funcs_factory, root=None, func_rels=None):
     if func_rels is  None:
         func_rels = []
 
@@ -52,8 +51,9 @@ def harvest_funcs_factory(funcs_factory, root=None, renames=None, func_rels=None
     #    to collect mock_calls.
     #
     funcs_factory = wrap_funcs_factory(funcs_factory)
-    (root, mocks) = funcs_factory.mockup_func_args(root=root, renames=renames)
-    cfuncs = funcs_factory(*mocks)
+    (root, mocks) = funcs_factory.mockup_func_args(root=root)
+
+    cfuncs = funcs_factory(*mocks) ## The cfuncs are now wrapped children.
 
     ## Harvest cfunc deps as a list of 3-tuple (item, deps, funx)
     #    by inspecting root after each cfunc-call.
@@ -65,20 +65,23 @@ def harvest_funcs_factory(funcs_factory, root=None, renames=None, func_rels=None
         except:
             pass
         harvest_mock_calls(root.mock_calls, cfunc, func_rels)
+    funcs_factory.reset()
 
     assert validate_func_relations(func_rels), func_rels
     return func_rels
 
-def harvest_func(func, root=None, renames=None, func_rels=None):
+def harvest_func(func, root=None, func_rels=None):
     if func_rels is None:
         func_rels = []
 
     func = wrap_standalone_func(func)
-    (root, mocks) = func.mockup_func_args(root=root, renames=renames)
+    (root, mocks) = func.mockup_func_args(root=root)
+
     tmp = func(*mocks)
     try: tmp += 2   ## Force dependencies from return values despite compiler-optimizations.
     except:
         pass
+    func.reset()
     harvest_mock_calls(root.mock_calls, func, func_rels)
 
     assert validate_func_relations(func_rels), func_rels
@@ -302,7 +305,7 @@ def all_predecessors(graph, nodes):
     return [k for node in nodes for k in nx.bfs_predecessors(graph, node).keys()]
 
 
-def establish_calculation_plan(graph, calc_nodes):
+def find_calculation_order(graph, calc_nodes):
     subgraph = graph.subgraph(calc_nodes)
     ordered_calc_nodes = list(reversed(nx.topological_sort(subgraph)))
 
@@ -320,6 +323,7 @@ def find_missing_input(calc_inp_nodes, graph):
 
 
 def extract_funcs_from_edges(graph, ordered_nodes):
+    # f=list(fs[0]['funcs'])[0]
     funcs = [f for (_, _, d) in graph.edges_iter(ordered_nodes, True) if d
             for f in d['funcs']] # a list of sets
 
@@ -377,7 +381,7 @@ class DepFunc:
         * pdcalc.wrap_standalone_func()
         * pdcalc.wrap_funcs_factory()
     '''
-    TYPES = ['standalone', 'funcs_factory', 'child_func']
+    TYPES = ['standalone', 'funcs_fact', 'child']
 
     def __init__(self, func, is_funcs_factory=False, _child_index=None):
         self.func = func
@@ -396,16 +400,9 @@ class DepFunc:
             self._type = 0
 
             assert _child_index == None, self
-#         sig = inspect.signature(func)
-#         sig.bind(args)
-#         self.sig = sig
 
     def get_type(self):
-        try:
-            t = DepFunc.TYPES(self._type)
-        except: # IndexError
-            t = 'BAD(%s)'%self._type
-        return t
+        return DepFunc.TYPES[self._type]
 
     def is_standalone_func(self):
         return self._type == 0
@@ -417,95 +414,60 @@ class DepFunc:
     def reset(self):
         if self.is_funcs_factory():
             self.child_funcs = None
-    def is_funcs_factory_invoked(self):
+    def is_reset(self):
         assert self.is_funcs_factory(), self
 
         return self.child_funcs is not None
 
-    def mockup_func_args(self, renames=None, root=None):
-        '''    renames: list with renamed-args (same len as func's args) or dict(arg --> new_name)'''
+    def mockup_func_args(self, root=None):
         assert not self.is_child_func(), self
-
-        argspec = inspect.getfullargspec(self.func)
-        if (argspec.varargs or argspec.varkw):
-            log.warning('Ignoring any dependencies from *varags or **keywords!')
-        arg_names = argspec.args
-
-        ## Apply any override arg-names.
-        #
-        if renames:
-            if isinstance(renames, Mapping):
-                new_args = OrderedDict(zip(arg_names, arg_names))
-                for k, v in renames.items():
-                    if k in new_args:
-                        new_args[k] = v
-                new_args = list(new_args.values())
-            else:
-                new_args = [arg if arg else farg for (farg, arg) in zip(arg_names, renames)]
-                if len(arg_names) != len(new_args):
-                    raise ValueError("Argument-renames mismatched self.function(%s)!\n  Expected(%s), got(%s), result(%s)."%(self.func, arg_names, renames, new_args))
-
-            arg_names = new_args
 
         if not root:
             root = make_mock(name=_root_name)
-        mocks = [make_mock() for cname in arg_names]
-        for (mock, cname) in zip(mocks, arg_names):
-            root.attach_mock(mock, cname)
+
+        sig = inspect.signature(self.func)
+        mocks = []
+        for (name, param) in sig.parameters.items():
+            if param.kind == inspect.Parameter.VAR_KEYWORD:
+                log.warning('Any dependencies from **%s will be ignored for %s!', name, self)
+                break
+            mock = make_mock()
+            mocks.append(mock)
+            root.attach_mock(mock, name)
         return (root, mocks)
 
 
-
-    def _invoke_func(self, *args):
-        '''To be used internally as it does not handle returned child_funcs.'''
-        assert not self.is_child_func(), self
-
-        args = build_func_args(self.func, args)
-        return self.func(*args)
-
-    def __call__(self, *args):
+    def __call__(self, *args, **kwargs):
         if self.is_standalone_func():           ## Standalone
-            return self._invoke_func(*args)
+            return self.func(*args, **kwargs)
 
         elif self.is_funcs_factory():           ## Factory
-            self.child_funcs = self._invoke_func(*args)
+            self.child_funcs = self.func(*args, **kwargs)
             return [DepFunc(func=self, _child_index=i) for i in range(len(self.child_funcs))]
 
         else:                                   ## Child
             parent_fact = self.func
             assert parent_fact.is_funcs_factory(), self
 
-            ## Use new args only if parent has been reset.
+            ## Use new args only if parent has previously been reset.
             #
-            if args and not parent_fact.is_funcs_factory_invoked():
-                parent_fact(*args) ## Ignore returned depfuncs.
+            if (args or kwargs) and not parent_fact.is_reset():
+                parent_fact(*args, **kwargs) ## Ignore returned depfuncs, we are the children!
 
             cfunc = parent_fact.child_funcs[self.child_index]
             return cfunc()
 
+    def __repr__(self):
+        return self.__str__()
+
     def __str__(self):
-        return 'DepFunc<%s>(%s)'%(self.get_type(), self.func)
+        try:
+            if (self.is_child_func()):
+                return 'DepFunc<child>(%s, %s)'%(self.func.func, self.child_index)
+            return 'DepFunc<%s>(%s)'%(self.get_type(), self.func)
+        except:
+            return 'DepFunc<BAD_STR>(%s)'%self.func
 
-
-
-def build_func_args(func, args):
-    '''    args: either a list with args (same len as func's args) or dict(arg_name --> arg)'''
-
-    argspec = inspect.getfullargspec(func)
-    if (argspec.varargs or argspec.varkw):
-        log.warning('Ignoring *varags(%s) or **keywords(%s) for func(%s)!', func, argspec.varargs, argspec.varkw)
-    arg_names = argspec.args
-
-    ## Apply any override arg-names.
-    #
-    if args:
-        if isinstance(args, Mapping):
-            args = [args[a] for a in arg_names]
-        else:
-            if len(arg_names) != len(args):
-                raise ValueError("Argument-args mismatched function(%s)!\n  Expected(%s), got(%s), result(%s)."%(func, arg_names, args, args))
-
-    return args
 
 
 class Dependencies:
@@ -543,60 +505,63 @@ class ExecutionPlanner:
 
     def __init__(self, graph):
         self.graph = graph
-        self.reset_plan()
 
-    def reset_plan(self):
-        self.plan = pd.Series(dict(calc_inp_nodes=[], calc_out_nodes=[], calc_nodes=[],
+    def make_empty_plan(self):
+        return pd.Series(dict(calc_inp_nodes=[], calc_out_nodes=[], calc_nodes=[],
             missing_data=[] if DEBUG else None, deps_graph=[]))
 
-    def run_funcs(self, named_args, dests, sources=None):
-        '''Limit graph to all those ordered_nodes reaching from 'sources' to 'dests'.
+    def establish_plan(self, dests, named_args=None, sources=None, plan=None):
+        '''Limit graph to all those dotted.data reaching from 'sources' to 'dests'.
 
-            named_args: an args-map {name: arg} as returned by inspect.signature(func).bind(*args).arguments: BoundArguments
-            sources: a list of ordered_nodes (existent or not) to search for all ordered_nodes originating from them
-            dests:   a list of ordered_nodes to search for all ordered_nodes leading to them them
+            named_args: an ordered map {name: arg} as returned by inspect.signature(func).bind(*args).arguments: BoundArguments
+            sources: a list of dotted.data (existent or not) to search for all dotted.data originating from them
+            dests:   a list of dotted.data to search for all dotted.data leading to them them
 
         Example::
 
             args = {'dfin': df, 'dfout':some.dict}
         '''
-        self.reset_plan()
-        plan = self.plan
+
+        if plan is None:
+            plan = self.make_empty_plan()
+            plan.dests = dests
 
         if (sources is None):
-            sources = tell_paths_from_named_args(named_args)
-            log.debug('EXISTING data(%i): %s', len(sources), sources)
-
+            sources         = tell_paths_from_named_args(named_args)
+        log.debug('EXISTING data(%i): %s', len(sources), sources)
         log.debug('REQUESTED data(%i): %s', len(dests), dests)
 
         (calc_inp_nodes, calc_out_nodes, unordered_calc_nodes, deps_graph) = \
                                 research_calculation_routes(self.graph, sources, dests)
-        plan.deps_graph = deps_graph
+        plan.deps_graph     = deps_graph
         plan.calc_out_nodes = calc_out_nodes
         plan.calc_inp_nodes = calc_inp_nodes
-        log.debug('CALC_INP data(%i): %s', len(calc_inp_nodes), calc_inp_nodes)
-        log.debug('CALC_OUT data(%i): %s', len(calc_out_nodes), calc_out_nodes)
 
-        calc_nodes = establish_calculation_plan(self.graph, unordered_calc_nodes)
-        plan.calc_nodes = calc_nodes
-        log.debug('CALCED data(%i): %s', len(calc_nodes), calc_nodes)
-        log.debug('DEPS ordered(%i): %s', deps_graph.size(), deps_graph.edges(calc_nodes, data=True))
+        calc_nodes          = find_calculation_order(self.graph, unordered_calc_nodes)
+        plan.calc_nodes     = calc_nodes
+        plan.deps           = deps_graph.edges(calc_nodes, data=True)
 
         if DEBUG:
-            missing_inp_nodes = find_missing_input(calc_inp_nodes, deps_graph)
-            plan.missing_inp_nodes = missing_inp_nodes
-            log.debug('MISSING? data(%i): %s', len(missing_inp_nodes), missing_inp_nodes)
+            missing_inp_nodes       = find_missing_input(calc_inp_nodes, deps_graph)
+            plan.missing_inp_nodes  = missing_inp_nodes
         else:
-            plan.missing_inp_nodes = None
+            plan.missing_inp_nodes  = None
 
-        funcs = extract_funcs_from_edges(deps_graph, calc_nodes)
-        plan.funcs = funcs
-        log.debug('FUNCS to run(%i): %s', len(funcs), funcs)
+        funcs               = extract_funcs_from_edges(deps_graph, calc_nodes)
+        plan.funcs          = funcs
 
+        return plan
+
+
+    def run_plan(self, plan, *args, **kwargs):
+        results = [func(*args, **kwargs) for func in plan.funcs]
+        return results
+
+
+    def make_plan_and_run(self, dests, named_args, sources=None):
+        plan = self.establish_plan(dests, named_args, sources=sources)
         log.info('Execution PLAN: %s', plan)
-
-        for f in funcs:
-            ret = f(named_args)
+        return self.run_plan(plan, *named_args.values())
 
     def __str__(self):
         return "%s(nodes=%r)" % ('ExecutionPlanner', self.graph.nodes())

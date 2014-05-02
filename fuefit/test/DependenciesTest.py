@@ -226,7 +226,7 @@ class Test(unittest.TestCase):
 
     def build_web(self):
         rels = list()
-        harvest_funcs_factory(funcs_fact, renames=[None, None, 'dfin'], func_rels=rels)
+        harvest_funcs_factory(funcs_fact, func_rels=rels)
         harvest_funcs_factory(funcs_fact2, func_rels=rels)
         graph = build_func_dependencies_graph(rels)
 

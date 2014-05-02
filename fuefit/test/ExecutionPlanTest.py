@@ -24,6 +24,7 @@ Created on Apr 23, 2014
 @author: ankostis
 '''
 import unittest
+from collections import OrderedDict
 import logging
 from networkx.classes.digraph import DiGraph
 import pandas as pd
@@ -38,7 +39,7 @@ def DF(d):
 def SR(d):
     return pd.Series(d)
 
-def funcs_fact1(params, engine, dfin):
+def funcs_fact1(params, engine, dfin, dfout):
     from math import pi
 
     def f1(): engine['fuel_lhv'] = params['fuel'][engine['fuel']]['lhv']
@@ -66,7 +67,7 @@ def funcs_fact2(params, engine, dfin, dfout):
     return (f11, f12, f13)
 
 def funcs_fact(params, engine, dfin, dfout):
-    return funcs_fact1(params, engine, dfin) + funcs_fact2(params, engine, dfin, dfout)
+    return funcs_fact1(params, engine, dfin, dfout) + funcs_fact2(params, engine, dfin, dfout)
 
 def get_params():
     return {
@@ -185,7 +186,7 @@ class Test(unittest.TestCase):
         inp = ('dfin.fc', 'dfin.fc_norm')
         out = ('dfout.fc', 'dfout.BAD')
         with self.assertRaisesRegex(ValueError, 'dfout\.BAD'):
-            plan.run_funcs(args, out, inp)
+            plan.make_plan_and_run(out, args, inp)
 
     def test_tell_paths_from_named_args_dicts(self):
         d = {'arg1':{'a':1, 'b':2}, 'arg2':{11:11, 12:{13:13}}}
@@ -221,35 +222,36 @@ class Test(unittest.TestCase):
         deps = build_base_deps()
         plan = deps.build_planner()
 
-        args = dict(
-            params = SR(get_params()),
-            engine = SR(get_engine()),
-            dfin =  DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]}), # TODO: Check dotted.var.names.
-            dfout = DF({})
-        )
+        args = OrderedDict([
+            ('params', SR(get_params())),
+            ('engine', SR(get_engine())),
+            ('dfin',  DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]})), # TODO, Check dotted.var.names.
+            ('dfout', DF({}))
+        ])
 
         #inp = ('dfin.fc', 'dfin.fc_norm')
-        #plan.run_funcs(args, out, inp)
+        #plan.make_plan_and_run(out, args, inp)
         out = ('dfout.rpm', 'dfout.fc_norm')
-        plan.run_funcs(args, out)
+        plan.make_plan_and_run(out, args)
 
-        print(args)
+        ## TODO: Check args modified!
+        print('\n'.join([str(i) for i in args.items()]))
 
     def testSmoke_ExecutionPlan_goodExtraRels(self):
         deps = build_base_deps()
         deps.add_func_rel('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv'))
         plan = deps.build_planner()
 
-        args = dict(
-            params = SR(get_params()),
-            engine = SR(get_engine()),
-            dfin =  DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]}), # TODO: CHeck dotted.var.names.
-            dfout = DF({}),
-        )
+        args = OrderedDict([
+            ('params', SR(get_params())),
+            ('engine', SR(get_engine())),
+            ('dfin',  DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]})),
+            ('dfout', DF({})),
+        ])
         #inp = ('dfin.fc', 'dfin.fc_norm')
-        #plan.run_funcs(args, out, inp)
+        #plan.make_plan_and_run(out, args, inp)
         out = ('dfout.rpm', 'dfout.fc_norm')
-        plan.run_funcs(args, out)
+        plan.make_plan_and_run(out, args)
 
     def testSmoke_ExecutionPlan_multiFatcs_good(self):
         deps = Dependencies()
@@ -258,16 +260,16 @@ class Test(unittest.TestCase):
         deps.add_func_rel('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv'))
         plan = deps.build_planner()
 
-        args = dict(
-            params = SR(get_params()),
-            engine = SR(get_engine()),
-            dfin =  DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]}), # TODO: CHeck dotted.var.names.
-            dfout = DF({}),
-        )
+        args = OrderedDict([
+            ('params', SR(get_params())),
+            ('engine', SR(get_engine())),
+            ('dfin',  DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]})),
+            ('dfout', DF({})),
+        ])
         #inp = ('dfin.fc', 'dfin.fc_norm')
-        #plan.run_funcs(args, out, inp)
+        #plan.make_plan_and_run(out, args, inp)
         out = ('dfout.rpm', 'dfout.fc_norm')
-        plan.run_funcs(args, out)
+        plan.make_plan_and_run(out, args)
 
 
 if __name__ == "__main__":
