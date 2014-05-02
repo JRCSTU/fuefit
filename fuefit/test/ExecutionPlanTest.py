@@ -97,7 +97,7 @@ class Test(unittest.TestCase):
         logging.basicConfig(level=logging.DEBUG)
         l=logging.getLogger()
         l.setLevel(logging.DEBUG)
-        l.addHandler(logging.StreamHandler())
+        l.handlers = [logging.StreamHandler()]
 
 
     def testSmoke_FuncExplorer_countNodes(self):
@@ -222,36 +222,56 @@ class Test(unittest.TestCase):
         deps = build_base_deps()
         plan = deps.build_planner()
 
+        ## TODO, Check dotted.var.names.
+        engine = SR(get_engine())
+        dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]})
+        dfout = DF({})
         args = OrderedDict([
             ('params', SR(get_params())),
-            ('engine', SR(get_engine())),
-            ('dfin',  DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]})), # TODO, Check dotted.var.names.
-            ('dfout', DF({}))
+            ('engine', engine),
+            ('dfin',  dfin),
+            ('dfout', dfout),
         ])
-
-        #inp = ('dfin.fc', 'dfin.fc_norm')
-        #plan.make_plan_and_run(out, args, inp)
         out = ('dfout.rpm', 'dfout.fc_norm')
+
+        engine_c = engine.copy()
+        dfin_c = dfin.copy()
+        dfout_c = dfout.copy()
+
         plan.make_plan_and_run(out, args)
 
-        ## TODO: Check args modified!
-        print('\n'.join([str(i) for i in args.items()]))
+        ## Check args modified!
+        self.assertFalse(engine.equals(engine_c), engine)
+        self.assertFalse(dfin.equals(dfin_c), dfin)
+        self.assertFalse(dfout.equals(dfout_c), dfout)
 
     def testSmoke_ExecutionPlan_goodExtraRels(self):
         deps = build_base_deps()
         deps.add_func_rel('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv'))
         plan = deps.build_planner()
 
+        engine = SR(get_engine())
+        dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]})
+        dfout = DF({})
         args = OrderedDict([
             ('params', SR(get_params())),
-            ('engine', SR(get_engine())),
-            ('dfin',  DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]})),
-            ('dfout', DF({})),
+            ('engine', engine),
+            ('dfin',  dfin),
+            ('dfout', dfout),
         ])
-        #inp = ('dfin.fc', 'dfin.fc_norm')
-        #plan.make_plan_and_run(out, args, inp)
         out = ('dfout.rpm', 'dfout.fc_norm')
+
+        engine_c = engine.copy()
+        dfin_c = dfin.copy()
+        dfout_c = dfout.copy()
+
         plan.make_plan_and_run(out, args)
+
+        ## Check args modified!
+        self.assertFalse(engine.equals(engine_c), engine)
+        self.assertFalse(dfin.equals(dfin_c), dfin)
+        self.assertFalse(dfout.equals(dfout_c), dfout)
+
 
     def testSmoke_ExecutionPlan_multiFatcs_good(self):
         deps = Dependencies()
@@ -260,16 +280,27 @@ class Test(unittest.TestCase):
         deps.add_func_rel('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv'))
         plan = deps.build_planner()
 
+        engine = SR(get_engine())
+        dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]})
+        dfout = DF({})
         args = OrderedDict([
             ('params', SR(get_params())),
-            ('engine', SR(get_engine())),
-            ('dfin',  DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]})),
-            ('dfout', DF({})),
+            ('engine', engine),
+            ('dfin',  dfin),
+            ('dfout', dfout),
         ])
-        #inp = ('dfin.fc', 'dfin.fc_norm')
-        #plan.make_plan_and_run(out, args, inp)
         out = ('dfout.rpm', 'dfout.fc_norm')
+
+        engine_c = engine.copy()
+        dfin_c = dfin.copy()
+        dfout_c = dfout.copy()
+
         plan.make_plan_and_run(out, args)
+
+        ## Check args modified!
+        self.assertFalse(engine.equals(engine_c), engine)
+        self.assertFalse(dfin.equals(dfin_c), dfin)
+        self.assertFalse(dfout.equals(dfout_c), dfout)
 
 
 if __name__ == "__main__":
