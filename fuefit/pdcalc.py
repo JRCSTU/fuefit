@@ -25,6 +25,7 @@ import logging
 from collections import OrderedDict, defaultdict
 from collections.abc import Mapping, Iterable
 import itertools as it
+import functools
 import inspect
 import networkx as nx
 import pandas as pd
@@ -364,6 +365,12 @@ def tell_paths_from_named_args(named_args, arg_paths_extractor_func=default_arg_
     return paths
 
 
+def name_all_func_args(func, *args, **kwargs):
+    sig = inspect.signature(func)
+    bound_args = sig.bind(*args, **kwargs)
+
+    return bound_args
+
 
 def wrap_standalone_func(func):
     return DepFunc(func=func, is_funcs_factory=False)
@@ -469,6 +476,10 @@ class DepFunc:
             return 'DepFunc<BAD_STR>(%s)'%self.func
 
 
+##############################
+## Classes
+##############################
+##
 
 class Dependencies:
     '''Discovers functions-relationships and produces ExecutionPlanner (see build_planner()) to inspect them. '''
@@ -510,12 +521,15 @@ class ExecutionPlanner:
         return pd.Series(dict(calc_inp_nodes=[], calc_out_nodes=[], calc_nodes=[],
             missing_data=[] if DEBUG else None, deps_graph=[]))
 
-    def establish_plan(self, dests, named_args=None, sources=None, plan=None):
+    def build_plan(self, dests, named_args=None, sources=None, plan=None):
         '''Limit graph to all those dotted.data reaching from 'sources' to 'dests'.
 
-            named_args: an ordered map {name: arg} as returned by inspect.signature(func).bind(*args).arguments: BoundArguments
-            sources: a list of dotted.data (existent or not) to search for all dotted.data originating from them
             dests:   a list of dotted.data to search for all dotted.data leading to them them
+            named_args: an ordered map {name: arg} as returned by inspect.signature(func).bind(*args).arguments: BoundArguments
+                    if 'sources' is specified, it is ignored
+            sources: a list of dotted.data (existent or not) that are assumed to exist
+                when the execution wil start
+            return: a 'plan' that can be fed to execute()
 
         Example::
 
@@ -526,8 +540,11 @@ class ExecutionPlanner:
             plan = self.make_empty_plan()
             plan.dests = dests
 
-        if (sources is None):
-            sources         = tell_paths_from_named_args(named_args)
+        if sources is None:
+            if named_args is None:
+                raise ValueError("One of 'sources' or 'named_args' must have a value!")
+            else:
+                sources     = tell_paths_from_named_args(named_args)
         log.debug('EXISTING data(%i): %s', len(sources), sources)
         log.debug('REQUESTED data(%i): %s', len(dests), dests)
 
@@ -553,16 +570,68 @@ class ExecutionPlanner:
         return plan
 
 
-    def run_plan(self, plan, *args, **kwargs):
+    def execute_plan(self, plan, *args, **kwargs):
         results = [func(*args, **kwargs) for func in plan.funcs]
         return results
 
 
-    def make_plan_and_run(self, dests, named_args, sources=None):
-        plan = self.establish_plan(dests, named_args, sources=sources)
-        log.info('Execution PLAN: %s', plan)
-        return self.run_plan(plan, *named_args.values())
-
     def __str__(self):
         return "%s(nodes=%r)" % ('ExecutionPlanner', self.graph.nodes())
+
+
+##############################
+## High-level methods
+##############################
+##
+
+
+def build_planner(funcs_map):
+    '''High-level function that gathers and cache dependencies from multiple functions at once.
+
+        funcs_map: a mapping of (func-->bool) with True if func is a funcs_factory,
+                False, if standalone_function, or None if just a relation-tuple
+        return: a fuefit.ExecutionPlanner
+
+    Note that all functions must accept exactly the same args, or else the planner
+    will scream on execute.
+    '''
+
+    deps = Dependencies()
+    for (func, is_factory) in list(funcs_map.items()):
+        try:
+            if is_factory is None:          ## relation-tuple
+                funcs_map.pop(func)
+                deps.add_func_rel(*func)
+            elif is_factory:                ## funcs_factory
+                deps.add_funcs_factory(func)
+            else:                           ## standalone-function
+                deps.add_func(func)
+        except Exception as ex:
+            raise ValueError("Failed harvesting dependencies for %s due to: %s"%(func, ex)) from ex
+
+    return deps.build_planner()
+
+def execute(funcs_map, dests, *args, **kwargs):
+    '''High-level function to quickly run a calculation according to (cached) dependencies.
+
+        funcs_map: see build_planner()
+        args: the actual args to use, and the names of these args would come rom the first function
+                to be invoked (which ever that might be!).
+    '''
+
+    ## Find the first func in the map and
+    #    use it to name the args.
+    #
+    a_func = None
+    for func in funcs_map.keys():
+        if callable(func):
+            a_func = func
+            break
+    if a_func is None:
+        raise ValueError('No function found in funcs_map(%s)!', funcs_map)
+
+    named_args  = name_all_func_args(a_func, *args, **kwargs)
+    planner     = build_planner(funcs_map)
+    plan        = planner.build_plan(dests, named_args)
+    plan        = plan.execute_plan(plan, *args, **kwargs)
 

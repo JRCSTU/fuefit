@@ -149,7 +149,6 @@ setup(
         'networkx',
     ],
     test_requires = [
-        'pandas',
     ],
     options = {
         'build_exe': {

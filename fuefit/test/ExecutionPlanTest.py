@@ -17,6 +17,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
+from fuefit.pdcalc import execute
 '''Check pdcalc's function-dependencies exploration, reporting and classes .
 
 Created on Apr 23, 2014
@@ -38,6 +39,24 @@ def DF(d):
     return pd.DataFrame(d)
 def SR(d):
     return pd.Series(d)
+
+
+def make_test_graph():
+    '''     (4)  6
+             ^   ^
+             | X |
+            (3)  5
+             ^   ^
+              \ /
+              [2]
+               ^
+               |
+              (1)
+    '''
+    web = DiGraph()
+    web.add_edges_from([(1,2), (2,3), (3,4), (2,5), (3,6), (5,6), (5,4)])
+    return web
+
 
 def funcs_fact1(params, engine, dfin, dfout):
     from math import pi
@@ -66,6 +85,18 @@ def funcs_fact2(params, engine, dfin, dfout):
 
     return (f11, f12, f13)
 
+def funcs_fact3(params, engine, dfin, dfout):
+    def f12():
+        dfout['rpm']    = engine['eng_map_params']
+        dfout['p']      = engine['eng_map_params'] * 2
+        dfout['fc']     = engine['eng_map_params'] * 4
+    def f13(): dfout['fc_norm']         = dfout.fc / dfout.p
+
+def func11(params, engine, dfin, dfout):
+    engine['eng_map_params'] = dfin.cm + dfin.pmf + dfin.pme
+
+
+
 def funcs_fact(params, engine, dfin, dfout):
     return funcs_fact1(params, engine, dfin, dfout) + funcs_fact2(params, engine, dfin, dfout)
 
@@ -91,6 +122,13 @@ def build_base_deps():
 
     return deps
 
+def make_plan_and_execute(planner, dests, named_args, sources=None):
+    plan = planner.build_plan(dests, named_args, sources=sources)
+    #log.info('Execution PLAN: %s', plan)
+    return planner.execute_plan(plan, *named_args.values())
+
+
+
 
 class Test(unittest.TestCase):
     def setUp(self):
@@ -98,6 +136,7 @@ class Test(unittest.TestCase):
         l=logging.getLogger()
         l.setLevel(logging.DEBUG)
         l.handlers = [logging.StreamHandler()]
+
 
 
     def testSmoke_FuncExplorer_countNodes(self):
@@ -131,8 +170,8 @@ class Test(unittest.TestCase):
 
 
     def test_find_connecting_nodes_good(self):
-        web = DiGraph()
-        web.add_edges_from([(1,2), (2,3), (3,4), (2,5), (3,6)])
+        web = make_test_graph()
+        web.remove_edges_from([(5,6), (5,4)])
 
         inp = (1, 3, 4)
         out = (2,)
@@ -143,8 +182,8 @@ class Test(unittest.TestCase):
         self.assertTrue(all_in & cn_nodes == all_in, cn_nodes)
 
     def test_find_connecting_nodes_good_sharedDep(self):
-        web = DiGraph()
-        web.add_edges_from([(1,2), (2,3), (3,4), (2,5), (3,6), (5,6)])
+        web = make_test_graph()
+        web.remove_edges_from([(5,4)])
 
         inp = (1, 3, 4)
         out = (2,)
@@ -186,7 +225,7 @@ class Test(unittest.TestCase):
         inp = ('dfin.fc', 'dfin.fc_norm')
         out = ('dfout.fc', 'dfout.BAD')
         with self.assertRaisesRegex(ValueError, 'dfout\.BAD'):
-            plan.make_plan_and_run(out, args, inp)
+            make_plan_and_execute(plan, out, args, inp)
 
     def test_tell_paths_from_named_args_dicts(self):
         d = {'arg1':{'a':1, 'b':2}, 'arg2':{11:11, 12:{13:13}}}
@@ -238,7 +277,7 @@ class Test(unittest.TestCase):
         dfin_c = dfin.copy()
         dfout_c = dfout.copy()
 
-        plan.make_plan_and_run(out, args)
+        make_plan_and_execute(plan, out, args)
 
         ## Check args modified!
         self.assertFalse(engine.equals(engine_c), engine)
@@ -265,7 +304,7 @@ class Test(unittest.TestCase):
         dfin_c = dfin.copy()
         dfout_c = dfout.copy()
 
-        plan.make_plan_and_run(out, args)
+        make_plan_and_execute(plan, out, args)
 
         ## Check args modified!
         self.assertFalse(engine.equals(engine_c), engine)
@@ -295,7 +334,34 @@ class Test(unittest.TestCase):
         dfin_c = dfin.copy()
         dfout_c = dfout.copy()
 
-        plan.make_plan_and_run(out, args)
+        make_plan_and_execute(plan, out, args)
+
+        ## Check args modified!
+        self.assertFalse(engine.equals(engine_c), engine)
+        self.assertFalse(dfin.equals(dfin_c), dfin)
+        self.assertFalse(dfout.equals(dfout_c), dfout)
+
+
+    def testSmoke_funcs_map_good(self):
+        params = SR(get_params())
+        engine = SR(get_engine())
+        dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]})
+        dfout = DF({})
+        out = ('dfout.rpm', 'dfout.fc_norm')
+
+        engine_c = engine.copy()
+        dfin_c = dfin.copy()
+        dfout_c = dfout.copy()
+
+
+        funcs_map = {
+            funcs_fact1: True,
+            funcs_fact3: True,
+            func11: None,
+#             ('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv')): None
+        }
+
+        execute(funcs_map, out, params, engine, dfout=dfout, dfin=dfin)
 
         ## Check args modified!
         self.assertFalse(engine.equals(engine_c), engine)
