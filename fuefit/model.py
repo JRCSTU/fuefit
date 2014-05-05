@@ -19,6 +19,11 @@
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 '''wltc module: Model json-all_schemas for WLTC gear-shift calculator.'''
 
+import json
+import jsonschema as jsons
+import operator as ops
+import pandas as pd
+from pandas.core.generic import NDFrame
 
 def model_schema(additional_properties = False):
     """The json-schema for input/output of the fuefit experiment.
@@ -41,8 +46,8 @@ def model_schema(additional_properties = False):
                 "description": "The engine attributes and  data-points vectors required for generating a fitted fuel-map.",
                 "properties": {
                     "fuel": {
-                        "title": "fuel (PETROL | DIESEL)",
-                        "enum": [ "PETROL", "DIESEL" ],
+                        "title": "fuel (petrol | diesel)",
+                        "enum": [ "petrol", "diesel" ],
                         "description": "the engine's fuel-type used for selecting specific-temperature and/or load-curve.",
                     },
                     "p_max": {
@@ -95,16 +100,39 @@ def model_schema(additional_properties = False):
                             The number of cyclinders in the engine.
                             The 'capacity' is calculated from 'stroke', 'bore' and 'cylinders' when are all present.""")
                     },
+                    'engine_lhv': {
+                        "title": "Fuel's Specific Heat-Value (kjoule/kgr)",
+                        "$ref": "#/definitions/positiveInteger",
+                        'description': dedent("""\
+                            If set, overrides any value that would be selected from params based on 'engine/fuel'. """)
+                    },
                 }  #engine-props
-            }, # engine
-#             "params": {
-#                 "title": "experiment parameters and constants",
-#                 "type": "object", "additionalProperties": additional_properties,
-#                 "required": [
-#                 ],
-#                 "properties": {
-#                 }
-#             },
+            }, #engine
+            'engine_points':{
+                "type": "DataFrame"
+            }, #engine_points
+            "params": {
+                "title": "experiment parameters and constants",
+                "type": "object", "additionalProperties": additional_properties,
+                "required": ['fuel'],
+                "properties": {
+                        'fuel': {
+                            "title": "fuel-types",
+                            "type": "object", "additionalProperties": additional_properties,
+                            "required": ['petrol', 'diesel'],
+                            "properties": {
+                                'diesel': {
+                                    "title": "typical diesel params",
+                                    "$ref": "#/definitions/fuel_spec",
+                                },
+                                'petrol': {
+                                    "title": "petrol params",
+                                    "$ref": "#/definitions/fuel_spec",
+                                },
+                            } #fuel-props
+                        } #fuel
+                }
+            },
         },
         "definitions": {
             "positiveInteger": {
@@ -134,6 +162,13 @@ def model_schema(additional_properties = False):
             "positiveNumbers": {
                 "type": "array",
                "items": { "$ref": "#/definitions/positiveNumber" },
+            },
+            "fuel_spec": {
+                "type": "object",
+                "required": ['lhv'],
+                "properties": {
+                    'lhv': {'title': "Fuel's Specific Heat-Value (kjoule/kgr)", "$ref": "#/definitions/positiveInteger"}
+                }
             },
             "mergeableArray": {
                 "type": "object", "": False,
@@ -222,7 +257,25 @@ def model_schema(additional_properties = False):
 def model_validator():
     from jsonschema import Draft4Validator
     schema = model_schema()
-    return Draft4Validator(schema)
+    validator = Draft4Validator(schema)
+    validator._types.update({"DataFrame" : pd.DataFrame, 'Series':pd.Series})
+
+    return validator
+
+def validate_model(mdl):
+    validator = model_validator()
+    try:
+        validator.validate(mdl)
+
+        return mdl
+    except jsons.ValidationError as ex:
+        ## Attempt to workround BUG: https://github.com/Julian/jsonschema/issues/164
+        #
+        if isinstance(ex.instance, NDFrame):
+            ex.instance = str(ex.instance)
+        raise
+
+
 
 def validate_full_load_curve(flc, f_n_max):
     if (min(flc[0]) > 0):
@@ -253,15 +306,36 @@ def base_model():
             "bore":    None,
             "cylinders":    None,
         },
+        'params': {
+            'fuel': {
+                'diesel':{'lhv':42700},
+                'petrol':{'lhv':43000},
+            }
+        }
     }
 
     return instance
 
 
+def json_dumps(obj, pd_method=None):
+    def _json_default(o):
+        if (isinstance(o, NDFrame)):
+            if pd_method is None:
+                s = json.loads(pd.DataFrame.to_json(o))
+            else:
+                method = ops.methodcaller(pd_method)
+                s = '%s:%s'%(type(o).__name__, method(o))
+        else:
+            s =repr(o)
+        return s
+
+    return json.dumps(obj, indent=2, default=_json_default)
+
+
 try:
-    from enum import Enum       # @UnresolvedImport
+    from enum import Enum       # @UnresolvedImport @UnusedImport
 except:
-    from enum34 import Enum     # @UnresolvedImport
+    from enum34 import Enum     # @UnresolvedImport @UnusedImport @Reimport
 
 class MergeMode(Enum):
     REPLACE       = 1

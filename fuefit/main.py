@@ -28,14 +28,15 @@ import logging
 import re
 import sys, os
 from textwrap import dedent
-import traceback
 
+import ast
 import jsonpointer as jsonp
 import jsonschema as jsons
 import pandas as pd
 
-from . import (_version, DEBUG, model, json_dumps, str2bool)  # @UnusedImport
-
+from . import (_version, DEBUG, model, str2bool)  # @UnusedImport
+from .model import (json_dumps)
+from .model import validate_model
 
 logging.basicConfig(level=logging.DEBUG)
 log     = logging.getLogger(__file__)
@@ -55,7 +56,7 @@ def main(argv=None):
             *=     : float
             ?=     : boolean
             :=     : parsed as json
-            ;=     : parsed as python (with eval())
+            @=     : parsed as python (with eval())
 
     EXAMPLES:
     ---------
@@ -65,21 +66,21 @@ def main(argv=None):
             ...
 
         ## Calculate and print fitted engine map's parameters
-        #     for a PETROL vehicle with the above engine-point's CSV-table:
-        >> %(prog)s -m fuel=PETROL -I engine.csv
+        #     for a petrol vehicle with the above engine-point's CSV-table:
+        >> %(prog)s -m fuel=petrol -I engine.csv
 
         ## Assume PME column contained normalized-Power in Watts,
         #    instead of P in kW:
-        >> %(prog)s -m fuel=PETROL -I engine.csv  -irenames X X 'Pnorm (w)'
+        >> %(prog)s -m fuel=petrol -I engine.csv  -irenames X X 'Pnorm (w)'
 
         ## Read the same table above but without header-row and
-        #    store results into Excel file:
-        >> %(prog)s -m fuel=PETROL -I engine.csv --icolumns CM PME PMF -I engine_map.xlsx
+        #    store results into Excel file, 1st sheet:
+        >> %(prog)s -m fuel=petrol -I engine.csv --icolumns CM PME PMF -I engine_map.xlsx sheetname+=0
 
         ## Supply as inline-json more model-values required for columns [RPM, P, FC]
         #    read from <stdin> as json 2D-array of values (no headers).
         #    and store results in UTF-8 regardless of platform's default encoding:
-        >> %(prog)s -m '/engine:={"fuel":"PETROL", "stroke":15, "capacity":1359}' \\
+        >> %(prog)s -m '/engine:={"fuel":"petrol", "stroke":15, "capacity":1359}' \\
                 -I - file_frmt=JSON orient=values -c RPM P FC \\
                 -O engine_map.txt encoding=UTF-8
 
@@ -93,11 +94,11 @@ def main(argv=None):
     and the 2nd having 2 columns with no headers at all and
     the 1st column being 'Pnorm', then it, then use the following command:
 
-        >> %(prog)s -O engine_map -m fuel=PETROL \\
-                -I=engine_1.xlsx \\
+        >> %(prog)s -O engine_map -m fuel=petrol \\
+                -I=engine_1.xlsx sheetname+=0 \\
                 -c X   X   N   'Fuel consumption'  X \\
                 -r X   X   RPM 'FC(g/s)'           X \\
-                -I=engine_2.csv \\
+                -I=engine_2.csv header@=None \\
                 -c Pnorm X
     """
 
@@ -119,11 +120,15 @@ def main(argv=None):
 
         DEBUG = bool(opts.debug)
 
-        if (DEBUG):
+        if (DEBUG or opts.verbose > 1):
             log.setLevel(logging.DEBUG)
         else:
-            log.setLevel(logging.INFO)
-        log.info("Args: argv\nOpts: %s", opts)
+            if opts.verbose == 1:
+                log.setLevel(logging.INFO)
+            else:
+                log.setLevel(logging.WARNING)
+
+        log.debug("Args: %s\nOpts: %s", argv, opts)
 
         opts = validate_file_opts(opts)
 
@@ -134,7 +139,7 @@ def main(argv=None):
         log.info("Output-files: %s", outfiles)
 
         mdl = build_model(opts, infiles)
-        log.info("Input Model: %s", json_dumps(mdl))
+        log.info("Input Model: %s", json_dumps(mdl, 'to_string'))
         mdl = validate_model(mdl)
 
     except (SystemExit) as ex:
@@ -148,9 +153,15 @@ def main(argv=None):
         parser.exit(3, "%s: %s\n%s  for help use --help\n"%(program_name, ex, indent))
     except jsons.ValidationError as ex:
         if DEBUG:
-            log.exception('Invalid input model!')
+            log.error('Invalid input model!', exc_info=ex)
         indent = len(program_name) * " "
         parser.exit(4, "%s: Model validation failed due to: %s\n%s  for help use --help\n"%(program_name, ex, indent))
+
+    except jsonp.JsonPointerException as ex:
+        if DEBUG:
+            log.exception('Invalid model operation!')
+        indent = len(program_name) * " "
+        parser.exit(4, "%s: Model operation failed due to: %s\n%s  for help use --help\n"%(program_name, ex, indent))
 
 
 
@@ -161,7 +172,6 @@ _pandas_formats = collections.OrderedDict([
     ('TXT', pd.read_csv),
     ('XLS', pd.read_excel),
     ('JSON', pd.read_json),
-    ('CLIPBOARD', pd.read_clipboard),
 ])
 _known_file_exts = {
     'XLSX':'XLS'
@@ -193,11 +203,11 @@ _value_parsers = {
     '*': float,
     '?': str2bool,
     ':': json.loads,
-    ';': eval
+    '@': ast.literal_eval ## best-effort security: http://stackoverflow.com/questions/3513292/python-make-eval-safe
 }
 
 
-_key_value_regex = re.compile(r'^\s*([A-Za-z]\w*)\s*([+*?:;]?)=\s*(.+?)\s*$')
+_key_value_regex = re.compile(r'^\s*([/_A-Za-z][\w/\.]*)\s*([+*?:@]?)=\s*(.+?)\s*$')
 def parse_key_value_pair(arg):
     """Argument-type for syntax like: KEY [+*?:]= VALUE."""
 
@@ -226,8 +236,6 @@ def parse_column_specifier(arg):
         raise argparse.ArgumentTypeError("Not a COLUMN_SPEC syntax: %s"%arg)
 
 
-FileSpec = collections.namedtuple('FileSpec', ('fname', 'file', 'frmt', 'path', 'append', 'kws'))
-
 def validate_file_opts(opts):
     ## Check number of input-files <--> related-opts
     #
@@ -249,7 +257,10 @@ def validate_file_opts(opts):
     return opts
 
 
+FileSpec = collections.namedtuple('FileSpec', ('fname', 'file', 'frmt', 'path', 'append', 'kws', 'read_method'))
+
 def parse_many_file_args(many_file_args, filetype):
+
     def parse_file_args(fname, *kv_args):
         frmt    = _default_pandas_format
         dest    = _default_df_dest
@@ -263,17 +274,25 @@ def parse_many_file_args(many_file_args, filetype):
             if (frmt not in _pandas_formats):
                 raise argparse.ArgumentTypeError("Unsupported pandas file_frmt: %s\n  Set 'file_frmt=XXX' to one of %s" % (frmt, list(_pandas_formats.keys())[1:]))
 
-        if (frmt == 'CLIPBOARD'):
+        if (fname == '+'):
             file    = None
             fname   = '<CLIPBOARD>'
+            frmt = 'TABLE'
+            method = pd.read_clipboard
         else:
             if (frmt == _default_pandas_format):
                 if ('-' == fname):
-                    raise argparse.ArgumentTypeError("With <stdio> a concrete file_frmt is required! \n  Set 'file_frmt=XXX' to one of %s" % (list(_pandas_formats.keys())[1:]))
+                    raise argparse.ArgumentTypeError("With <stdio> and <clipboard> a concrete file_frmt is required! \n  Set 'file_frmt=XXX' to one of %s" % (list(_pandas_formats.keys())[1:]))
                 frmt = get_file_format_from_extension(fname)
                 if (not frmt):
                     raise argparse.ArgumentTypeError("File(%s) has unknown extension, file_frmt is required! \n  Set 'file_frmt=XXX' to one of %s" % (fname, list(_pandas_formats.keys())[1:]))
-            file = argparse.FileType(filetype)(fname)
+
+            method = _pandas_formats[frmt]
+
+            if (method == pd.read_excel):
+                file = fname
+            else:
+                file = argparse.FileType(filetype)(fname)
 
         try:
             dest = pandas_kws.pop('model_path')
@@ -288,14 +307,15 @@ def parse_many_file_args(many_file_args, filetype):
         except KeyError:
             pass
 
-        return FileSpec(fname, file, frmt, dest, append, pandas_kws)
+        return FileSpec(fname, file, frmt, dest, append, pandas_kws, method)
 
     return [parse_file_args(*file_args) for file_args in many_file_args]
 
 
 def load_file_as_df(filespec):
 # FileSpec(fname, file, frmt, path, append, kws)
-    method = _pandas_formats[filespec.frmt]
+    method = filespec.read_method
+    log.debug('Reading file with: pandas.%s(%s, %s)', method.__name__, filespec.file, filespec.kws)
     dfin = method(filespec.file, **filespec.kws)
 
     return dfin
@@ -306,7 +326,7 @@ def build_model(opts, infiles):
 
     for filespec in infiles:
         dfin = load_file_as_df(filespec)
-        log.info("+-input-file(%s):\n%s", filespec.fname, dfin)
+        log.debug("  +-input-file(%s):\n%s", filespec.fname, dfin)
         jsonp.set_pointer(mdl, filespec.path, dfin)
 
     model_overrides = opts.m
@@ -319,12 +339,6 @@ def build_model(opts, infiles):
 
     return mdl
 
-
-def validate_model(mdl):
-    validator = model.model_validator()
-    validator.validate(mdl)
-
-    return mdl
 
 def build_args_parser(program_name, version, desc, epilog):
     version_string  = '%%prog %s' % (version)
@@ -360,7 +374,7 @@ def build_args_parser(program_name, version, desc, epilog):
               must either match them, be 1 (meaning use them for all files), or be totally absent
               (meaning use defaults for all files). """),
                         action='append', nargs='+', required=True,
-#                         default=[('- file_frmt=%s model_path=%s'%('CSV', _default_df_dest)).split()],
+                        #default=[('- file_frmt=%s model_path=%s'%('CSV', _default_df_dest)).split()],
                         metavar='ARG')
     grp_io.add_argument('-c', '--icolumns', help=dedent("""\
             describes the contents and the units of input file(s) (see --I).
@@ -443,8 +457,8 @@ def build_args_parser(program_name, version, desc, epilog):
 
     grp_various = parser.add_argument_group('Various', 'Options controlling various other aspects.')
     #parser.add_argument('--gui', help='start in GUI mode', action='store_true')
-    grp_various.add_argument("--debug", action="store_true", help="set debug level [default: %(default)s]", default=False)
-    grp_various.add_argument("--verbose", action="count", default=0, help="set verbosity level [default: %(default)s]")
+    grp_various.add_argument('-d', "--debug", action="store_true", help="set debug level [default: %(default)s]", default=False)
+    grp_various.add_argument('-v', "--verbose", action="count", default=0, help="set verbosity level [default: %(default)s]")
     grp_various.add_argument("--version", action="version", version=version_string, help="prints version identifier of the program")
     grp_various.add_argument("--help", action="help", help='show this help message and exit')
 

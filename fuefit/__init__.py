@@ -34,16 +34,6 @@ DEBUG   = False
 #  Utilities
 #
 
-def _json_default(o):
-    if (isinstance(o, pd.DataFrame)):
-        return json.loads(pd.DataFrame.to_json(o))
-    else:
-        return repr(o)
-
-def json_dumps(obj):
-    return json.dumps(obj, indent=2, default=_json_default)
-
-
 def str2bool(v):
     vv = v.lower()
     if (vv in ("yes", "true", "on")):

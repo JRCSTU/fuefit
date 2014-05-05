@@ -29,10 +29,10 @@ import functools
 import argparse
 from os.path import os
 
-from ..main import (main, build_args_parser, validate_file_opts, parse_key_value_pair, parse_many_file_args,
+from ..main import (build_args_parser, validate_file_opts, parse_key_value_pair, parse_many_file_args,
     build_model, validate_model, FileSpec)
+from ..model import (json_dumps)
 from .redirect import redirected  # @UnresolvedImport
-from fuefit.main import json_dumps
 
 
 class Test(unittest.TestCase):
@@ -55,10 +55,14 @@ class Test(unittest.TestCase):
         self._goodColumns = ['quant', 'spaced quant', 'quant (units)', 'quant (spaced units)', 'Pnorm (kJ / sec)']
 
         self._failKVPairsMsg = 'Not a KEY=VALUE syntax'
-        self._failKVPairs = ['no_value', 'miss_value=', 'spa ced', 'spaced key = key', '3number=val']
-        self._goodKVPairs = {'k=v':'v', ' Num_3_key = 3 ':'3', 'k = spaced value ':'spaced value',
+        self._failKVPairs = ['no_value', 'miss_value=', 'spa ced', 'spaced key = key', '3number=val',
+            '_']
+        self._goodKVPairs = {'k=v':'v', ' Num_3_key = 3 ':'3', '_key=hidden_key':'hidden_key',
+            'k = spaced value ':'spaced value',
             'k+=123':123, 'k*=12.3':12.3, 'k?=1':True, 'k?=true':True, 'k?=False':False, 'k?=on':True,
-            'k := 3':3, 'k := 3.14':3.14, 'k := ["a", 3.14]':['a', 3.14], 'k:={"a":3.14, "2":[1, "1"]}':{'a':3.14, '2':[1, "1"]}
+            'k := 3':3, 'k := 3.14':3.14, 'k := ["a", 3.14]':['a', 3.14], 'k:={"a":3.14, "2":[1, "1"]}':{'a':3.14, '2':[1, "1"]},
+            'k @= 3':3, 'k @= 3.14':3.14, 'k @= ["a", 3.14]':['a', 3.14], 'k@={\'a\':3.14, "2":[1, "1"]}':{'a':3.14, '2':[1, "1"]},
+            'path/key += 0': 0, '/rootpath/+=1':1
         }
 
         self._failFormatsMsg = 'invalid choice:'
@@ -154,7 +158,7 @@ class Test(unittest.TestCase):
 
 
 #     def test0(self):
-#         main('-mfuel=DIESEL'.split())
+#         main('-mfuel=diesel'.split())
 
 
     def testHelpMsg(self):
@@ -171,19 +175,19 @@ class Test(unittest.TestCase):
 
 
     def testModelOverrides_fail(self):
-        self.checkParseOpt_fail('-m', [''] + self._failKVPairs, self._failKVPairsMsg)
+        self.checkParseOpt_fail('-I funcs_map -m', [''] + self._failKVPairs, self._failKVPairsMsg)
     def testModelOverrides_good(self):
-        self.checkParseOpt_good('-m', self._goodKVPairs.keys())
+        self.checkParseOpt_good('-I funcs_map -m', self._goodKVPairs.keys())
 
     def testColumnNames_fail(self):
         self.checkParseOpt_fail('-c', self._failColumns, self._failColumnsMsg)
     def testColumnNames_good(self):
-        self.checkParseOpt_good('-c', self._goodColumns)
+        self.checkParseOpt_good('-I temp.csv -c', self._goodColumns)
 
     def testColumnRenames_fail(self):
         self.checkParseOpt_fail('-r', self._failColumns, self._failColumnsMsg)
     def testColumnRenames_good(self):
-        self.checkParseOpt_good('-r', self._goodColumns)
+        self.checkParseOpt_good('-I funcs_map -r', self._goodColumns)
 
 
     def testKVPairs_fail(self):
@@ -225,11 +229,11 @@ class Test(unittest.TestCase):
             (('r', 'w', 'a'), [[test_fnames[0], 'file_frmt=CSV', 'model_path=/gjhgj']]),
             (('r', 'w', 'a'), [[test_fnames[0], 'some=other', 'keys+=4', 'fun:=[1, {"a":2}]']]),
             (('r', 'w', 'a'), [[test_fnames[1], 'file_frmt=CSV']]),
-            (('r', 'w', 'a'), [['any_fname.haha', 'file_frmt=CLIPBOARD']]),
+            (('r', 'w', 'a'), [['+', ]]),
 
             (('r', 'w'), [['-', 'file_frmt=JSON']]),
             (('r', 'w'), [['-', 'file_frmt=CSV', 'model_path=/gjhgj']]),
-            (('r', 'w'), [['-', 'file_frmt=CLIPBOARD']]),
+            (('r', 'w'), [['+', ]]),
         ]
         for (open_modes, many_file_args) in cases:
             for open_mode in open_modes:
@@ -273,17 +277,34 @@ class Test(unittest.TestCase):
             opts = argparse.Namespace(**opts)
             validate_file_opts(opts)
 
-    def testBuildModel(self):
+    def testSmoke_BuildModel_print(self):
+        import pandas as pd
+
         fname = 'test_table.csv'
-        opts = {'m':None, }
+        opts = {'m':[[('fuel','diesel')]] }
         infiles = [
-            FileSpec(open(fname, 'r'), fname, 'CSV', '/engine_points', None, {})
+            FileSpec(open(fname, 'r'), fname, 'CSV', '/engine_points', None, {}, pd.read_csv)
         ]
         opts = argparse.Namespace(**opts)
         mdl = build_model(opts, infiles)
 
         print(json_dumps(mdl))
 
+
+    def testBuildModel_validate(self):
+        import pandas as pd
+
+        fname = 'test_table.csv'
+        opts = {'m':[[('fuel','diesel')]] }
+        infiles = [
+            FileSpec(open(fname, 'r'), fname, 'CSV', '/engine_points', None, {}, pd.read_csv)
+        ]
+        opts = argparse.Namespace(**opts)
+        mdl = build_model(opts, infiles)
+        validate_model(mdl)
+
+
+    #-I fuefit/test/FuelFit.xlsx  sheetname+=0 -m 'fuel=diesel'
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']
     unittest.main()

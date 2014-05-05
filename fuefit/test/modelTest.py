@@ -29,6 +29,7 @@ from .. import model
 
 class Test(unittest.TestCase):
 
+    @unittest.expectedFailure #Due to extra types: DataFrame, Series
     def testSchema(self):
         validator = model.model_validator()
         validator.check_schema(model.model_schema())
@@ -47,14 +48,33 @@ class Test(unittest.TestCase):
         self.assertRaises(jsonschema.ValidationError, model.model_validator().validate, mdl)
 
         jsonp.set_pointer(mdl, '/engine/fuel', 'BAD_FUEL')
-        self.assertRaises(jsonschema.ValidationError, model.model_validator().validate, mdl)
+        self.assertRaisesRegex(jsonschema.ValidationError, "BAD_FUEL' is not one of", model.model_validator().validate, mdl)
 
 
-    def testModel_good(self):
+    def testModel_FAIL_extraFuel(self):
         import jsonpointer as jsonp
 
         mdl = model.base_model()
-        jsonp.set_pointer(mdl, '/engine/fuel', 'DIESEL')
+        jsonp.set_pointer(mdl, '/engine/fuel', 'diesel')
+        mdl['params']['fuel']['EXTRA_FUEL'] = 'somethign'
+
+        self.assertRaisesRegex(jsonschema.ValidationError, "Additional properties .*EXTRA_FUEL", model.model_validator().validate, mdl)
+
+    def testModel_FAIL_missLhv(self):
+        import jsonpointer as jsonp
+
+        mdl = model.base_model()
+        jsonp.set_pointer(mdl, '/engine/fuel', 'diesel')
+        mdl['params']['fuel']['petrol'] = {}
+
+        self.assertRaisesRegex(jsonschema.ValidationError, "'lhv' is a required", model.model_validator().validate, mdl)
+
+
+    def testModel_GOOD(self):
+        import jsonpointer as jsonp
+
+        mdl = model.base_model()
+        jsonp.set_pointer(mdl, '/engine/fuel', 'diesel')
 
         validator = model.model_validator()
         validator.validate(mdl)

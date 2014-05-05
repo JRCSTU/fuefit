@@ -105,7 +105,10 @@ def funcs_fact(params, engine, dfin, dfout):
 
 def get_params():
     return {
-        'fuel': {'diesel':{'lhv':42700}, }, 'petrol':{'lhv':43000}
+        'fuel': {
+            'diesel':{'lhv':42700},
+            'petrol':{'lhv':43000}
+        },
     }
 
 def get_engine():
