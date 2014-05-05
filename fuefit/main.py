@@ -137,20 +137,18 @@ def main(argv=None):
         log.info("Input Model: %s", json_dumps(mdl))
         mdl = validate_model(mdl)
 
-
-
     except (SystemExit) as ex:
         if DEBUG:
-            log.error(traceback.format_exception())
+            log.exception('Invalid args!')
         raise
     except (ValueError) as ex:
         if DEBUG:
-            log.error(traceback.format_exception())
+            log.exception('Cmd-line parsing failed!')
         indent = len(program_name) * " "
         parser.exit(3, "%s: %s\n%s  for help use --help\n"%(program_name, ex, indent))
     except jsons.ValidationError as ex:
         if DEBUG:
-            log.error(traceback.format_exception())
+            log.exception('Invalid input model!')
         indent = len(program_name) * " "
         parser.exit(4, "%s: Model validation failed due to: %s\n%s  for help use --help\n"%(program_name, ex, indent))
 
@@ -361,8 +359,8 @@ def build_args_parser(program_name, version, desc, epilog):
             * When more input-files given, the number --icolumns and --irenames options,
               must either match them, be 1 (meaning use them for all files), or be totally absent
               (meaning use defaults for all files). """),
-                        action='append', nargs='+',
-                        default=[('- file_frmt=%s model_path=%s'%('CSV', _default_df_dest)).split()],
+                        action='append', nargs='+', required=True,
+#                         default=[('- file_frmt=%s model_path=%s'%('CSV', _default_df_dest)).split()],
                         metavar='ARG')
     grp_io.add_argument('-c', '--icolumns', help=dedent("""\
             describes the contents and the units of input file(s) (see --I).
