@@ -17,7 +17,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
-from fuefit.pdcalc import execute
+from fuefit.pdcalc import execute, DependenciesError
 '''Check pdcalc's function-dependencies exploration, reporting and classes .
 
 Created on Apr 23, 2014
@@ -92,6 +92,9 @@ def funcs_fact3(params, engine, dfin, dfout):
         dfout['fc']     = engine['eng_map_params'] * 4
     def f13(): dfout['fc_norm']         = dfout.fc / dfout.p
 
+    return (f12, f13)
+
+
 def func11(params, engine, dfin, dfout):
     engine['eng_map_params'] = dfin.cm + dfin.pmf + dfin.pme
 
@@ -118,7 +121,7 @@ def get_engine():
 
 def build_base_deps():
     deps = Dependencies()
-    deps.add_funcs_factory(funcs_fact)
+    deps.harvest_funcs_factory(funcs_fact)
 
     return deps
 
@@ -128,6 +131,12 @@ def make_plan_and_execute(planner, dests, named_args, sources=None):
     return planner.execute_plan(plan, *named_args.values())
 
 
+def bad_func(params, engine, dfin, dfout):
+    raise AssertionError('Bad func invoked!')
+def bad_funcs_fact(params, engine, dfin, dfout):
+    def child():
+        raise AssertionError("Bad funcs_fact's child invoked!")
+    return (child, )
 
 
 class Test(unittest.TestCase):
@@ -165,7 +174,7 @@ class Test(unittest.TestCase):
 
         inp = ('dfin.fc', 'dfin.fc_norm')
         out = ('dfout.fc', 'dfout.BAD')
-        with self.assertRaisesRegex(ValueError, 'dfout\.BAD'):
+        with self.assertRaisesRegex(DependenciesError, 'dfout\.BAD'):
             research_calculation_routes(plan.graph, inp, out)
 
 
@@ -224,7 +233,7 @@ class Test(unittest.TestCase):
         args = {}
         inp = ('dfin.fc', 'dfin.fc_norm')
         out = ('dfout.fc', 'dfout.BAD')
-        with self.assertRaisesRegex(ValueError, 'dfout\.BAD'):
+        with self.assertRaisesRegex(DependenciesError, 'dfout\.BAD'):
             make_plan_and_execute(plan, out, args, inp)
 
     def test_tell_paths_from_named_args_dicts(self):
@@ -314,8 +323,8 @@ class Test(unittest.TestCase):
 
     def testSmoke_ExecutionPlan_multiFatcs_good(self):
         deps = Dependencies()
-        deps.add_funcs_factory(funcs_fact1)
-        deps.add_funcs_factory(funcs_fact2)
+        deps.harvest_funcs_factory(funcs_fact1)
+        deps.harvest_funcs_factory(funcs_fact2)
         deps.add_func_rel('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv'))
         plan = deps.build_planner()
 
@@ -357,8 +366,10 @@ class Test(unittest.TestCase):
         funcs_map = {
             funcs_fact1: True,
             funcs_fact3: True,
-            func11: None,
-#             ('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv')): None
+            func11: False,
+            ('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv'), None): None,
+            ('a.standalone', 'some.dep', bad_func): None,
+            ('a.funcs_fact', ('one.dep', 'another.dep'), (bad_funcs_fact, 0)): None,
         }
 
         execute(funcs_map, out, params, engine, dfout=dfout, dfin=dfin)

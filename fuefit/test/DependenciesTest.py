@@ -27,7 +27,7 @@ import unittest
 import logging
 
 from fuefit.pdcalc import build_func_dependencies_graph, harvest_func, harvest_funcs_factory, filter_common_prefixes, \
-    gen_all_prefix_pairs
+    gen_all_prefix_pairs, Dependencies, DependenciesError, validate_func_relations
 
 
 def lstr(lst):
@@ -240,6 +240,61 @@ class Test(unittest.TestCase):
         self.assertEqual(len(web), 25) #29 when adding.segments
 
         return web
+
+
+
+    def test_validate_func_relations_FAIL(self):
+        cases = [
+            (('some.item', ('a.dep', 'a.dep.other'), None), 'prefixed with root'),
+            (('R.some.item', ('a.dep', 'a.dep.other'), None), 'prefixed with root'),
+            (('R.some.item', ('R.a.dep', 'a.dep.other'), None), 'prefixed with root'),
+            (('some.item', ('R.a.dep', 'R.a.dep.other'), None), 'prefixed with root'),
+
+            ((('R.some.item', ), ('R.a.dep', 'R.a.dep.other'), None), 'Bad explicit func_relations'),
+            ((123, ('R.a.dep', 'R.a.dep.other'), None), 'Bad explicit func_relations'),
+            (('R.some.item', ('R.a.dep', ('R.a.dep.other', )), None), 'Bad explicit func_relations'),
+            (('R.some.item', (123, 'R.a.dep.other'), None), 'Bad explicit func_relations'),
+
+#             (('R.some.item', ('R.a.dep', 'R.a.dep.other'), []), 'are DepFunc instances'),
+#             ((123, ('R.a.dep', 'R.a.dep.other'), (funcs_fact, -1)), 'are DepFunc instances'),
+        ]
+        for (i, (rel, err)) in enumerate(cases):
+            with self.assertRaisesRegex(DependenciesError, err, msg='Case(%i)'%i):
+                validate_func_relations([rel])
+
+
+
+    def test_Dependencies_FAIL(self):
+        cases = [
+            ((('some.item', ), ('a.dep', 'a.dep.other'), None), 'Failed adding explicit func_relation'),
+            ((123, ('a.dep', 'a.dep.other'), None), 'Failed adding explicit func_relation'),
+            (('some.item', ('a.dep', ('a.dep.other', )), None), 'Failed adding explicit func_relation'),
+            (('some.item', (123, 'a.dep.other'), None), 'Failed adding explicit func_relation'),
+        ]
+
+        deps = Dependencies()
+
+        for (i, (rel, err)) in enumerate(cases):
+            with self.assertRaisesRegex(DependenciesError, err, msg='Case(%i)'%i):
+                deps.add_func_rel(*rel)
+
+    def test_Dependencies_GOOD(self):
+        cases = [
+            ('some.item', ('a.dep', 'a.dep.other'), None),
+            ('R.some.item', ('a.dep', 'a.dep.other'), None),
+            ('R.some.item', ('R.a.dep', 'a.dep.other'), None),
+            ('some.item', ('R.a.dep', 'R.a.dep.other'), None),
+
+            ('some.item', ('a.dep', 'a.dep.other'), None),
+            ('some.item', ('a.dep', 'a.dep.other'), funcs_fact),
+            ('some.item', ('a.dep', 'a.dep.other'), (funcs_fact, 1)),
+        ]
+
+        deps = Dependencies()
+
+        for rel in cases:
+            deps.add_func_rel(*rel)
+
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']

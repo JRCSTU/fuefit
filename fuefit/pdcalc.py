@@ -39,14 +39,17 @@ _root_name = 'R'
 _root_len = len(_root_name)+1
 log = logging.getLogger(__file__)
 
+class DependenciesError(Exception):
+    def __init__(self, msg, item=None):
+        super(Exception, self).__init__(msg)
+        self.item = item
 
 def make_mock(*args, **kwargs):
     return MagicMock(*args, **kwargs)
 
 
 def harvest_funcs_factory(funcs_factory, root=None, func_rels=None):
-    if func_rels is  None:
-        func_rels = []
+    new_func_rels = []
 
     ## Wrap and invoke funcs_factory with "rooted" mockups as args
     #    to collect mock_calls.
@@ -65,15 +68,18 @@ def harvest_funcs_factory(funcs_factory, root=None, func_rels=None):
         try: tmp += 2   ## Force dependencies from return values despite compiler-optimizations.
         except:
             pass
-        harvest_mock_calls(root.mock_calls, cfunc, func_rels)
+        harvest_mock_calls(root.mock_calls, cfunc, new_func_rels)
     funcs_factory.reset()
 
-    assert validate_func_relations(func_rels), func_rels
-    return func_rels
+    validate_func_relations(new_func_rels)
+
+    if func_rels is not None:
+        func_rels.extend(new_func_rels)
+
+    return new_func_rels
 
 def harvest_func(func, root=None, func_rels=None):
-    if func_rels is None:
-        func_rels = []
+    new_func_rels = []
 
     func = wrap_standalone_func(func)
     (root, mocks) = func.mockup_func_args(root=root)
@@ -83,10 +89,14 @@ def harvest_func(func, root=None, func_rels=None):
     except:
         pass
     func.reset()
-    harvest_mock_calls(root.mock_calls, func, func_rels)
+    harvest_mock_calls(root.mock_calls, func, new_func_rels)
 
-    assert validate_func_relations(func_rels), func_rels
-    return func_rels
+    validate_func_relations(new_func_rels)
+
+    if func_rels is not None:
+        func_rels.extend(new_func_rels)
+
+    return new_func_rels
 
 
 def harvest_mock_calls(mock_calls, func, func_rels):
@@ -186,13 +196,23 @@ def parse_mock_str(m):
     return _mock_id_regex.search(m.__repr__()).groups()
 
 def validate_func_relations(func_rels):
-    items = [not item.startswith(_root_name) for (item, _, _) in func_rels]
-    if any(items):
-        return False
-    deps = [not dep.startswith(_root_name) for (_, deps, _) in func_rels for dep in deps]
-    if any(deps):
-        return False
-    return True
+    try:
+        bad_items = [item for (item, _, _) in func_rels if not item.startswith(_root_name)]
+        if bad_items:
+            raise DependenciesError("Not all dependency-items are prefixed with root(%s): %s"%(_root_name, bad_items), bad_items)
+
+        bad_deps = [dep for (_, deps, _) in func_rels for dep in deps if not dep.startswith(_root_name)]
+        if bad_deps:
+            raise DependenciesError("Not all dependency-data are prefixed with root(%s): %s"%(_root_name, bad_deps), bad_deps)
+
+        ## NO, check only for algo-generated errors.
+        # bad_funcs = [func for (_, _, func) in func_rels if not isinstance(func, DepFunc)]
+        # if bad_funcs:
+        #     raise DependenciesError("Not all dependency-funcs are DepFunc instances: %s"%bad_funcs, bad_funcs)
+    except DependenciesError:
+        raise
+    except Exception as ex:
+        raise DependenciesError("Bad explicit func_relations(%s) (item not a string, or deps not a tuple, etc) due to: %s"%(func_rels, ex), func_rels) from ex
 
 
 def build_func_dependencies_graph(func_rels, graph = None):
@@ -208,7 +228,7 @@ def build_func_dependencies_graph(func_rels, graph = None):
 
     cycles = list(nx.simple_cycles(graph))
     if cycles:
-        raise ValueError('Cyclic dependencies! %s', cycles)
+        raise DependenciesError('Cyclic dependencies! %s'%cycles, graph)
 
     return graph
 
@@ -298,7 +318,7 @@ def research_calculation_routes(graph, sources, dests):
         calc_nodes = set(list(calc_out_nodes) + all_predecessors(data_graph, calc_out_nodes))
     except (KeyError, NetworkXError) as ex:
         unknown = [node for node in calc_out_nodes if node not in graph]
-        raise ValueError('Unknown OUT-args(%s)!' % unknown) from ex
+        raise DependenciesError('Unknown OUT-args(%s)!' % unknown, (graph, unknown)) from ex
     else:
         return (calc_inp_nodes, calc_out_nodes, calc_nodes, deps_graph)
 
@@ -329,8 +349,11 @@ def extract_funcs_from_edges(graph, ordered_nodes):
             for f in d['funcs']] # a list of sets
 
 
-    ## Remove duplicates whilist preserving order.
-    funcs = list(OrderedDict.fromkeys(funcs))
+    ## Remove duplicates and No-funcs whilist preserving order.
+    #
+    od = OrderedDict.fromkeys(funcs)
+    od.pop(None, None)
+    funcs = list(od)
 
     return funcs
 
@@ -369,13 +392,19 @@ def name_all_func_args(func, *args, **kwargs):
     sig = inspect.signature(func)
     bound_args = sig.bind(*args, **kwargs)
 
-    return bound_args
+    return bound_args.arguments
+
+
 
 
 def wrap_standalone_func(func):
     return DepFunc(func=func, is_funcs_factory=False)
 def wrap_funcs_factory(funcs_factory):
     return DepFunc(func=funcs_factory, is_funcs_factory=True)
+def wrap_child_func(funcs_factory, child_index):
+    if not isinstance(funcs_factory, DepFunc):
+        funcs_factory = wrap_funcs_factory(funcs_factory)
+    return DepFunc(func=funcs_factory, _child_index=child_index)
 class DepFunc:
     '''A wrapper for functions explored for relations, optionally allowing them to form a hierarchy of factories and produced functions.
 
@@ -402,11 +431,14 @@ class DepFunc:
             self.child_index = _child_index
 
             assert func.is_funcs_factory(), self
-            assert _child_index >= 0 and _child_index < len(func.child_funcs)
         else:                           ## Standalone
             self._type = 0
 
             assert _child_index == None, self
+
+        if not callable(func):
+            raise DependenciesError('Cannot create a DepFunc for a non-callable(%s)!'%func, func)
+
 
     def get_type(self):
         return DepFunc.TYPES[self._type]
@@ -449,8 +481,11 @@ class DepFunc:
             return self.func(*args, **kwargs)
 
         elif self.is_funcs_factory():           ## Factory
-            self.child_funcs = self.func(*args, **kwargs)
-            return [DepFunc(func=self, _child_index=i) for i in range(len(self.child_funcs))]
+            cfuncs = self.func(*args, **kwargs)
+            if not cfuncs:
+                raise DependenciesError('%s returned %s as child-functions!'%(self.func, cfuncs), self.func)
+            self.child_funcs = cfuncs
+            return [DepFunc(func=self, _child_index=i) for i in range(len(cfuncs))]
 
         else:                                   ## Child
             parent_fact = self.func
@@ -487,21 +522,51 @@ class Dependencies:
     def __init__(self):
         self.rels = []
 
-    def add_funcs_factory(self, funcs_factory):
+    def harvest_funcs_factory(self, funcs_factory):
         root = make_mock(name=_root_name)
         harvest_funcs_factory(funcs_factory, root=root, func_rels=self.rels)
         log.debug('DEPS collected(%i): %s', len(self.rels), self.rels)
 
-    def add_func(self, func):
+    def harvest_func(self, func):
         root = make_mock(name=_root_name)
         harvest_func(func, root=root, func_rels=self.rels)
         log.debug('DEPS collected(%i): %s', len(self.rels), self.rels)
 
-    def add_func_rel(self, item, deps=None, func=None, args=None):
-        '''func: a list of integers, the indices of funcs returned by the factory'''
-        if deps is None:
-            deps = []
-        append_func_relation(item, deps, func, self.rels)
+    def add_func_rel(self, item, deps=None, func=None):
+        '''
+            item: a string,
+            deps: a string or a sequence of strings
+            func: a standalone func or a funcs_factory as a 2-tuple (func, index)
+        '''
+
+        ## Prepare args and do some basic argument-checking.
+        #
+        try:
+            if func is not None:
+                if isinstance(func, tuple):
+                    (funcs_factory, child_index) = func
+                    func = wrap_child_func(funcs_factory, child_index)
+                else:
+                    func = wrap_standalone_func(func)
+        except (TypeError, ValueError) as ex:
+            raise DependenciesError("Failed adding explicit func_relation(%s) due to bad functions\n  Function must either be a standalone-function or a 2-tuple(funcS_factory, child_index)."%item) from ex
+        try:
+            item = _root_name + '.' + item
+            if deps is None:
+                deps = []
+            else:
+                if isinstance(deps, str):
+                    deps = [deps]
+                deps = [_root_name + '.' + dep for dep in deps]
+        except TypeError as ex:
+            raise DependenciesError("Failed adding explicit func_relation(%s) due to bad item or dependencies strings!"%item) from ex
+
+        new_func_rels = []
+        append_func_relation(item, deps, func, new_func_rels)
+
+        validate_func_relations(new_func_rels)
+
+        self.rels.extend(new_func_rels)
 
     def build_planner(self):
         graph = build_func_dependencies_graph(self.rels)
@@ -542,7 +607,7 @@ class ExecutionPlanner:
 
         if sources is None:
             if named_args is None:
-                raise ValueError("One of 'sources' or 'named_args' must have a value!")
+                raise ValueError("At least one of 'sources' or 'named_args' must have a value!")
             else:
                 sources     = tell_paths_from_named_args(named_args)
         log.debug('EXISTING data(%i): %s', len(sources), sources)
@@ -571,7 +636,13 @@ class ExecutionPlanner:
 
 
     def execute_plan(self, plan, *args, **kwargs):
-        results = [func(*args, **kwargs) for func in plan.funcs]
+        results = []
+        for func in plan.funcs:
+            try:
+                results.append(func(*args, **kwargs))
+            except Exception as ex:
+                raise DependenciesError("Failed executing %s due to: %s"%(func, ex), func) from ex
+
         return results
 
 
@@ -586,28 +657,38 @@ class ExecutionPlanner:
 
 
 def build_planner(funcs_map):
-    '''High-level function that gathers and cache dependencies from multiple functions at once.
+    '''High-level function that uses a Dependencies instance to harvest multiple functions at once to build an ExecutionPlanner.
 
-        funcs_map: a mapping of (func-->bool) with True if func is a funcs_factory,
-                False, if standalone_function, or None if just a relation-tuple
+        funcs_map: a mapping or a sequence of pairs (func--> bool) with True when func is a funcs_factory,
+            False, when standalone_function, or None when an explicit relation 3-tuple (item, deps, func)
+            to be fed directly to Dependencies.add_func_rel(), where:
+                item: is a string,
+                deps: a string or a sequence of strings, and
+                func: a standalone func or a funcs_factory as a 2-tuple (func, index)
         return: a fuefit.ExecutionPlanner
 
     Note that all functions must accept exactly the same args, or else the planner
-    will scream on execute.
+    the results will be undetermined and it will most-likely scream on execute.
     '''
 
     deps = Dependencies()
-    for (func, is_factory) in list(funcs_map.items()):
+    if isinstance(funcs_map, Mapping):
+        pairs = funcs_map.items()
+    else:
+        pairs = funcs_map
+    for (func, is_factory) in list(pairs):
         try:
             if is_factory is None:          ## relation-tuple
                 funcs_map.pop(func)
                 deps.add_func_rel(*func)
             elif is_factory:                ## funcs_factory
-                deps.add_funcs_factory(func)
+                deps.harvest_funcs_factory(func)
             else:                           ## standalone-function
-                deps.add_func(func)
+                deps.harvest_func(func)
+        except DependenciesError as ex:
+            raise
         except Exception as ex:
-            raise ValueError("Failed harvesting dependencies for %s due to: %s"%(func, ex)) from ex
+            raise DependenciesError("Failed harvesting dependencies for %s due to: %s"%(func, ex), func) from ex
 
     return deps.build_planner()
 
@@ -628,10 +709,11 @@ def execute(funcs_map, dests, *args, **kwargs):
             a_func = func
             break
     if a_func is None:
-        raise ValueError('No function found in funcs_map(%s)!', funcs_map)
+        raise DependenciesError('No function found in funcs_map(%s)!'%funcs_map, funcs_map)
 
     named_args  = name_all_func_args(a_func, *args, **kwargs)
     planner     = build_planner(funcs_map)
     plan        = planner.build_plan(dests, named_args)
-    plan        = plan.execute_plan(plan, *args, **kwargs)
+
+    return planner.execute_plan(plan, *args, **kwargs)
 
