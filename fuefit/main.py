@@ -210,9 +210,8 @@ def get_file_format_from_extension(fname):
     return None
 
 
-_default_df_dest_path        = '/engine_points'
-_default_df_source_path      = '/engine_map'
-_default_out_file_append         = False
+_default_df_path            = ('/engine_points', '/engine_map')
+_default_out_file_append    = False
 ## When option `-m MODEL_PATH=VALUE` contains a relative path,
 # the following is preppended:
 _default_model_overridde_path = '/engine/'
@@ -284,7 +283,7 @@ def parse_many_file_args(many_file_args, filemode):
 
     def parse_file_args(fname, *kv_args):
         frmt    = _default_pandas_format
-        dest    = _default_df_dest_path
+        dest    = _default_df_path[io_file_indx]
         append  = _default_out_file_append
 
         kv_pairs = [parse_key_value_pair(kv) for kv in kv_args]
@@ -509,9 +508,9 @@ def build_args_parser(program_name, version, desc, epilog):
             * One extra key-value pair:
             ** file_append = [ TRUE | FALSE ]
                     specify whether to augment pre-existing files, or overwrite them.
-            * Default: %(default)s] """),
+            * Default: - file_frmt=CSV model_path=/engine_map """),
                         action='append', nargs='+',
-                        default=[('- file_frmt=%s model_path=%s file_append=%s'%('CSV', _default_df_source_path,  _default_out_file_append)).split()],
+                        #default=[('- file_frmt=%s model_path=%s file_append=%s'%('CSV', _default_df_path[1],  _default_out_file_append)).split()],
                         metavar='ARG')
 
 

@@ -68,3 +68,5 @@ __pycache__/
 
 #Scratch
 ~*.txt
+~*.csv
+~*.xls

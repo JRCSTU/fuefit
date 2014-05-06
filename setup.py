@@ -147,6 +147,7 @@ setup(
         'jsonschema',
         'jsonpointer',
         'networkx',
+        'pint',
     ],
     test_requires = [
     ],
