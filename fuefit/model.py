@@ -254,16 +254,16 @@ def model_schema(additional_properties = False):
 
 
 
-def model_validator():
+def model_validator(additional_properties=False):
     from jsonschema import Draft4Validator
-    schema = model_schema()
+    schema = model_schema(additional_properties)
     validator = Draft4Validator(schema)
     validator._types.update({"DataFrame" : pd.DataFrame, 'Series':pd.Series})
 
     return validator
 
-def validate_model(mdl):
-    validator = model_validator()
+def validate_model(mdl, additional_properties=False):
+    validator = model_validator(additional_properties=False)
     try:
         validator.validate(mdl)
 
@@ -317,8 +317,8 @@ def base_model():
     return instance
 
 
-def json_dumps(obj, pd_method=None):
-    def _json_default(o):
+def make_json_defaulter(pd_method):
+    def defaulter(o):
         if (isinstance(o, NDFrame)):
             if pd_method is None:
                 s = json.loads(pd.DataFrame.to_json(o))
@@ -329,7 +329,12 @@ def json_dumps(obj, pd_method=None):
             s =repr(o)
         return s
 
-    return json.dumps(obj, indent=2, default=_json_default)
+    return defaulter
+
+def json_dumps(obj, pd_method=None):
+    return json.dumps(obj, indent=2, default=make_json_defaulter(pd_method))
+def json_dump(obj, fp, pd_method=None):
+    json.dump(obj, fp, indent=2, default=make_json_defaulter(pd_method))
 
 
 try:

@@ -4,6 +4,10 @@ import logging
 
 log = logging.getLogger(__file__)
 
+
+def run_processor(opts, mdl):
+    return mdl
+
 def funcs_fact(params, engine, dfin, dfout):
     from math import pi
 

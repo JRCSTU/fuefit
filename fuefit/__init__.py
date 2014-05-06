@@ -54,3 +54,12 @@ def pairwise(t):
     except:
         return []
     return zip(it1, it2)
+
+
+## From http://stackoverflow.com/a/4149190/548792
+#
+class Lazy(object):
+    def __init__(self,func):
+        self.func=func
+    def __str__(self):
+        return self.func()

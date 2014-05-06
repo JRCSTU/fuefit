@@ -28,14 +28,16 @@ from collections import OrderedDict
 import functools
 import argparse
 from os.path import os
+import io, sys
+
 
 from ..main import (build_args_parser, validate_file_opts, parse_key_value_pair, parse_many_file_args,
-    build_model, validate_model, FileSpec)
-from ..model import (json_dumps)
+    assemble_model, validate_model, FileSpec, main, distribute_model)
+from ..model import (json_dumps, base_model)
 from .redirect import redirected  # @UnresolvedImport
 
 
-class Test(unittest.TestCase):
+class TestFuncs(unittest.TestCase):
 
     def setUp(self):
         unittest.TestCase.setUp(self)
@@ -55,10 +57,10 @@ class Test(unittest.TestCase):
         self._goodColumns = ['quant', 'spaced quant', 'quant (units)', 'quant (spaced units)', 'Pnorm (kJ / sec)']
 
         self._failKVPairsMsg = 'Not a KEY=VALUE syntax'
-        self._failKVPairs = ['no_value', 'miss_value=', 'spa ced', 'spaced key = key', '3number=val',
+        self._failKVPairs = ['no_value', 'spa ced', 'spaced key = key', '3number=val',
             '_']
-        self._goodKVPairs = {'k=v':'v', ' Num_3_key = 3 ':'3', '_key=hidden_key':'hidden_key',
-            'k = spaced value ':'spaced value',
+        self._goodKVPairs = {'k=v':'v', 'key=value':'value', 'Num_3_key = 3 ':'3', '_key=hidden_key':'hidden_key',
+            'k = spaced value ':'spaced value', 'miss_value=':'',
             'k+=123':123, 'k*=12.3':12.3, 'k?=1':True, 'k?=true':True, 'k?=False':False, 'k?=on':True,
             'k := 3':3, 'k := 3.14':3.14, 'k := ["a", 3.14]':['a', 3.14], 'k:={"a":3.14, "2":[1, "1"]}':{'a':3.14, '2':[1, "1"]},
             'k @= 3':3, 'k @= 3.14':3.14, 'k @= ["a", 3.14]':['a', 3.14], 'k@={\'a\':3.14, "2":[1, "1"]}':{'a':3.14, '2':[1, "1"]},
@@ -87,8 +89,6 @@ class Test(unittest.TestCase):
 
 
     def check_exits(self, cmdline, exit_code):
-        import io
-
         mystdout = io.StringIO()
         mystderr = io.StringIO()
         opts = None  # @UnusedVariable
@@ -207,33 +207,39 @@ class Test(unittest.TestCase):
             [['']],
             [['missing.file']],
             [[test_fnames[0], 'file_frmt=BAD']],
-            [[test_fnames[0], 'model_path=']],
             [[test_fnames[0], 'model_path=rel_path']],
             [[test_fnames[0], '2_bad=key']],
-            [['-']],            # missing file_frmt
             [[test_fnames[1]]], # missing file_frmt
         ]
         for many_file_args in cases:
+            with self.assertRaises(argparse.ArgumentTypeError, msg=many_file_args):
+                parse_many_file_args(many_file_args, 'r')
             with self.assertRaises(argparse.ArgumentTypeError, msg=many_file_args):
                 parse_many_file_args(many_file_args, 'r')
 
         all_cases = functools.reduce(lambda x, y: x+y, cases)
         with self.assertRaises(argparse.ArgumentTypeError, msg=all_cases):
             parse_many_file_args(all_cases, 'r')
+        with self.assertRaises(argparse.ArgumentTypeError, msg=all_cases):
+            parse_many_file_args(all_cases, 'r')
 
     def testFileSpec_good(self):
         test_fnames = self._test_fnames
         cases = [
-            (('r', 'w', 'a'), [[test_fnames[0]]]),
-            (('r', 'w', 'a'), [[test_fnames[0], 'file_frmt=AUTO']]),
-            (('r', 'w', 'a'), [[test_fnames[0], 'file_frmt=CSV', 'model_path=/gjhgj']]),
-            (('r', 'w', 'a'), [[test_fnames[0], 'some=other', 'keys+=4', 'fun:=[1, {"a":2}]']]),
-            (('r', 'w', 'a'), [[test_fnames[1], 'file_frmt=CSV']]),
-            (('r', 'w', 'a'), [['+', ]]),
-
-            (('r', 'w'), [['-', 'file_frmt=JSON']]),
-            (('r', 'w'), [['-', 'file_frmt=CSV', 'model_path=/gjhgj']]),
+            (('r', 'w'), [[test_fnames[0]]]),
+            (('r', 'w'), [[test_fnames[0], 'file_frmt=AUTO']]),
+            (('r', 'w'), [[test_fnames[0], 'model_path=']]),
+            (('r', 'w'), [[test_fnames[0], 'file_frmt=CSV', 'model_path=/gjhgj']]),
+            (('r', 'w'), [[test_fnames[0], 'some=other', 'keys+=4', 'fun:=[1, {"a":2}]']]),
+            (('r', 'w'), [[test_fnames[1], 'file_frmt=CSV']]),
             (('r', 'w'), [['+', ]]),
+
+            (('r', 'w'), [['-', ]]),
+            (('r', 'w'), [['+', ]]),
+            (('r', 'w'), [['-', 'file_frmt=JSON']]),
+            (('r', 'w'), [['+', 'file_frmt=JSON']]),
+            (('r', 'w'), [['-', 'file_frmt=CSV', 'model_path=/gjhgj']]),
+            (('r', 'w'), [['+', 'file_frmt=CSV', 'model_path=/gjhgj']]),
         ]
         for (open_modes, many_file_args) in cases:
             for open_mode in open_modes:
@@ -277,16 +283,16 @@ class Test(unittest.TestCase):
             opts = argparse.Namespace(**opts)
             validate_file_opts(opts)
 
-    def testSmoke_BuildModel_print(self):
+    def testSmoke_BuildModel_model_overrideParse_n_print(self):
         import pandas as pd
 
         fname = 'test_table.csv'
         opts = {'m':[[('fuel','diesel')]] }
-        infiles = [
-            FileSpec(open(fname, 'r'), fname, 'CSV', '/engine_points', None, {}, pd.read_csv)
+        filespecs = [
+            FileSpec(pd.read_csv, fname, open(fname, 'r'), 'CSV', '/engine_points', None, {})
         ]
         opts = argparse.Namespace(**opts)
-        mdl = build_model(opts, infiles)
+        mdl = assemble_model(filespecs, opts.m)
 
         print(json_dumps(mdl))
 
@@ -295,16 +301,67 @@ class Test(unittest.TestCase):
         import pandas as pd
 
         fname = 'test_table.csv'
-        opts = {'m':[[('fuel','diesel')]] }
-        infiles = [
-            FileSpec(open(fname, 'r'), fname, 'CSV', '/engine_points', None, {}, pd.read_csv)
+        model_overrides = [[('fuel','diesel')]]
+        filespecs = [
+            FileSpec(pd.read_csv, fname, open(fname, 'r'), 'CSV', '/engine_points', None, {})
         ]
-        opts = argparse.Namespace(**opts)
-        mdl = build_model(opts, infiles)
+        mdl = assemble_model(filespecs, model_overrides)
         validate_model(mdl)
 
 
-    #-I fuefit/test/FuelFit.xlsx  sheetname+=0 -m 'fuel=diesel'
+    def testWriteModelparts_emptyModel(self):
+        mystdout = io.StringIO()
+        mdl = {}
+        filespecs = [
+            FileSpec('write_csv', '<mystream>', mystdout, 'CSV', '', None, {})
+        ]
+
+        mystdout = io.StringIO()
+        distribute_model(mdl, filespecs)
+        self.assertEqual('', mystdout.getvalue(), mystdout.getvalue())
+
+    def testWriteModelparts_baseModel(self):
+        mystdout = io.StringIO()
+        mdl = base_model()
+        filespecs = [
+            FileSpec('write_csv', '<mystream>', mystdout, 'CSV', '', None, {})
+        ]
+        distribute_model(mdl, filespecs)
+        self.assertEqual(json_dumps(mdl), mystdout.getvalue(), mystdout.getvalue())
+
+    def testWriteModelparts_alteredModel(self):
+        mystdout = io.StringIO()
+        mdl = base_model()
+        k = 'test_key'
+        v = 'TEST_value'
+        mdl['engine'][k] = v
+        filespecs = [
+            FileSpec('write_csv', '<mystream>', mystdout, 'CSV', '', None, {})
+        ]
+        distribute_model(mdl, filespecs)
+        self.assertTrue(mystdout.getvalue().find(k) > 0, mystdout.getvalue())
+        self.assertTrue(mystdout.getvalue().find(v) > 0, mystdout.getvalue())
+
+    #def testWriteModelparts_dataframe(self):
+
+
+class TestMain(unittest.TestCase):
+    def setUp(self):
+        unittest.TestCase.setUp(self)
+        self.held, sys.stdout = sys.stdout, io.StringIO()
+
+    def test_run_main(self):
+        main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["RP<","b","dc"]  -m /engine/fuel=diesel -O - model_path= -v -d '''.split())
+        self.assertTrue(sys.stdout.getvalue().strip().find('RP<') > 0)
+
+        main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["RP<","b","dc"]  -m fuel=diesel -O - -v -d '''.split())
+        self.assertTrue(sys.stdout.getvalue().strip().find('RP<') > 0)
+
+
+    def tearDown(self):
+        unittest.TestCase.tearDown(self)
+        self.held, sys.stdout = sys.stdout, self.held
+        print(self.held.getvalue())
+
 if __name__ == "__main__":
-    #import sys;sys.argv = ['', 'Test.testName']
     unittest.main()

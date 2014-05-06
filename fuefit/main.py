@@ -21,22 +21,28 @@
 
 from argparse import RawTextHelpFormatter
 import argparse
+import ast
 import collections
 import functools
 import json
 import logging
+import os
 import re
-import sys, os
+import sys
 from textwrap import dedent
 
-import ast
+from pandas.core.generic import NDFrame
+
+from fuefit import Lazy
 import jsonpointer as jsonp
 import jsonschema as jsons
+import operator as ops
 import pandas as pd
 
-from . import (_version, DEBUG, model, str2bool)  # @UnusedImport
-from .model import (json_dumps)
-from .model import validate_model
+from . import _version, DEBUG, model, str2bool # @UnusedImport
+from .model import json_dump, json_dumps, validate_model
+from .processor import run_processor
+
 
 logging.basicConfig(level=logging.DEBUG)
 log     = logging.getLogger(__file__)
@@ -117,18 +123,22 @@ def main(argv=None):
     try:
 
         opts = parser.parse_args(argv)
+    except SystemExit:
+        log.error('Invalid args: %s', argv)
+        raise
 
+    try:
         DEBUG = bool(opts.debug)
 
         if (DEBUG or opts.verbose > 1):
-            log.setLevel(logging.DEBUG)
-        else:
-            if opts.verbose == 1:
-                log.setLevel(logging.INFO)
-            else:
-                log.setLevel(logging.WARNING)
+            opts.strict = True
 
-        log.debug("Args: %s\nOpts: %s", argv, opts)
+        if opts.verbose == 1:
+            log.setLevel(logging.INFO)
+        else:
+            log.setLevel(logging.WARNING)
+
+        log.debug("Args: %s\n  +--Opts: %s", argv, opts)
 
         opts = validate_file_opts(opts)
 
@@ -138,40 +148,52 @@ def main(argv=None):
         outfiles    = parse_many_file_args(opts.O, 'w')
         log.info("Output-files: %s", outfiles)
 
-        mdl = build_model(opts, infiles)
-        log.info("Input Model: %s", json_dumps(mdl, 'to_string'))
-        mdl = validate_model(mdl)
-
-    except (SystemExit) as ex:
-        if DEBUG:
-            log.exception('Invalid args!')
-        raise
     except (ValueError) as ex:
         if DEBUG:
             log.exception('Cmd-line parsing failed!')
         indent = len(program_name) * " "
         parser.exit(3, "%s: %s\n%s  for help use --help\n"%(program_name, ex, indent))
+
+    ## Main program
+    #
+    try:
+        additional_props = not opts.strict
+        mdl = assemble_model(infiles, opts.m)
+        log.info("Input Model(strict: %s): %s", opts.strict, Lazy(lambda: json_dumps(mdl, 'to_string')))
+        mdl = validate_model(mdl, additional_props)
+
+        mdl = run_processor(opts, mdl)
+
+        distribute_model(mdl, outfiles)
+
     except jsons.ValidationError as ex:
         if DEBUG:
             log.error('Invalid input model!', exc_info=ex)
         indent = len(program_name) * " "
-        parser.exit(4, "%s: Model validation failed due to: %s\n%s  for help use --help\n"%(program_name, ex, indent))
+        parser.exit(4, "%s: Model validation failed due to: %s\n%s\n"%(program_name, ex, indent))
 
     except jsonp.JsonPointerException as ex:
         if DEBUG:
             log.exception('Invalid model operation!')
         indent = len(program_name) * " "
-        parser.exit(4, "%s: Model operation failed due to: %s\n%s  for help use --help\n"%(program_name, ex, indent))
+        parser.exit(4, "%s: Model operation failed due to: %s\n%s\n"%(program_name, ex, indent))
 
 
 
-## The value of file_frmt=VALUE to decide which pandas.read_XXX() method to use.
+
+## The value of file_frmt=VALUE to decide which
+#    pandas.read_XXX() and write_XXX() methods to use.
+#
+#_io_file_modes = {'r':0, 'rb':0, 'w':1, 'wb':1, 'a':1, 'ab':1}
+_io_file_modes = {'r':0, 'w':1}
+_read_clipboard_methods = (pd.read_clipboard, 'to_clipboard')
+_default_pandas_format  = 'AUTO'
 _pandas_formats = collections.OrderedDict([
-    ('AUTO',None),
-    ('CSV', pd.read_csv),
-    ('TXT', pd.read_csv),
-    ('XLS', pd.read_excel),
-    ('JSON', pd.read_json),
+    ('AUTO', None),
+    ('CSV', (pd.read_csv, 'to_csv')),
+    ('TXT', (pd.read_csv, 'to_csv')),
+    ('XLS', (pd.read_excel, 'to_excel')),
+    ('JSON', (pd.read_json, 'to_json')),
 ])
 _known_file_exts = {
     'XLSX':'XLS'
@@ -188,14 +210,12 @@ def get_file_format_from_extension(fname):
     return None
 
 
-_default_pandas_format  = 'AUTO'
-_default_df_dest        = '/engine_points'
-_default_df_source      = '/engine_map'
-_default_append         = False
-
+_default_df_dest_path        = '/engine_points'
+_default_df_source_path      = '/engine_map'
+_default_out_file_append         = False
 ## When option `-m MODEL_PATH=VALUE` contains a relative path,
 # the following is preppended:
-_model_default_prefix = '/engine/'
+_default_model_overridde_path = '/engine/'
 
 
 _value_parsers = {
@@ -207,7 +227,7 @@ _value_parsers = {
 }
 
 
-_key_value_regex = re.compile(r'^\s*([/_A-Za-z][\w/\.]*)\s*([+*?:@]?)=\s*(.+?)\s*$')
+_key_value_regex = re.compile(r'^\s*([/_A-Za-z][\w/\.]*)\s*([+*?:@]?)=\s*(.*?)\s*$')
 def parse_key_value_pair(arg):
     """Argument-type for syntax like: KEY [+*?:]= VALUE."""
 
@@ -218,7 +238,7 @@ def parse_key_value_pair(arg):
             try:
                 value   = _value_parsers[type_sym](value)
             except Exception as ex:
-                raise argparse.ArgumentTypeError("Failed parsing key(%s)'s %s-VALUE(%s) due to: %s" %(key, type_sym, value, ex)) from ex
+                raise argparse.ArgumentTypeError("Failed parsing key(%s)%s=VALUE(%s) due to: %s" %(key, type_sym, value, ex)) from ex
 
         return [key, value]
     else:
@@ -257,14 +277,15 @@ def validate_file_opts(opts):
     return opts
 
 
-FileSpec = collections.namedtuple('FileSpec', ('fname', 'file', 'frmt', 'path', 'append', 'kws', 'read_method'))
+FileSpec = collections.namedtuple('FileSpec', ('io_method', 'fname', 'file', 'frmt', 'path', 'append', 'kws'))
 
-def parse_many_file_args(many_file_args, filetype):
+def parse_many_file_args(many_file_args, filemode):
+    io_file_indx = _io_file_modes[filemode]
 
     def parse_file_args(fname, *kv_args):
         frmt    = _default_pandas_format
-        dest    = _default_df_dest
-        append  = _default_append
+        dest    = _default_df_dest_path
+        append  = _default_out_file_append
 
         kv_pairs = [parse_key_value_pair(kv) for kv in kv_args]
         pandas_kws = dict(kv_pairs)
@@ -274,29 +295,32 @@ def parse_many_file_args(many_file_args, filetype):
             if (frmt not in _pandas_formats):
                 raise argparse.ArgumentTypeError("Unsupported pandas file_frmt: %s\n  Set 'file_frmt=XXX' to one of %s" % (frmt, list(_pandas_formats.keys())[1:]))
 
-        if (fname == '+'):
-            file    = None
-            fname   = '<CLIPBOARD>'
-            frmt = 'TABLE'
-            method = pd.read_clipboard
-        else:
-            if (frmt == _default_pandas_format):
-                if ('-' == fname):
-                    raise argparse.ArgumentTypeError("With <stdio> and <clipboard> a concrete file_frmt is required! \n  Set 'file_frmt=XXX' to one of %s" % (list(_pandas_formats.keys())[1:]))
-                frmt = get_file_format_from_extension(fname)
-                if (not frmt):
-                    raise argparse.ArgumentTypeError("File(%s) has unknown extension, file_frmt is required! \n  Set 'file_frmt=XXX' to one of %s" % (fname, list(_pandas_formats.keys())[1:]))
 
+        if (frmt == _default_pandas_format):
+            if ('-' == fname or fname == '+'):
+                frmt = 'CSV'
+            else:
+                frmt = get_file_format_from_extension(fname)
+            if (not frmt):
+                raise argparse.ArgumentTypeError("File(%s) has unknown extension, file_frmt is required! \n  Set 'file_frmt=XXX' to one of %s" % (fname, list(_pandas_formats.keys())[1:]))
+
+
+        if (fname == '+'):
+            method = _read_clipboard_methods[io_file_indx]
+            file = ''
+        else:
             method = _pandas_formats[frmt]
+            assert isinstance(method, tuple), method
+            method = method[io_file_indx]
 
             if (method == pd.read_excel):
                 file = fname
             else:
-                file = argparse.FileType(filetype)(fname)
+                file = argparse.FileType(filemode)(fname)
 
         try:
             dest = pandas_kws.pop('model_path')
-            if (not dest.startswith('/')):
+            if (len(dest) > 0 and not dest.startswith('/')):
                 raise argparse.ArgumentTypeError('Only absolute dest-paths supported: %s' % (dest))
         except KeyError:
             pass
@@ -307,37 +331,74 @@ def parse_many_file_args(many_file_args, filetype):
         except KeyError:
             pass
 
-        return FileSpec(fname, file, frmt, dest, append, pandas_kws, method)
+        return FileSpec(method, fname, file, frmt, dest, append, pandas_kws)
 
     return [parse_file_args(*file_args) for file_args in many_file_args]
 
 
 def load_file_as_df(filespec):
-# FileSpec(fname, file, frmt, path, append, kws)
-    method = filespec.read_method
-    log.debug('Reading file with: pandas.%s(%s, %s)', method.__name__, filespec.file, filespec.kws)
-    dfin = method(filespec.file, **filespec.kws)
+# FileSpec(io_method, fname, file, frmt, path, append, kws)
+    method = filespec.io_method
+    log.debug('Reading file with: pandas.%s(%s, %s)', method.__name__, filespec.fname, filespec.kws)
+    if filespec.file is None:       ## ie. when reading CLIPBOARD
+        dfin = method(**filespec.kws)
+    else:
+        dfin = method(filespec.file, **filespec.kws)
 
     return dfin
 
-def build_model(opts, infiles):
+
+
+def assemble_model(infiles, model_overrides):
 
     mdl = model.base_model()
 
     for filespec in infiles:
         dfin = load_file_as_df(filespec)
         log.debug("  +-input-file(%s):\n%s", filespec.fname, dfin)
-        jsonp.set_pointer(mdl, filespec.path, dfin)
+        if filespec.path:
+            jsonp.set_pointer(mdl, filespec.path, dfin)
+        else:
+            mdl = dfin
 
-    model_overrides = opts.m
     if (model_overrides):
         model_overrides = functools.reduce(lambda x,y: x+y, model_overrides) # join all -m
         for (json_path, value) in model_overrides:
             if (not json_path.startswith('/')):
-                json_path = _model_default_prefix + json_path
+                json_path = _default_model_overridde_path + json_path
             jsonp.set_pointer(mdl, json_path, value)
 
     return mdl
+
+
+
+
+def store_part_as_df(filespec, part):
+    '''If part is Pandas, store it as it is, else, store it as sson recursively.
+
+        FileSpec: named_tuple(io_method, fname, file, frmt, path, append, kws)
+    '''
+
+    if isinstance(part, NDFrame):
+        log.debug('Writing file with: pandas.%s(%s, %s)', filespec.io_method, filespec.fname, filespec.kws)
+        if filespec.file is None:       ## ie. when reading CLIPBOARD
+            method = ops.methodcaller(filespec.io_method, **filespec.kws)
+        else:
+            method = ops.methodcaller(filespec.io_method, filespec.file, **filespec.kws)
+        method(part)
+    else:
+        json_dump(part, filespec.file, pd_method=None, **filespec.kws)
+
+
+_no_part=object()
+def distribute_model(mdl, outfiles):
+    for filespec in outfiles:
+        part = jsonp.resolve_pointer(mdl, filespec.path, _no_part)
+        if part is _no_part:
+            log.warning('Nothing found at model(%s) to write to file(%s).', filespec.path, filespec.fname)
+        else:
+            store_part_as_df(filespec, part)
+
 
 
 def build_args_parser(program_name, version, desc, epilog):
@@ -349,21 +410,20 @@ def build_args_parser(program_name, version, desc, epilog):
 
     grp_io = parser.add_argument_group('Input/Output', 'Options controlling reading/writting of file(s) and for specifying model values.')
     grp_io.add_argument('-I', help=dedent("""\
-            import file(s) into the model utilizing pandas-dataframes.
+            import file(s) into the model utilizing pandas-IO methods, see
+                http://pandas.pydata.org/pandas-docs/stable/io.html
             Default: %(default)s]
             * The syntax of this option is like this:
                     FILENAME [KEY=VALUE ...]]
-            * The FILENAME can be '-' to designate <stdin>.
-            * Most KEY-VALUE pairs pass option(s) directly to pandas.read_XXX() methods, see:
-                    http://pandas.pydata.org/pandas-docs/stable/io.html
-              See REMARKS below for the parsing of KEY-VAULE pairs.
-            * The following keys are consumed before reaching pandas:
-            ** file_frmt = [ AUTO | CSV | TXT | XLS | JSON | CLIPBOARD ]
+            * The FILENAME can be '-' to designate <stdin> or '+' to designate CLIPBOARD.
+            * Any KEY-VALUE pairs pass directly to pandas.read_XXX() options,
+              except from the following keys, which are consumed before reaching pandas:
+            ** file_frmt = [ AUTO | CSV | TXT | XLS | JSON ]
                     selects which pandas.read_XXX() method to use.
-                    When AUTO (default), deduced from filename's extension (ie Excel files).
+                    Defaults to AUTO, unless reading <stdin> or <clipboard>, which is CSV.
+                    When AUTO, the format is deduced from the filename's extension (ie Excel files).
                     For  JSON, different sub-formats are selected through the 'orient' keyword
                     of Pandas, specified with a key-value pair.
-                    When CLIPBOARD, file ignored
             ** model_path = MODEL_PATH
                     specifies the destination (or source) of the dataframe within the model
                     as json-pointer path (see -m option).
@@ -372,7 +432,8 @@ def build_args_parser(program_name, version, desc, epilog):
                     for all those data-files must be equal.
             * When more input-files given, the number --icolumns and --irenames options,
               must either match them, be 1 (meaning use them for all files), or be totally absent
-              (meaning use defaults for all files). """),
+              (meaning use defaults for all files).
+            * see REMARKS at the bottom regarding the parsing of KEY-VAULE pairs. """),
                         action='append', nargs='+', required=True,
                         #default=[('- file_frmt=%s model_path=%s'%('CSV', _default_df_dest)).split()],
                         metavar='ARG')
@@ -431,9 +492,8 @@ def build_args_parser(program_name, version, desc, epilog):
             """),
                         action='append', nargs='+',
                         type=parse_key_value_pair, metavar='MODEL_PATH=VALUE')
-    grp_io.add_argument('--lax', help=dedent("""\
-            validate model more relaxed (additional-properties allowed)."""),
-            default=True, type=str2bool,
+    grp_io.add_argument('--strict', help=dedent("validate model more strictly (no additional-properties allowed)."),
+            default=False, type=str2bool,
             metavar='[TRUE | FALSE]')
     grp_io.add_argument('-M', help=dedent("""\
             get help description for the specfied model path.
@@ -445,19 +505,24 @@ def build_args_parser(program_name, version, desc, epilog):
     grp_io.add_argument('-O', help=dedent("""\
             specifies output-file(s) to write model-portions into after calculations.
             The syntax is indentical to -I, with these differences:
-            * When FILENAME is '-', <stdout> is used.
+            * Instead of <stdin>, <stdout> and write_XXX() methods are used wherever.
             * One extra key-value pair:
             ** file_append = [ TRUE | FALSE ]
                     specify whether to augment pre-existing files, or overwrite them.
             * Default: %(default)s] """),
                         action='append', nargs='+',
-                        default=[('- file_frmt=%s model_path=%s file_append=%s'%('CSV', _default_df_source,  _default_append)).split()],
+                        default=[('- file_frmt=%s model_path=%s file_append=%s'%('CSV', _default_df_source_path,  _default_out_file_append)).split()],
                         metavar='ARG')
 
 
     grp_various = parser.add_argument_group('Various', 'Options controlling various other aspects.')
     #parser.add_argument('--gui', help='start in GUI mode', action='store_true')
-    grp_various.add_argument('-d', "--debug", action="store_true", help="set debug level [default: %(default)s]", default=False)
+    grp_various.add_argument('-d', "--debug", action="store_true", help=dedent("""\
+            "set debug-mode with various checks and error-traces
+            Suggested combining with --verbose counter-flag.
+            Implies --strict true
+            [default: %(default)s] """),
+                        default=False)
     grp_various.add_argument('-v', "--verbose", action="count", default=0, help="set verbosity level [default: %(default)s]")
     grp_various.add_argument("--version", action="version", version=version_string, help="prints version identifier of the program")
     grp_various.add_argument("--help", action="help", help='show this help message and exit')
