@@ -79,6 +79,30 @@ class Test(unittest.TestCase):
         validator = model.model_validator()
         validator.validate(mdl)
 
+    def testModel_units_GOOD(self):
+        import jsonpointer as jsonp
+        from pint import UnitRegistry
+        ureg = UnitRegistry()
+
+        cases = [
+            [['/engine/bore', None], 0.14 * ureg.meter],
+            [['/engine/bore', 0.14], 0.14 * ureg.meter],
+            [['/engine/bore', '0.14 (m)'], 0.14 * ureg.meter],
+            [['/engine/bore', '+0.14 (m)'], 0.14 * ureg.meter],
+            [['/engine/bore', '14 (mm)'], 0.14 * ureg.meter],
+            [['/engine/bore', '14'], 0.14 * ureg.meter],
+            [['/engine/bore', ' +14 '], 0.14 * ureg.meter],
+        ]
+
+        validator = model.model_validator()
+
+        for (args, res) in cases:
+            mdl = model.base_model()
+            jsonp.set_pointer(mdl, '/engine/fuel', 'diesel')
+
+            jsonp.set_pointer(mdl, *args)
+            validator.validate(mdl)
+
 
 
 

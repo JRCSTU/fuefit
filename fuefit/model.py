@@ -52,35 +52,35 @@ def model_schema(additional_properties = False):
                     },
                     "p_max": {
                         "title": "maximum rated power",
-                        "$ref": "#/definitions/positiveNumberOrNull",
+                        "$ref": "#/definitions/positiveQuantityOrNumOrNull",
                         "description": dedent("""\
                             The maximum rated engine power as declared by the manufacturer.
                             Required if Pnorm or FCnorm exists in input-file's or example-map's columns.""")
                     },
                     "rpm_rated": {
                         "title": "rated engine revolutions (rad/min)",
-                        "$ref": "#/definitions/positiveNumberOrNull",
+                        "$ref": "#/definitions/positiveQuantityOrNumOrNull",
                         "description": dedent("""\
                             The engine's revolutions where maximum-power is attained.
                             Required if RPMnorm exists in input-file's or example-map columns."""),
                     },
                     "rpm_idle": {
                         "title": "idling revolutions (rad/min)",
-                        "$ref": "#/definitions/positiveNumberOrNull",
+                        "$ref": "#/definitions/positiveQuantityOrNumOrNull",
                         "description": dedent("""\
                             The engine's revolutions when idle.
                             Required if RPMnorm exists in input-file's or example-map columns."""),
                     },
                     'stroke': {
                         "title": "piston stroke (mm)",
-                        "$ref": "#/definitions/positiveNumberOrNull",
+                        "$ref": "#/definitions/positiveQuantityOrNumOrNull",
                         'description': dedent("""\
                             The engine's stroke travelling distance.
                             Required if CM is not among the inputs or requested to generate example-map with RPM column.""")
                     },
                     'capacity': {
                         "title": "engine capacity (cm^3)",
-                        "$ref": "#/definitions/positiveNumberOrNull",
+                        "$ref": "#/definitions/positiveQuantityOrNumOrNull",
                         'description': dedent("""\
                             The total displacement of all engine's pistons.
                             This value is ignored' if 'stroke', 'bore' and 'cylinders' are all present.
@@ -88,7 +88,7 @@ def model_schema(additional_properties = False):
                     },
                     'bore': {
                         "title": "piston bore (mm)",
-                        "$ref": "#/definitions/positiveNumberOrNull",
+                        "$ref": "#/definitions/positiveQuantityOrNumOrNull",
                         'description': dedent("""\
                             The piston diameter.
                             The 'capacity' is calculated from 'stroke', 'bore' and 'cylinders' when are all present.""")
@@ -163,6 +163,27 @@ def model_schema(additional_properties = False):
                 "type": "array",
                "items": { "$ref": "#/definitions/positiveNumber" },
             },
+
+            "quantity": {
+                "type": "string",
+                "pattern": "^\s*[-+]?\s*\d+(\.\d*)?\s*(\([^)]+\))?\s*$",
+            },
+            "positiveQuantity": {
+                "type": "string",
+                "pattern": "^\s*\+?\s*\d+(\.\d*)?\s*(\([^)]+\))?\s*$",
+            },
+            "negativeQuantity": {
+                "type": "string",
+                "pattern": "^\s*-\s*\d+(\.\d*)?\s*(\([^)]+\))?\s*$",
+            },
+            "positiveQuantityOrNumOrNull": {
+                "oneOf": [
+                    { "$ref": "#/definitions/positiveQuantity" },
+                    { "$ref": "#/definitions/positiveNumber" },
+                    { "type": "null" },
+                ],
+            },
+
             "fuel_spec": {
                 "type": "object",
                 "required": ['lhv'],
