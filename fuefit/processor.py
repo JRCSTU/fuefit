@@ -8,18 +8,8 @@ log = logging.getLogger(__file__)
 def run_processor(opts, mdl):
     return mdl
 
-def funcs_fact(params, engine, dfin, dfout):
+def normalize_ffact(params, engine, dfin, dfout):
     from math import pi
-
-    engine['engine.fuel_lhv']    = params[engine.fuel]
-    dfin['rpm']   = dfin.rpm_norm * (engine.rpm_rated - engine.rpm_idle) + engine.rpm_idle
-    dfin['p']     = dfin.p_norm * engine.p_max
-    dfin['fc']    = dfin.fc_norm * engine.p_max
-    dfin['rps']   = dfin.rpm / 60
-    dfin['torque'] = (dfin.p * 1000) / (dfin.rps * 2 * pi)
-    dfin['pme']   = (dfin.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-3)
-    dfin['pmf']   = ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-3)) * (dfin.fc / (3600 * dfin.rps * 2 * pi)) * 10e-5
-    dfin['cm']    = dfin.rps * 2 * engine.stroke / 1000
 
     def f1(): engine['fuel_lhv'] = params['fuel'][engine['fuel']]['lhv']
     def f2(): dfin['rpm']     = dfin.rpm_norm * (engine.rpm_rated - engine.rpm_idle) + engine.rpm_idle
@@ -31,17 +21,17 @@ def funcs_fact(params, engine, dfin, dfout):
     def f8(): dfin['pmf']     = ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-3)) * (dfin.fc / (3600 * dfin.rps * 2 * pi)) * 10e-5
     def f9(): dfin['cm']      = dfin.rps * 2 * engine.stroke / 1000
 
-    ## Out of returned funcs!!
-    def f10(): return dfin.cm + dfin.pmf + dfin.pme
+    return (f1, f2, f3, f4, f5, f6, f7, f8, f9)
 
-    def f11(): engine['fc_map_params'] = f10()
-    def f12():
-        dfout['rpm']    = engine['fc_map_params']
-        dfout['p']      = engine['fc_map_params'] * 2
-        dfout['fc']     = engine['fc_map_params'] * 4
-    def f13(): dfout['fc_norm']         = dfout.fc / dfout.p
+def denormalize_ffact(params, engine, dfin, dfout):
+    def f1(): engine['fc_map_params'] = f10()
+    def f2():
+        dfout['rpm']               = engine['fc_map_params']
+        dfout['p']                 = engine['fc_map_params'] * 2
+        dfout['fc']                = engine['fc_map_params'] * 4
+    def f3(): dfout['fc_norm']     = dfout.fc / dfout.p
 
-    return (f1, f2, f3, f4, f5, f6, f7, f8, f9, f11, f12, f13)
+    return (f1, f2, f3)
 
 def proc_vehicle(dfin, model):
 

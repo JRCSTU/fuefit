@@ -25,9 +25,24 @@ Created on Apr 23, 2014
 '''
 import unittest
 import logging
+import itertools as it
 
-from fuefit.pdcalc import build_func_dependencies_graph, harvest_func, harvest_funcs_factory, filter_common_prefixes, \
-    gen_all_prefix_pairs, Dependencies, DependenciesError, validate_func_relations
+from fuefit.pdcalc import _build_func_dependencies_graph, harvest_func, harvest_funcs_factory, _filter_common_prefixes, \
+    Dependencies, DependenciesError, _validate_func_relations
+
+def gen_all_prefix_pairs(path):
+    ''' R.foo.com' --> [('R.foo.com', 'R.foo'), ('R.foo', 'R')] but outer reversed'''
+    (it1, it2) = it.tee(path.split('.'))
+    s1 = ''
+    s2 = next(it2)
+    try:
+        while(True):
+            s1 += next(it1)
+            s2 += '.' + next(it2)
+            yield (s2, s1)
+            s1 += '.'
+    except StopIteration:
+        pass
 
 
 def lstr(lst):
@@ -66,13 +81,13 @@ class Test(unittest.TestCase):
         logging.basicConfig(level=logging.DEBUG)
 
     def test_filter_common_prefixes(self):
-        filter_common_prefixes
+        _filter_common_prefixes
         deps = ['a', 'a.b', 'b.cc', 'a.d', 'b', 'ac', 'a.c']
-        res = filter_common_prefixes(deps)
+        res = _filter_common_prefixes(deps)
         self.assertEqual(res, ['a.b', 'a.c', 'a.d', 'ac', 'b.cc'])
 
         deps = ['R.dfin.hh.tt', 'R.dfin.hh.ll', 'R.dfin.hh']
-        res = filter_common_prefixes(deps)
+        res = _filter_common_prefixes(deps)
         self.assertEqual(res, ['R.dfin.hh.ll', 'R.dfin.hh.tt'])
 
     def test_gen_all_prefix_pairs(self):
@@ -209,7 +224,7 @@ class Test(unittest.TestCase):
         deps = harvest_funcs_factory(funcs_fact)
         print('\n'.join([str(s) for s in deps]))
 
-        g = build_func_dependencies_graph(deps)
+        g = _build_func_dependencies_graph(deps)
 #         print(g.edge)
 #         print('topological:', '\n'.join(nx.topological_sort(g)))
 #         print('topological_recusrive:', '\n'.join(nx.topological_sort_recursive(g)))
@@ -220,7 +235,7 @@ class Test(unittest.TestCase):
         deps = harvest_funcs_factory(funcs_fact)
         print('\n'.join([str(s) for s in deps]))
 
-        g = build_func_dependencies_graph(deps)
+        g = _build_func_dependencies_graph(deps)
         self.assertEqual(len(g), 20) #23 when adding.segments
 
 
@@ -228,7 +243,7 @@ class Test(unittest.TestCase):
         rels = list()
         harvest_funcs_factory(funcs_fact, func_rels=rels)
         harvest_funcs_factory(funcs_fact2, func_rels=rels)
-        graph = build_func_dependencies_graph(rels)
+        graph = _build_func_dependencies_graph(rels)
 
         return graph
 
@@ -260,7 +275,7 @@ class Test(unittest.TestCase):
         ]
         for (i, (rel, err)) in enumerate(cases):
             with self.assertRaisesRegex(DependenciesError, err, msg='Case(%i)'%i):
-                validate_func_relations([rel])
+                _validate_func_relations([rel])
 
 
 

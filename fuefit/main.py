@@ -437,7 +437,7 @@ def build_args_parser(program_name, version, desc, epilog):
                         #default=[('- file_frmt=%s model_path=%s'%('CSV', _default_df_dest)).split()],
                         metavar='ARG')
     grp_io.add_argument('-c', '--icolumns', help=dedent("""\
-            describes the contents and the units of input file(s) (see --I).
+            describes the columns-contents of input file(s) along with their units (see --I).
             It must be followed either by an integer denoting the index of the header-row
             within the tabular data, or by a list of column-names specifications,
             obeying the following syntax:
@@ -460,7 +460,7 @@ def build_args_parser(program_name, version, desc, epilog):
                 PMF      (bar)
             4. Irellevant column:
                 X
-            Default when files include heqders is 0 (1st row), otherwise it is 'RPM,P,FC'."""),
+            Default when files include headers is 0 (1st row), otherwise it is 'RPM,P,FC'."""),
                         action='append', nargs='+',
                         type=parse_column_specifier, metavar='COLUMN_SPEC')
     grp_io.add_argument('-r', '--irenames', help=dedent("""\

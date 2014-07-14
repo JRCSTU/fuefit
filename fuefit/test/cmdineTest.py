@@ -357,10 +357,10 @@ class TestMain(unittest.TestCase):
         main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["RP<","b","dc"]  -m fuel=diesel -O - -v -d '''.split())
         self.assertTrue(sys.stdout.getvalue().strip().find('RP<') > 0)
 
-        main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["RPM","P","FC"]  -m fuel=petrol -O ~t.csv model_path=/engine_points -v -d'''.split())
+        main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["RPM","P","FC"]  -m fuel=petrol -O ~t.csv model_path=/engine_points index?=false -v -d'''.split())
         with open('~t.csv', 'r') as fp:
             txt = fp.read()
-        self.assertTrue(txt.strip().find('RPM') > 0)
+        self.assertTrue(txt.strip().find('RPM') >= 0)
 
     def tearDown(self):
         unittest.TestCase.tearDown(self)

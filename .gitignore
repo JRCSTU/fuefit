@@ -70,3 +70,4 @@ __pycache__/
 ~*.txt
 ~*.csv
 ~*.xls
+~*.xlsx
