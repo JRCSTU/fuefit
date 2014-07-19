@@ -1,53 +1,65 @@
 import pandas as pd
 import numpy as np
 import logging
+from fuefit import pdcalc
 
 log = logging.getLogger(__file__)
 
 
 def run_processor(opts, mdl):
+    funcs_map = {
+        norm_to_std_map: True
+    }
+    params  = mdl['params']
+    engine  = mdl['engine']
+    dfin      = mdl['engine_points']
+    pdcalc.execute(funcs_map, ('cm', 'pme', 'pmf'), params, engine, dfin)
+
+    engine['fc_map_params'] = fit_map(engine, dfin)
+
+    dfout = std_to_norm_map(params, engine, dfin)
+
+    mdl['engine_map'] = dfout
+
     return mdl
 
-def normalize_ffact(params, engine, dfin, dfout):
-    from math import pi
 
+def norm_to_std_map(params, engine, df):
+    from math import pi
     def f1(): engine['fuel_lhv'] = params['fuel'][engine['fuel']]['lhv']
-    def f2(): dfin['rpm']     = dfin.rpm_norm * (engine.rpm_rated - engine.rpm_idle) + engine.rpm_idle
-    def f3(): dfin['p']       = dfin.p_norm * engine.p_max
-    def f4(): dfin['fc']      = dfin.fc_norm * engine.p_max
-    def f5(): dfin['rps']     = dfin.rpm / 60
-    def f6(): dfin['torque']  = (dfin.p * 1000) / (dfin.rps * 2 * pi)
-    def f7(): dfin['pme']     = (dfin.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-6)
-    def f8(): dfin['pmf']     = ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-3)) * (dfin.fc / (3600 * dfin.rps * 2 * pi)) * 10e-5
-    def f9(): dfin['cm']      = dfin.rps * 2 * engine.stroke / 1000
+    def f2(): df['rpm']     = df.rpm_norm * (engine.rpm_rated - engine.rpm_idle) + engine.rpm_idle
+    def f3(): df['p']       = df.p_norm * engine.p_max
+    def f4(): df['fc']      = df.fc_norm * engine.p_max
+    def f5(): df['rps']     = df.rpm / 60
+    def f6(): df['torque']  = (df.p * 1000) / (df.rps * 2 * pi)
+    def f7(): df['pme']     = (df.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-6)
+    def f8(): df['pmf']     = ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-3)) * (df.fc / (3600 * df.rps * 2 * pi)) * 10e-5
+    def f9(): df['cm']      = df.rps * 2 * engine.stroke / 1000
 
     return (f1, f2, f3, f4, f5, f6, f7, f8, f9)
 
-def denormalize_ffact(params, engine, dfin, dfout):
-    def f1(): engine['fc_map_params'] = f10()
-    def f2():
-        dfout['rpm']               = engine['fc_map_params']
-        dfout['p']                 = engine['fc_map_params'] * 2
-        dfout['fc']                = engine['fc_map_params'] * 4
-    def f3(): dfout['fc_norm']     = dfout.fc / dfout.p
+def std_to_norm_map(params, engine, df):
+    from math import pi
 
-    return (f1, f2, f3)
+    df['rps']       = df.cm * 1000 / (2 * engine.stroke)
+    df['rpm']       = df.rps * 60
+    df['rpm_norm']  = df['rpm'] / (engine.rpm_rated - engine.rpm_idle) + engine.rpm_idle
 
-def proc_vehicle(dfin, model):
+    df['torque']    = df.pme * (engine.capacity * 10e-3) / (4 * pi * 10e-5)
+    df['p']         = df.torque * (df.rps * 2 * pi) / 1000
 
-    ## Filter values
-    #
-    nrows       = len(dfin)
-    dfin = dfin[(dfin.pme > -1.0) & (dfin.pme < 25.0)]
-    log.warning('Filtered %s out of %s rows for BAD  pme.', nrows-len(dfin), nrows)
+    df['fc']        = (df.pmf * (engine.capacity * 10e-2) * (3600 * df.rps * 2 * pi)) / (4 * pi * engine.fuel_lhv * 10e-5)
+    df['fc_norm']   = df.fc / engine.p_max
 
-    return dfin
+    df['p_norm']    = df.p / engine.p_max
+
+
 
 
 ## Perform normal and ROBUST fit.
 #
 
-def fit_map(engine, dfin):
+def fit_map(engine, df):
     from scipy.optimize import curve_fit as curve_fit
     #from .robustfit import curve_fit
 
@@ -61,9 +73,19 @@ def fit_map(engine, dfin):
         z = (a + b*cm + c*cm**2)*pmf + (a2 + b2*cm)*pmf**2 + loss0 + loss2*cm**2
         return z
 
-    dfin = engine.fc_table
-    Y = dfin.pme.values
+    Y = df.pme.values
 
-    (res, _) = curve_fit(fitfunc, dfin, Y, robust=False)
+    (res, _) = curve_fit(fitfunc, df, Y, robust=False)
     res_df = pd.DataFrame(res, index=param_names)
-    engine['fc_map_params'] = res_df
+    return res_df
+
+
+def proc_vehicle(dfin, model):
+
+    ## Filter values
+    #
+    nrows       = len(dfin)
+    dfin = dfin[(dfin.pme > -1.0) & (dfin.pme < 25.0)]
+    log.warning('Filtered %s out of %s rows for BAD  pme.', nrows-len(dfin), nrows)
+
+    return dfin
