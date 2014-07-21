@@ -13,7 +13,7 @@ def run_processor(opts, mdl):
     params  = mdl['params']
     engine  = mdl['engine']
     dfin      = mdl['engine_points']
-    pdcalc.execute(funcs_map, ('cm', 'pme', 'pmf'), params, engine, dfin)
+    pdcalc.execute_funcs_map(funcs_map, ('cm', 'pme', 'pmf'), params, engine, dfin)
 
     engine['fc_map_params'] = fit_map(engine, dfin)
 

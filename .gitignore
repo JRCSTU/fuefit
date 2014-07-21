@@ -71,3 +71,5 @@ __pycache__/
 ~*.csv
 ~*.xls
 ~*.xlsx
+**/temp.csv
+**/strange.ext

@@ -27,7 +27,7 @@ import unittest
 from collections import OrderedDict
 import functools
 import argparse
-from os.path import os
+import os
 import io, sys
 
 
@@ -349,18 +349,19 @@ class TestMain(unittest.TestCase):
     def setUp(self):
         unittest.TestCase.setUp(self)
         self.held, sys.stdout = sys.stdout, io.StringIO()
+        os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
     def test_run_main(self):
         main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["RP<","b","dc"]  -m /engine/fuel=diesel -O - model_path= -v -d '''.split())
-        self.assertTrue(sys.stdout.getvalue().strip().find('RP<') > 0)
+        self.assertGreater(sys.stdout.getvalue().strip().find('RP<'), 0)
 
         main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["RP<","b","dc"]  -m fuel=diesel -O - -v -d '''.split())
-        self.assertTrue(sys.stdout.getvalue().strip().find('RP<') > 0)
+        self.assertGreater(sys.stdout.getvalue().strip().find('RP<'), 0)
 
         main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["RPM","P","FC"]  -m fuel=petrol -O ~t.csv model_path=/engine_points index?=false -v -d'''.split())
         with open('~t.csv', 'r') as fp:
             txt = fp.read()
-        self.assertTrue(txt.strip().find('RPM') >= 0)
+        self.assertGreaterEqual(txt.strip().find('RPM'), 0)
 
     def tearDown(self):
         unittest.TestCase.tearDown(self)
