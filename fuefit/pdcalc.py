@@ -349,56 +349,6 @@ def _extract_funcs_from_edges(graph, ordered_nodes):
 
 
 
-def default_arg_paths_extractor(arg_name, arg, paths):
-    '''
-    Dig recursively objects for indices to build the `sources`/`dests` sequences for :meth:`Dependencies.build_plan()`
-
-    It extracts indices recursively from maps and pandas
-    The inner-ones paths are not added, ie ``df.some.key``, but not ``df`` or ``df.some``.
-
-    .. Note:: for pandas-series their index (their infos-axis) gets appended only the 1st time
-    (not if invoked in recursion, from DataFrame columns).
-
-    :param list paths: where to add the extracted paths into
-    '''
-    try:
-        for key in arg.keys():
-            path = '%s.%s'%(arg_name, key)
-            value = arg[key]
-            if (isinstance(value, pd.Series)):
-                paths.append(path) # do not recurse into series.
-            else:
-                default_arg_paths_extractor(path, value, paths)
-    except (AttributeError, KeyError):
-        paths.append(arg_name)
-
-
-def tell_paths_from_named_args(named_args, arg_paths_extractor_func=default_arg_paths_extractor, paths=None):
-    '''
-    Builds the `sources` or the `dests` sequences params of :meth:`Dependencies.build_plan()` from a map of function-arguments
-
-    :param named_args: an ordered map ``{param_name --> param_value}`` similar to that returned by
-            ``inspect.signature(func).bind(*args).arguments: BoundArguments``.
-            Use the utility :func:`name_all_func_args()` to generate such a map for some function.
-    :return: the `paths` updated with all ''dotted.vars'' found
-    '''
-
-    if paths is None:
-        paths = []
-    for (name, arg) in named_args.items():
-        arg_paths_extractor_func(name, arg, paths)
-
-    return paths
-
-
-def name_all_func_args(func, *args, **kwargs):
-    sig = inspect.signature(func)
-    bound_args = sig.bind(*args, **kwargs)
-
-    return bound_args.arguments
-
-
-
 
 def _wrap_standalone_func(func):
     return _DepFunc(func=func, is_funcs_factory=False)
@@ -512,6 +462,61 @@ class _DepFunc:
             return '_DepFunc<%s>(%s)'%(self.get_type(), self.func)
         except:
             return '_DepFunc<BAD_STR>(%s)'%self.func
+
+
+##############################
+## User Utilities
+##############################
+##
+
+def default_arg_paths_extractor(arg_name, arg, paths):
+    '''
+    Dig recursively objects for indices to build the `sources`/`dests` sequences for :meth:`Dependencies.build_plan()`
+
+    It extracts indices recursively from maps and pandas
+    The inner-ones paths are not added, ie ``df.some.key``, but not ``df`` or ``df.some``.
+
+    .. Note:: for pandas-series their index (their infos-axis) gets appended only the 1st time
+    (not if invoked in recursion, from DataFrame columns).
+
+    :param list paths: where to add the extracted paths into
+    '''
+    try:
+        for key in arg.keys():
+            path = '%s.%s'%(arg_name, key)
+            value = arg[key]
+            if (isinstance(value, pd.Series)):
+                paths.append(path) # do not recurse into series.
+            else:
+                default_arg_paths_extractor(path, value, paths)
+    except (AttributeError, KeyError):
+        paths.append(arg_name)
+
+
+def tell_paths_from_named_args(named_args, arg_paths_extractor_func=default_arg_paths_extractor, paths=None):
+    '''
+    Builds the `sources` or the `dests` sequences params of :meth:`Dependencies.build_plan()` from a map of function-arguments
+
+    :param named_args: an ordered map ``{param_name --> param_value}`` similar to that returned by
+            ``inspect.signature(func).bind(*args).arguments: BoundArguments``.
+            Use the utility :func:`name_all_func_args()` to generate such a map for some function.
+    :return: the `paths` updated with all ''dotted.vars'' found
+    '''
+
+    if paths is None:
+        paths = []
+    for (name, arg) in named_args.items():
+        arg_paths_extractor_func(name, arg, paths)
+
+    return paths
+
+
+def name_all_func_args(func, *args, **kwargs):
+    sig = inspect.signature(func)
+    bound_args = sig.bind(*args, **kwargs)
+
+    return bound_args.arguments
+
 
 
 ##############################

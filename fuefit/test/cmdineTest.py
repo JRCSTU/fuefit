@@ -351,17 +351,21 @@ class TestMain(unittest.TestCase):
         self.held, sys.stdout = sys.stdout, io.StringIO()
         os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
-    def test_run_main(self):
-        main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["RP<","b","dc"]  -m /engine/fuel=diesel -O - model_path= -v -d '''.split())
-        self.assertGreater(sys.stdout.getvalue().strip().find('RP<'), 0)
+    def test_run_main_stdout(self):
+        main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["rpm","p","fc"]
+                -I engine.csv file_frmt=SERIES model_path=/engine header@=None
+                -m /engine/fuel=petrol
+                -O - model_path= -v -d'''.split())
+        self.assertGreater(sys.stdout.getvalue().strip().find('rpm'), 0)
 
-        main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["RP<","b","dc"]  -m fuel=diesel -O - -v -d '''.split())
-        self.assertGreater(sys.stdout.getvalue().strip().find('RP<'), 0)
-
-        main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["RPM","P","FC"]  -m fuel=petrol -O ~t.csv model_path=/engine_points index?=false -v -d'''.split())
+    def test_run_main_fileout(self):
+        main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["rpm","p","fc"]
+                -I engine.csv file_frmt=SERIES model_path=/engine header@=None
+                -m /engine/fuel=petrol
+                -O ~t.csv model_path=/engine_points index?=false'''.split())
         with open('~t.csv', 'r') as fp:
             txt = fp.read()
-        self.assertGreaterEqual(txt.strip().find('RPM'), 0)
+        self.assertGreaterEqual(txt.strip().find('rpm'), 0)
 
     def tearDown(self):
         unittest.TestCase.tearDown(self)

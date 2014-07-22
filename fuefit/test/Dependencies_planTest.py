@@ -23,14 +23,14 @@ Created on Apr 23, 2014
 
 @author: ankostis
 '''
-from fuefit.pdcalc import execute, DependenciesError
+from fuefit.pdcalc import DependenciesError, execute_funcs_map, execute_plan
 import unittest
 from collections import OrderedDict
 import logging
 from networkx.classes.digraph import DiGraph
 import pandas as pd
 
-from ..pdcalc import Dependencies, research_calculation_routes, tell_paths_from_named_args
+from ..pdcalc import Dependencies, _research_calculation_routes, tell_paths_from_named_args
 
 def lstr(lst):
     return '\n'.join([str(e) for e in lst])
@@ -128,10 +128,15 @@ def build_base_deps():
 
     return deps
 
-def make_plan_and_execute(planner, dests, named_args, sources=None):
-    plan = planner.build_plan(dests, named_args, sources=sources)
+def make_plan_and_execute(deps, dests, named_args=None, sources=None):
+    if not named_args is None:
+        sources = tell_paths_from_named_args(named_args)
+    elif sources is None:
+        raise Exception("One of `named_args`, `sources` should not be None!")
+
+    plan = deps.build_plan(sources, dests)
     #log.info('Execution PLAN: %s', plan)
-    return planner.execute_plan(plan, *named_args.values())
+    return execute_plan(plan, *named_args.values())
 
 
 def bad_func(params, engine, dfin, dfout):
@@ -153,32 +158,32 @@ class Test(unittest.TestCase):
 
     def testSmoke_FuncExplorer_countNodes(self):
         deps = build_base_deps()
-        plan = deps.build_planner()
+        graph = deps._build_deps_graph()
 #         print("RELS:\n", lstr(deps.rels))
 #         print('ORDERED:\n', lstr(plan.graph.ordered(True)))
-        self.assertEqual(len(plan.graph), 25) #29 when adding.segments
+        self.assertEqual(len(graph), 25) #29 when adding.segments
 
-        return plan
+        return graph
 
     def test_find_connecting_nodes_smoke(self):
         deps = build_base_deps()
-        plan = deps.build_planner()
+        graph = deps._build_deps_graph()
 
         inp = ('dfin.fc', 'dfin.fc_norm', 'dfin.XX')
         out = ('dfout.fc', 'dfout.rpm')
-        (_, _, cn_nodes, _) = research_calculation_routes(plan.graph, inp, out)
+        (_, _, cn_nodes, _) = _research_calculation_routes(graph, inp, out)
         self.assertTrue('dfin.fc_norm' not in cn_nodes)
 
         #print(cn_nodes)
 
     def test_find_connecting_nodes_fail(self):
         deps = build_base_deps()
-        plan = deps.build_planner()
+        graph = deps._build_deps_graph()
 
         inp = ('dfin.fc', 'dfin.fc_norm')
         out = ('dfout.fc', 'dfout.BAD')
         with self.assertRaisesRegex(DependenciesError, 'dfout\.BAD'):
-            research_calculation_routes(plan.graph, inp, out)
+            _research_calculation_routes(graph, inp, out)
 
 
     def test_find_connecting_nodes_good(self):
@@ -187,7 +192,7 @@ class Test(unittest.TestCase):
 
         inp = (1, 3, 4)
         out = (2,)
-        (_, _, cn_nodes, _) = research_calculation_routes(web, inp, out)
+        (_, _, cn_nodes, _) = _research_calculation_routes(web, inp, out)
         all_out = {1,4,3}
         all_in = {2,5}
         self.assertTrue(cn_nodes - all_out == cn_nodes, cn_nodes)
@@ -199,7 +204,7 @@ class Test(unittest.TestCase):
 
         inp = (1, 3, 4)
         out = (2,)
-        (_, _, cn_nodes, _) = research_calculation_routes(web, inp, out)
+        (_, _, cn_nodes, _) = _research_calculation_routes(web, inp, out)
         all_out = {1,4,3}
         all_in = {2,5,6}
         self.assertTrue(cn_nodes - all_out == cn_nodes, cn_nodes)
@@ -222,7 +227,7 @@ class Test(unittest.TestCase):
 
         inp = (1, 3, 4)
         out = (2,)
-        (_, _, cn_nodes, _) = research_calculation_routes(web, inp, out)
+        (_, _, cn_nodes, _) = _research_calculation_routes(web, inp, out)
         all_out = {1,4,3}
         all_in = {2,5,6}
         self.assertTrue(cn_nodes - all_out == cn_nodes, cn_nodes)
@@ -231,13 +236,12 @@ class Test(unittest.TestCase):
 
     def testSmoke_ExecutionPlan_fail(self):
         deps = build_base_deps()
-        plan = deps.build_planner()
 
         args = {}
         inp = ('dfin.fc', 'dfin.fc_norm')
         out = ('dfout.fc', 'dfout.BAD')
         with self.assertRaisesRegex(DependenciesError, 'dfout\.BAD'):
-            make_plan_and_execute(plan, out, args, inp)
+            make_plan_and_execute(deps, out, args, inp)
 
     def test_tell_paths_from_named_args_dicts(self):
         d = {'arg1':{'a':1, 'b':2}, 'arg2':{11:11, 12:{13:13}}}
@@ -271,7 +275,6 @@ class Test(unittest.TestCase):
 
     def testSmoke_ExecutionPlan_good(self):
         deps = build_base_deps()
-        plan = deps.build_planner()
 
         ## TODO, Check dotted.var.names.
         engine = SR(get_engine())
@@ -289,7 +292,7 @@ class Test(unittest.TestCase):
         dfin_c = dfin.copy()
         dfout_c = dfout.copy()
 
-        make_plan_and_execute(plan, out, args)
+        make_plan_and_execute(deps, out, named_args=args)
 
         ## Check args modified!
         self.assertFalse(engine.equals(engine_c), engine)
@@ -299,7 +302,6 @@ class Test(unittest.TestCase):
     def testSmoke_ExecutionPlan_goodExtraRels(self):
         deps = build_base_deps()
         deps.add_func_rel('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv'))
-        plan = deps.build_planner()
 
         engine = SR(get_engine())
         dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]})
@@ -316,7 +318,7 @@ class Test(unittest.TestCase):
         dfin_c = dfin.copy()
         dfout_c = dfout.copy()
 
-        make_plan_and_execute(plan, out, args)
+        make_plan_and_execute(deps, out, named_args=args)
 
         ## Check args modified!
         self.assertFalse(engine.equals(engine_c), engine)
@@ -329,7 +331,6 @@ class Test(unittest.TestCase):
         deps.harvest_funcs_factory(funcs_fact1)
         deps.harvest_funcs_factory(funcs_fact2)
         deps.add_func_rel('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv'))
-        plan = deps.build_planner()
 
         engine = SR(get_engine())
         dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]})
@@ -346,7 +347,7 @@ class Test(unittest.TestCase):
         dfin_c = dfin.copy()
         dfout_c = dfout.copy()
 
-        make_plan_and_execute(plan, out, args)
+        make_plan_and_execute(deps, out, args)
 
         ## Check args modified!
         self.assertFalse(engine.equals(engine_c), engine)
@@ -375,7 +376,7 @@ class Test(unittest.TestCase):
             ('a.funcs_fact', ('one.dep', 'another.dep'), (bad_funcs_fact, 0)): None,
         }
 
-        execute(funcs_map, out, params, engine, dfout=dfout, dfin=dfin)
+        execute_funcs_map(funcs_map, out, params, engine, dfout=dfout, dfin=dfin)
 
         ## Check args modified!
         self.assertFalse(engine.equals(engine_c), engine)

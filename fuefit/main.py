@@ -73,7 +73,9 @@ def main(argv=None):
 
         ## Calculate and print fitted engine map's parameters
         #     for a petrol vehicle with the above engine-point's CSV-table:
-        >> %(prog)s -m fuel=petrol -I engine.csv
+
+        ## ...and if no header existed:
+        >> %(prog)s -m fuel=petrol -I engine.csv header@=None
 
         ## Assume PME column contained normalized-Power in Watts,
         #    instead of P in kW:
@@ -194,6 +196,7 @@ _pandas_formats = collections.OrderedDict([
     ('TXT', (pd.read_csv, 'to_csv')),
     ('XLS', (pd.read_excel, 'to_excel')),
     ('JSON', (pd.read_json, 'to_json')),
+    ('SERIES', (pd.Series.from_csv, 'to_json')),
 ])
 _known_file_exts = {
     'XLSX':'XLS'
@@ -308,9 +311,9 @@ def parse_many_file_args(many_file_args, filemode):
             method = _read_clipboard_methods[io_file_indx]
             file = ''
         else:
-            method = _pandas_formats[frmt]
-            assert isinstance(method, tuple), method
-            method = method[io_file_indx]
+            methods = _pandas_formats[frmt]
+            assert isinstance(methods, tuple), methods
+            method = methods[io_file_indx]
 
             if (method == pd.read_excel):
                 file = fname
@@ -343,6 +346,8 @@ def load_file_as_df(filespec):
         dfin = method(**filespec.kws)
     else:
         dfin = method(filespec.file, **filespec.kws)
+
+    dfin = dfin.convert_objects(convert_numeric=True)
 
     return dfin
 
@@ -417,18 +422,20 @@ def build_args_parser(program_name, version, desc, epilog):
             * The FILENAME can be '-' to designate <stdin> or '+' to designate CLIPBOARD.
             * Any KEY-VALUE pairs pass directly to pandas.read_XXX() options,
               except from the following keys, which are consumed before reaching pandas:
-            ** file_frmt = [ AUTO | CSV | TXT | XLS | JSON ]
-                    selects which pandas.read_XXX() method to use.
-                    Defaults to AUTO, unless reading <stdin> or <clipboard>, which is CSV.
-                    When AUTO, the format is deduced from the filename's extension (ie Excel files).
-                    For  JSON, different sub-formats are selected through the 'orient' keyword
-                    of Pandas, specified with a key-value pair.
-            ** model_path = MODEL_PATH
-                    specifies the destination (or source) of the dataframe within the model
-                    as json-pointer path (see -m option).
-                    If many input-files have the same --model_path, the dataframes are
-                    concatenated horizontally therefore the number of rows (excluding header)
-                    for all those data-files must be equal.
+                ** file_frmt = [ AUTO | CSV | TXT | XLS | JSON | SERIES ]
+                  selects which pandas.read_XXX() method to use:
+                    *** AUTO: the format is deduced from the filename's extension (ie Excel files).
+                    *** JSON: different sub-formats are selected through the 'orient' keyword
+                      of Pandas specified with a key-value pair
+                      (see: http://pandas.pydata.org/pandas-docs/dev/generated/pandas.io.json.read_json.html).
+                    *** SERIES: uses `pd.Series.from_csv()`.
+                    *** Defaults to AUTO, unless reading <stdin> or <clipboard>, which then is CSV.
+                ** model_path = MODEL_PATH
+                  specifies the destination (or source) of the dataframe within the model
+                  as json-pointer path (see -m option).
+                  concatenated horizontally therefore the number of rows (excluding header)
+                  If many input-files have the same --model_path, the dataframes are
+                  for all those data-files must be equal.
             * When more input-files given, the number --icolumns and --irenames options,
               must either match them, be 1 (meaning use them for all files), or be totally absent
               (meaning use defaults for all files).
@@ -491,7 +498,9 @@ def build_args_parser(program_name, version, desc, epilog):
             """),
                         action='append', nargs='+',
                         type=parse_key_value_pair, metavar='MODEL_PATH=VALUE')
-    grp_io.add_argument('--strict', help=dedent("validate model more strictly (no additional-properties allowed)."),
+    grp_io.add_argument('--strict', help=dedent("""\
+            validate model more strictly, ie no additional-properties allowed.
+            [default: %(default)s]"""),
             default=False, type=str2bool,
             metavar='[TRUE | FALSE]')
     grp_io.add_argument('-M', help=dedent("""\

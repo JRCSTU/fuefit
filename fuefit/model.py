@@ -40,73 +40,80 @@ def model_schema(additional_properties = False):
         "required": ["engine"],
         "properties": {
             "engine": {
-                "title": "engine model",
-                "type": "object", "additionalProperties": additional_properties,
-                "required": ["fuel"],
-                "description": "The engine attributes and  data-points vectors required for generating a fitted fuel-map.",
-                "properties": {
-                    "fuel": {
-                        "title": "fuel (petrol | diesel)",
-                        "enum": [ "petrol", "diesel" ],
-                        "description": "the engine's fuel-type used for selecting specific-temperature and/or load-curve.",
+                "oneOf": [{
+                        "title": "engine series",
+                        "type": "Series",
                     },
-                    "p_max": {
-                        "title": "maximum rated power",
-                        "$ref": "#/definitions/positiveQuantityOrNumOrNull",
-                        "description": dedent("""\
-                            The maximum rated engine power as declared by the manufacturer.
-                            Required if Pnorm or FCnorm exists in input-file's or example-map's columns.""")
-                    },
-                    "rpm_rated": {
-                        "title": "rated engine revolutions (rad/min)",
-                        "$ref": "#/definitions/positiveQuantityOrNumOrNull",
-                        "description": dedent("""\
-                            The engine's revolutions where maximum-power is attained.
-                            Required if RPMnorm exists in input-file's or example-map columns."""),
-                    },
-                    "rpm_idle": {
-                        "title": "idling revolutions (rad/min)",
-                        "$ref": "#/definitions/positiveQuantityOrNumOrNull",
-                        "description": dedent("""\
-                            The engine's revolutions when idle.
-                            Required if RPMnorm exists in input-file's or example-map columns."""),
-                    },
-                    'stroke': {
-                        "title": "piston stroke (mm)",
-                        "$ref": "#/definitions/positiveQuantityOrNumOrNull",
-                        'description': dedent("""\
-                            The engine's stroke travelling distance.
-                            Required if CM is not among the inputs or requested to generate example-map with RPM column.""")
-                    },
-                    'capacity': {
-                        "title": "engine capacity (cm^3)",
-                        "$ref": "#/definitions/positiveQuantityOrNumOrNull",
-                        'description': dedent("""\
-                            The total displacement of all engine's pistons.
-                            This value is ignored' if 'stroke', 'bore' and 'cylinders' are all present.
-                            Required if PMF is not among the inputs or requested to generate example-map with FC column.""")
-                    },
-                    'bore': {
-                        "title": "piston bore (mm)",
-                        "$ref": "#/definitions/positiveQuantityOrNumOrNull",
-                        'description': dedent("""\
-                            The piston diameter.
-                            The 'capacity' is calculated from 'stroke', 'bore' and 'cylinders' when are all present.""")
-                    },
-                    'cylinders': {
-                        "title": "number of cylinders (mm)",
-                        "$ref": "#/definitions/positiveIntegerOrNull",
-                        'description': dedent("""\
-                            The number of cyclinders in the engine.
-                            The 'capacity' is calculated from 'stroke', 'bore' and 'cylinders' when are all present.""")
-                    },
-                    'engine_lhv': {
-                        "title": "Fuel's Specific Heat-Value (kjoule/kgr)",
-                        "$ref": "#/definitions/positiveInteger",
-                        'description': dedent("""\
-                            If set, overrides any value that would be selected from params based on 'engine/fuel'. """)
-                    },
-                }  #engine-props
+                    {
+                        "title": "engine model",
+                        "type": "object", "additionalProperties": additional_properties,
+                        "required": ["fuel"],
+                        "description": "The engine attributes and  data-points vectors required for generating a fitted fuel-map.",
+                        "properties": {
+                            "fuel": {
+                                "title": "fuel (petrol | diesel)",
+                                "enum": [ "petrol", "diesel" ],
+                                "description": "the engine's fuel-type used for selecting specific-temperature and/or load-curve.",
+                            },
+                            "p_max": {
+                                "title": "maximum rated power",
+                                "$ref": "#/definitions/positiveQuantityOrNumOrNull",
+                                "description": dedent("""\
+                                    The maximum rated engine power as declared by the manufacturer.
+                                    Required if Pnorm or FCnorm exists in input-file's or example-map's columns.""")
+                            },
+                            "rpm_rated": {
+                                "title": "rated engine revolutions (rad/min)",
+                                "$ref": "#/definitions/positiveQuantityOrNumOrNull",
+                                "description": dedent("""\
+                                    The engine's revolutions where maximum-power is attained.
+                                    Required if RPMnorm exists in input-file's or example-map columns."""),
+                            },
+                            "rpm_idle": {
+                                "title": "idling revolutions (rad/min)",
+                                "$ref": "#/definitions/positiveQuantityOrNumOrNull",
+                                "description": dedent("""\
+                                    The engine's revolutions when idle.
+                                    Required if RPMnorm exists in input-file's or example-map columns."""),
+                            },
+                            'stroke': {
+                                "title": "piston stroke (mm)",
+                                "$ref": "#/definitions/positiveQuantityOrNumOrNull",
+                                'description': dedent("""\
+                                    The engine's stroke travelling distance.
+                                    Required if CM is not among the inputs or requested to generate example-map with RPM column.""")
+                            },
+                            'capacity': {
+                                "title": "engine capacity (cm^3)",
+                                "$ref": "#/definitions/positiveQuantityOrNumOrNull",
+                                'description': dedent("""\
+                                    The total displacement of all engine's pistons.
+                                    This value is ignored' if 'stroke', 'bore' and 'cylinders' are all present.
+                                    Required if PMF is not among the inputs or requested to generate example-map with FC column.""")
+                            },
+                            'bore': {
+                                "title": "piston bore (mm)",
+                                "$ref": "#/definitions/positiveQuantityOrNumOrNull",
+                                'description': dedent("""\
+                                    The piston diameter.
+                                    The 'capacity' is calculated from 'stroke', 'bore' and 'cylinders' when are all present.""")
+                            },
+                            'cylinders': {
+                                "title": "number of cylinders (mm)",
+                                "$ref": "#/definitions/positiveIntegerOrNull",
+                                'description': dedent("""\
+                                    The number of cyclinders in the engine.
+                                    The 'capacity' is calculated from 'stroke', 'bore' and 'cylinders' when are all present.""")
+                            },
+                            'engine_lhv': {
+                                "title": "Fuel's Specific Heat-Value (kjoule/kgr)",
+                                "$ref": "#/definitions/positiveInteger",
+                                'description': dedent("""\
+                                    If set, overrides any value that would be selected from params based on 'engine/fuel'. """)
+                            },
+                        }
+                    }  #engine-props
+                ]
             }, #engine
             'engine_points':{
                 "type": "DataFrame"
@@ -279,7 +286,7 @@ def model_validator(additional_properties=False):
     from jsonschema import Draft4Validator
     schema = model_schema(additional_properties)
     validator = Draft4Validator(schema)
-    validator._types.update({"DataFrame" : pd.DataFrame, 'Series':pd.Series})
+    validator._types.update({"object": (dict, pd.Series, pd.DataFrame), "DataFrame" : pd.DataFrame, 'Series':pd.Series})
 
     return validator
 

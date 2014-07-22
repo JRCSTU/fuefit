@@ -13,7 +13,7 @@ def run_processor(opts, mdl):
     params  = mdl['params']
     engine  = mdl['engine']
     dfin      = mdl['engine_points']
-    pdcalc.execute_funcs_map(funcs_map, ('cm', 'pme', 'pmf'), params, engine, dfin)
+    pdcalc.execute_funcs_map(funcs_map, ('df.cm', 'df.pme', 'df.pmf'), params, engine, dfin)
 
     engine['fc_map_params'] = fit_map(engine, dfin)
 
@@ -26,15 +26,24 @@ def run_processor(opts, mdl):
 
 def norm_to_std_map(params, engine, df):
     from math import pi
-    def f1(): engine['fuel_lhv'] = params['fuel'][engine['fuel']]['lhv']
-    def f2(): df['rpm']     = df.rpm_norm * (engine.rpm_rated - engine.rpm_idle) + engine.rpm_idle
-    def f3(): df['p']       = df.p_norm * engine.p_max
-    def f4(): df['fc']      = df.fc_norm * engine.p_max
-    def f5(): df['rps']     = df.rpm / 60
-    def f6(): df['torque']  = (df.p * 1000) / (df.rps * 2 * pi)
-    def f7(): df['pme']     = (df.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-6)
-    def f8(): df['pmf']     = ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-3)) * (df.fc / (3600 * df.rps * 2 * pi)) * 10e-5
-    def f9(): df['cm']      = df.rps * 2 * engine.stroke / 1000
+    def f1():
+        engine['fuel_lhv'] = params['fuel'][engine.fuel]['lhv']
+    def f2():
+        df['rpm']     = df.rpm_norm * (engine.rpm_rated - engine.rpm_idle) + engine.rpm_idle
+    def f3():
+        df['p']       = df.p_norm * engine.p_max
+    def f4():
+        df['fc']      = df.fc_norm * engine.p_max
+    def f5():
+        df['rps']     = df.rpm / 60
+    def f6():
+        df['torque']  = (df.p * 1000) / (df.rps * 2 * pi)
+    def f7():
+        df['pme']     = (df.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-6)
+    def f8():
+        df['pmf']     = ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-3)) * (df.fc / (3600 * df.rps * 2 * pi)) * 10e-5
+    def f9():
+        df['cm']      = df.rps * 2 * engine.stroke / 1000
 
     return (f1, f2, f3, f4, f5, f6, f7, f8, f9)
 
@@ -75,7 +84,7 @@ def fit_map(engine, df):
 
     Y = df.pme.values
 
-    (res, _) = curve_fit(fitfunc, df, Y, robust=False)
+    (res, _) = curve_fit(fitfunc, df, Y)#, robust=False)
     res_df = pd.DataFrame(res, index=param_names)
     return res_df
 

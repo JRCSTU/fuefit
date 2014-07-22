@@ -48,7 +48,7 @@ class Test(unittest.TestCase):
         self.assertRaises(jsonschema.ValidationError, model.model_validator().validate, mdl)
 
         jsonp.set_pointer(mdl, '/engine/fuel', 'BAD_FUEL')
-        self.assertRaisesRegex(jsonschema.ValidationError, "BAD_FUEL' is not one of", model.model_validator().validate, mdl)
+        self.assertRaisesRegex(jsonschema.ValidationError, "Failed validating 'oneOf' in schema.*properties.*engine", model.model_validator().validate, mdl)
 
 
     def testModel_FAIL_extraFuel(self):
