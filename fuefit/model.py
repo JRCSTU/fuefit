@@ -137,7 +137,12 @@ def model_schema(additional_properties = False):
                                     "$ref": "#/definitions/fuel_spec",
                                 },
                             } #fuel-props
-                        } #fuel
+                        }, #fuel
+                        'plot_maps': {
+                            "title": "plot engine-maps?",
+                            "type": "boolean",
+                            "default": False,
+                        },
                 }
             },
         },

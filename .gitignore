@@ -1,3 +1,7 @@
+#Scratch
+/~*.*
+**/~*
+
 ## Python: https://github.com/github/gitignore/blob/master/Python.gitignore
 ##
 *.py[cod]
@@ -65,11 +69,3 @@ __pycache__/
 
 # TeXlipse plugin
 .texlipse/.settings
-
-#Scratch
-~*.txt
-~*.csv
-~*.xls
-~*.xlsx
-**/temp.csv
-**/strange.ext

@@ -19,7 +19,6 @@
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 """The command-line entry-point for using all functionality of fuefit tool. """
 
-from argparse import RawTextHelpFormatter
 import argparse
 import ast
 import collections
@@ -166,7 +165,7 @@ def main(argv=None):
 
         mdl = run_processor(opts, mdl)
 
-        distribute_model(mdl, outfiles)
+        store_model_parts(mdl, outfiles)
 
     except jsons.ValidationError as ex:
         if DEBUG:
@@ -358,19 +357,25 @@ def assemble_model(infiles, model_overrides):
     mdl = model.base_model()
 
     for filespec in infiles:
-        dfin = load_file_as_df(filespec)
-        log.debug("  +-input-file(%s):\n%s", filespec.fname, dfin)
-        if filespec.path:
-            jsonp.set_pointer(mdl, filespec.path, dfin)
-        else:
-            mdl = dfin
+        try:
+            dfin = load_file_as_df(filespec)
+            log.debug("  +-input-file(%s):\n%s", filespec.fname, dfin)
+            if filespec.path:
+                jsonp.set_pointer(mdl, filespec.path, dfin)
+            else:
+                mdl = dfin
+        except Exception as ex:
+            raise Exception("Failed reading %s due to: %s" %(filespec.path, filespec, ex)) from ex
 
     if (model_overrides):
         model_overrides = functools.reduce(lambda x,y: x+y, model_overrides) # join all -m
         for (json_path, value) in model_overrides:
-            if (not json_path.startswith('/')):
-                json_path = _default_model_overridde_path + json_path
-            jsonp.set_pointer(mdl, json_path, value)
+            try:
+                if (not json_path.startswith('/')):
+                    json_path = _default_model_overridde_path + json_path
+                jsonp.set_pointer(mdl, json_path, value)
+            except Exception as ex:
+                raise Exception("Failed setting model-value(%s) due to: %s" %(json_path, value, ex)) from ex
 
     return mdl
 
@@ -378,9 +383,10 @@ def assemble_model(infiles, model_overrides):
 
 
 def store_part_as_df(filespec, part):
-    '''If part is Pandas, store it as it is, else, store it as sson recursively.
+    '''If part is Pandas, store it as it is, else, store it as json recursively.
 
-        FileSpec: named_tuple(io_method, fname, file, frmt, path, append, kws)
+        :param FileSpec filespec: named_tuple
+        :param part: what to store, originating from model(filespec.path))
     '''
 
     if isinstance(part, NDFrame):
@@ -395,14 +401,26 @@ def store_part_as_df(filespec, part):
 
 
 _no_part=object()
-def distribute_model(mdl, outfiles):
+def store_model_parts(mdl, outfiles):
     for filespec in outfiles:
-        part = jsonp.resolve_pointer(mdl, filespec.path, _no_part)
-        if part is _no_part:
-            log.warning('Nothing found at model(%s) to write to file(%s).', filespec.path, filespec.fname)
-        else:
-            store_part_as_df(filespec, part)
+        try:
+            part = jsonp.resolve_pointer(mdl, filespec.path, _no_part)
+            if part is _no_part:
+                log.warning('Nothing found at model(%s) to write to file(%s).', filespec.path, filespec.fname)
+            else:
+                store_part_as_df(filespec, part)
+        except Exception as ex:
+            raise Exception("Failed storing %s due to: %s" %(filespec, ex)) from ex
 
+class RawTextHelpFormatter(argparse.RawDescriptionHelpFormatter):
+    """Help message formatter which retains formatting of all help text.
+
+    Only the name of this class is considered a public API. All the methods
+    provided by the class are considered an implementation detail.
+    """
+
+    def _split_lines(self, text, width):
+        return text.splitlines()
 
 
 def build_args_parser(program_name, version, desc, epilog):
@@ -526,7 +544,7 @@ def build_args_parser(program_name, version, desc, epilog):
     grp_various = parser.add_argument_group('Various', 'Options controlling various other aspects.')
     #parser.add_argument('--gui', help='start in GUI mode', action='store_true')
     grp_various.add_argument('-d', "--debug", action="store_true", help=dedent("""\
-            "set debug-mode with various checks and error-traces
+            set debug-mode with various checks and error-traces
             Suggested combining with --verbose counter-flag.
             Implies --strict true
             [default: %(default)s] """),

@@ -32,7 +32,7 @@ import io, sys
 
 
 from ..main import (build_args_parser, validate_file_opts, parse_key_value_pair, parse_many_file_args,
-    assemble_model, validate_model, FileSpec, main, distribute_model)
+        assemble_model, validate_model, FileSpec, main, store_model_parts)
 from ..model import (json_dumps, base_model)
 from .redirect import redirected  # @UnresolvedImport
 
@@ -317,7 +317,7 @@ class TestFuncs(unittest.TestCase):
         ]
 
         mystdout = io.StringIO()
-        distribute_model(mdl, filespecs)
+        store_model_parts(mdl, filespecs)
         self.assertEqual('', mystdout.getvalue(), mystdout.getvalue())
 
     def testWriteModelparts_baseModel(self):
@@ -326,7 +326,7 @@ class TestFuncs(unittest.TestCase):
         filespecs = [
             FileSpec('write_csv', '<mystream>', mystdout, 'CSV', '', None, {})
         ]
-        distribute_model(mdl, filespecs)
+        store_model_parts(mdl, filespecs)
         self.assertEqual(json_dumps(mdl), mystdout.getvalue(), mystdout.getvalue())
 
     def testWriteModelparts_alteredModel(self):
@@ -338,7 +338,7 @@ class TestFuncs(unittest.TestCase):
         filespecs = [
             FileSpec('write_csv', '<mystream>', mystdout, 'CSV', '', None, {})
         ]
-        distribute_model(mdl, filespecs)
+        store_model_parts(mdl, filespecs)
         self.assertTrue(mystdout.getvalue().find(k) > 0, mystdout.getvalue())
         self.assertTrue(mystdout.getvalue().find(v) > 0, mystdout.getvalue())
 
@@ -351,21 +351,34 @@ class TestMain(unittest.TestCase):
         self.held, sys.stdout = sys.stdout, io.StringIO()
         os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
-    def test_run_main_stdout(self):
+    def test_run_main_stdout1(self):
         main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["rpm","p","fc"]
                 -I engine.csv file_frmt=SERIES model_path=/engine header@=None
                 -m /engine/fuel=petrol
                 -O - model_path= -v -d'''.split())
         self.assertGreater(sys.stdout.getvalue().strip().find('rpm'), 0)
 
-    def test_run_main_fileout(self):
+    def test_run_main_stdout2(self):
         main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["rpm","p","fc"]
                 -I engine.csv file_frmt=SERIES model_path=/engine header@=None
                 -m /engine/fuel=petrol
-                -O ~t.csv model_path=/engine_points index?=false'''.split())
-        with open('~t.csv', 'r') as fp:
+                -O - model_path=/engine_map  index?=false -v -d'''.split())
+        self.assertEqual(sys.stdout.getvalue().strip().find('rpm'), 0)
+
+    def test_run_main_fileout(self):
+        out_fname = '~t.json'
+        main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["rpm","p","fc"]
+                -I engine.csv file_frmt=SERIES model_path=/engine header@=None
+                -m /engine/fuel=petrol
+                -O ~t1.csv model_path=/engine_points index?=false
+                -O ~t2.csv model_path=/engine_map index?=false
+                -O {} model_path=
+                -m /params/plot_maps?=False
+                '''.format(out_fname).split())
+        with open(out_fname, 'r') as fp:
             txt = fp.read()
-        self.assertGreaterEqual(txt.strip().find('rpm'), 0)
+        self.assertIn('rpm', txt.strip())
+        self.assertIn('rpm', txt.strip())
 
     def tearDown(self):
         unittest.TestCase.tearDown(self)

@@ -153,6 +153,17 @@ setup(
     ],
     options = {
         'build_exe': {
+            "excludes": [ "tkinter","PyQt4","PySide",
+                "IPython", "numexpr",
+                "pygments", "pyreadline", "jinja2",
+                "setuptools",
+                "statsmodels", "docutils",
+                "xml", "xmlrpc",
+                "nose",
+                "Cython", "pydoc_data", "sphinx", "docutils",
+                #urllib<--email<--http<--pandas
+                #distutils" <-- pandas.compat
+                ],
             'include_msvcr': True,
             'compressed': True,
             'include_in_shared_zip': True,

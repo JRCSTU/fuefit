@@ -1,23 +1,38 @@
 import pandas as pd
 import numpy as np
 import logging
-from fuefit import pdcalc
+from fuefit import pdcalc, ensure_modelpath_Series, ensure_modelpath_DataFrame
+import jsonpointer as jsonp
+from matplotlib import pyplot as plt
+
 
 log = logging.getLogger(__file__)
 
 
 def run_processor(opts, mdl):
+
+    ensure_modelpath_Series(mdl, '/engine')
+#     ensure_modelpath_Series(mdl, '/params')
+    ensure_modelpath_DataFrame(mdl, '/engine_points')
+
     funcs_map = {
         norm_to_std_map: True
     }
     params  = mdl['params']
     engine  = mdl['engine']
-    dfin      = mdl['engine_points']
+    dfin    = mdl['engine_points']
     pdcalc.execute_funcs_map(funcs_map, ('df.cm', 'df.pme', 'df.pmf'), params, engine, dfin)
 
-    engine['fc_map_params'] = fit_map(engine, dfin)
+    fitted_params = fit_map(engine, dfin)
+    engine['fc_map_params'] = fitted_params
 
-    dfout = std_to_norm_map(params, engine, dfin)
+    (X1, X2, Y) = reconstruct_enginemap(dfin, fitted_params)
+    if jsonp.resolve_pointer(mdl, '/params/plot_maps', False):
+        plot_map(X1, X2, Y, dfin)
+        plt.show()
+
+    dfout = pd.DataFrame({'pmf': X1.flatten(), 'cm': X2.flatten(), 'pme': Y.flatten()})
+    dfout = std_to_norm_map(params, engine, dfout)
 
     mdl['engine_map'] = dfout
 
@@ -47,26 +62,33 @@ def norm_to_std_map(params, engine, df):
 
     return (f1, f2, f3, f4, f5, f6, f7, f8, f9)
 
-def std_to_norm_map(params, engine, df):
+def std_to_norm_map(params, engine, dfout):
     from math import pi
 
-    df['rps']       = df.cm * 1000 / (2 * engine.stroke)
-    df['rpm']       = df.rps * 60
-    df['rpm_norm']  = df['rpm'] / (engine.rpm_rated - engine.rpm_idle) + engine.rpm_idle
+    dfout['rps']       = dfout.cm * 1000 / (2 * engine.stroke)
+    dfout['rpm']       = dfout.rps * 60
+    dfout['rpm_norm']  = dfout['rpm'] / (engine.rpm_rated - engine.rpm_idle) + engine.rpm_idle
 
-    df['torque']    = df.pme * (engine.capacity * 10e-3) / (4 * pi * 10e-5)
-    df['p']         = df.torque * (df.rps * 2 * pi) / 1000
+    dfout['torque']    = dfout.pme * (engine.capacity * 10e-3) / (4 * pi * 10e-5)
+    dfout['p']         = dfout.torque * (dfout.rps * 2 * pi) / 1000
 
-    df['fc']        = (df.pmf * (engine.capacity * 10e-2) * (3600 * df.rps * 2 * pi)) / (4 * pi * engine.fuel_lhv * 10e-5)
-    df['fc_norm']   = df.fc / engine.p_max
+    dfout['fc']        = (dfout.pmf * (engine.capacity * 10e-2) * (3600 * dfout.rps * 2 * pi)) / (4 * pi * engine.fuel_lhv * 10e-5)
+    dfout['fc_norm']   = dfout.fc / engine.p_max
 
-    df['p_norm']    = df.p / engine.p_max
+    dfout['p_norm']    = dfout.p / engine.p_max
+
+    return dfout
 
 
 
+def fitfunc(X, a, b, c, a2, b2, loss0, loss2):
+    pmf = X['pmf']
+    cm = X['cm']
+    assert not np.any(np.isnan(pmf)), np.any(np.isnan(pmf), axis=1)
+    assert not np.any(np.isnan(cm)), np.any(np.isnan(cm), axis=1)
+    z = (a + b*cm + c*cm**2)*pmf + (a2 + b2*cm)*pmf**2 + loss0 + loss2*cm**2
+    return z
 
-## Perform normal and ROBUST fit.
-#
 
 def fit_map(engine, df):
     from scipy.optimize import curve_fit as curve_fit
@@ -74,19 +96,44 @@ def fit_map(engine, df):
 
     param_names = ('a', 'b', 'c', 'a2', 'b2', 'loss0', 'loss2')
 
-    def fitfunc(X, a, b, c, a2, b2, loss0, loss2):
-        pmf = X['pmf']
-        cm = X['cm']
-        assert not any(np.isnan(pmf)), np.any(np.isnan(pmf), axis=1)
-        assert not any(np.isnan(cm)), np.any(np.isnan(cm), axis=1)
-        z = (a + b*cm + c*cm**2)*pmf + (a2 + b2*cm)*pmf**2 + loss0 + loss2*cm**2
-        return z
-
     Y = df.pme.values
 
     (res, _) = curve_fit(fitfunc, df, Y)#, robust=False)
-    res_df = pd.DataFrame(res, index=param_names)
+    res_df = pd.Series(res, index=param_names)
     return res_df
+
+
+def reconstruct_enginemap(dfin, fitted_params):
+    ## Construct X.
+    #
+    dmin = dfin.loc[:, ['pmf', 'cm']].min(axis=0)
+    dmax = dfin.loc[:, ['pmf', 'cm']].max(axis=0)
+    drng = (dmax - dmin)
+    dmin -= 0.05 * drng
+    dmax += 0.10 * drng
+    dstp = (dmax - dmin) / 40
+
+    X1, X2 = np.mgrid[dmin[0]:dmax[0]:dstp[0], dmin[1]:dmax[1]:dstp[1]]
+
+    X = {'pmf': X1, 'cm': X2}
+    Y = fitfunc(X, *fitted_params)
+
+
+    return (X1, X2, Y)
+
+
+def plot_map(X1, X2, Y, dfin):
+    plt.plot(dfin.pmf, dfin.cm, '.c', alpha=0.4)
+    plt.contour(Y, cmap=plt.cm.coolwarm, hold=True)  # @UndefinedVariable
+
+    x1min = X1.min(); x1max = X1.max();
+    x2min = X2.min(); x2max = X2.max();
+    plt.imshow(Y, cmap=plt.cm.copper, extent=(x1min, x1max, x2min, x2max))   # @UndefinedVariable
+
+    ax = plt.gca()
+    ax.set_title('Fitted engine_map')
+    ax.set_aspect('auto'); ax.set_adjustable('box-forced')
+    ax.set_xlabel('pmf', color='red'); ax.set_ylabel('cm', color='green')
 
 
 def proc_vehicle(dfin, model):
