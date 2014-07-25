@@ -17,7 +17,11 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
-"""The command-line entry-point for using all functionality of fuefit tool. """
+"""The command-line entry-point for using all functionality of fuefit tool.
+
+.. Seealso::
+    :func:`main()`
+"""
 
 import argparse
 import ast
@@ -32,13 +36,12 @@ from textwrap import dedent
 
 from pandas.core.generic import NDFrame
 
-from fuefit import Lazy
 import jsonpointer as jsonp
 import jsonschema as jsons
 import operator as ops
 import pandas as pd
 
-from . import _version, DEBUG, model, str2bool # @UnusedImport
+from . import _version, DEBUG, model, str2bool, Lazy
 from .model import json_dump, json_dumps, validate_model
 from .processor import run_processor
 
@@ -121,12 +124,7 @@ def main(argv=None):
     epilog          = dedent('\n'.join(doc_lines[1:]))
     parser = build_args_parser(program_name, _version, desc, epilog)
 
-    try:
-
-        opts = parser.parse_args(argv)
-    except SystemExit:
-        log.error('Invalid args: %s', argv)
-        raise
+    opts = parser.parse_args(argv)
 
     try:
         DEBUG = bool(opts.debug)
@@ -285,7 +283,7 @@ def parse_many_file_args(many_file_args, filemode):
 
     def parse_file_args(fname, *kv_args):
         frmt    = _default_pandas_format
-        dest    = _default_df_path[io_file_indx]
+        path    = _default_df_path[io_file_indx]
         append  = _default_out_file_append
 
         kv_pairs = [parse_key_value_pair(kv) for kv in kv_args]
@@ -320,9 +318,9 @@ def parse_many_file_args(many_file_args, filemode):
                 file = argparse.FileType(filemode)(fname)
 
         try:
-            dest = pandas_kws.pop('model_path')
-            if (len(dest) > 0 and not dest.startswith('/')):
-                raise argparse.ArgumentTypeError('Only absolute dest-paths supported: %s' % (dest))
+            path = pandas_kws.pop('model_path')
+            if (len(path) > 0 and not path.startswith('/')):
+                raise argparse.ArgumentTypeError('Only absolute model-paths (those starting with '/') are supported: %s' % (path))
         except KeyError:
             pass
 
@@ -332,7 +330,7 @@ def parse_many_file_args(many_file_args, filemode):
         except KeyError:
             pass
 
-        return FileSpec(method, fname, file, frmt, dest, append, pandas_kws)
+        return FileSpec(method, fname, file, frmt, path, append, pandas_kws)
 
     return [parse_file_args(*file_args) for file_args in many_file_args]
 
@@ -351,6 +349,15 @@ def load_file_as_df(filespec):
     return dfin
 
 
+def load_model_part(mdl, filespec):
+    dfin = load_file_as_df(filespec)
+    log.debug("  +-input-file(%s):\n%s", filespec.fname, dfin.head())
+    if filespec.path:
+        jsonp.set_pointer(mdl, filespec.path, dfin)
+    else:
+        mdl = dfin
+    return mdl
+
 
 def assemble_model(infiles, model_overrides):
 
@@ -358,14 +365,9 @@ def assemble_model(infiles, model_overrides):
 
     for filespec in infiles:
         try:
-            dfin = load_file_as_df(filespec)
-            log.debug("  +-input-file(%s):\n%s", filespec.fname, dfin)
-            if filespec.path:
-                jsonp.set_pointer(mdl, filespec.path, dfin)
-            else:
-                mdl = dfin
+            mdl = load_model_part(mdl, filespec)
         except Exception as ex:
-            raise Exception("Failed reading %s due to: %s" %(filespec.path, filespec, ex)) from ex
+            raise Exception("Failed reading %s due to: %s" %(filespec, ex)) from ex
 
     if (model_overrides):
         model_overrides = functools.reduce(lambda x,y: x+y, model_overrides) # join all -m
@@ -378,8 +380,6 @@ def assemble_model(infiles, model_overrides):
                 raise Exception("Failed setting model-value(%s) due to: %s" %(json_path, value, ex)) from ex
 
     return mdl
-
-
 
 
 def store_part_as_df(filespec, part):
@@ -400,12 +400,11 @@ def store_part_as_df(filespec, part):
         json_dump(part, filespec.file, pd_method=None, **filespec.kws)
 
 
-_no_part=object()
 def store_model_parts(mdl, outfiles):
     for filespec in outfiles:
         try:
-            part = jsonp.resolve_pointer(mdl, filespec.path, _no_part)
-            if part is _no_part:
+            part = jsonp.resolve_pointer(mdl, filespec.path)
+            if part is jsonp._nothing:
                 log.warning('Nothing found at model(%s) to write to file(%s).', filespec.path, filespec.fname)
             else:
                 store_part_as_df(filespec, part)
@@ -451,12 +450,12 @@ def build_args_parser(program_name, version, desc, epilog):
                 ** model_path = MODEL_PATH
                   specifies the destination (or source) of the dataframe within the model
                   as json-pointer path (see -m option).
-                  concatenated horizontally therefore the number of rows (excluding header)
                   If many input-files have the same --model_path, the dataframes are
+                  concatenated horizontally, therefore the number of rows (excluding header)
                   for all those data-files must be equal.
-            * When more input-files given, the number --icolumns and --irenames options,
-              must either match them, be 1 (meaning use them for all files), or be totally absent
-              (meaning use defaults for all files).
+            * When multiple input-files given, the number of --icolumns and --irenames options,
+              must either match them, be 1 (meaning, use them for all files), or be totally absent
+              (meaning, use defaults for all files).
             * see REMARKS at the bottom regarding the parsing of KEY-VAULE pairs. """),
                         action='append', nargs='+', required=True,
                         #default=[('- file_frmt=%s model_path=%s'%('CSV', _default_df_dest)).split()],
@@ -555,6 +554,3 @@ def build_args_parser(program_name, version, desc, epilog):
 
     return parser
 
-
-if __name__ == "__main__":
-    sys.exit(main())

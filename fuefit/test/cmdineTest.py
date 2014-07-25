@@ -363,7 +363,7 @@ class TestMain(unittest.TestCase):
                 -I engine.csv file_frmt=SERIES model_path=/engine header@=None
                 -m /engine/fuel=petrol
                 -O - model_path=/engine_map  index?=false -v -d'''.split())
-        self.assertEqual(sys.stdout.getvalue().strip().find('rpm'), 0)
+        self.assertGreaterEqual(sys.stdout.getvalue().strip().find('rpm'), 0)
 
     def test_run_main_fileout(self):
         out_fname = '~t.json'

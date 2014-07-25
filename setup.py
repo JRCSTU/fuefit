@@ -18,8 +18,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 
-''''A calculator producing fuel-consumption engine-maps from measured data-points
-fitted according to XXX's formula.
+''''fuefit: Fit fuel-consumption engine-maps on a physical formula with 6 parameters.
 
 
 Install:
@@ -38,91 +37,50 @@ Or get it directly from the PIP repository::
 Tested with Python 3.4.
 
 
-Overview:
-=========
-
-Fuefit accepts as input data-points for RPM, Power and Fuel-Consumprtion
-(or equivalent quantities such as CM, PME/Torwue and PMF) and spits-out
-fitted fuel-maps according to the formula:
-
-   (a + b*cm + c*cm**2)*pmf + (a2 + b2*cm)*pmf**2 + loss0 + loss2*cm**2\n",
-
-An "execution" or a "run" of an experiment is depicted in the following diagram::
-
-                           _______________
-         .----------.     |               |      .------------------.
-        /   Model  /  ==> |   Experiment  | ==> / Model(augmented) /
-       /----------/       |_______________|    '------------------'
-      /  fuefit  /
-     /  consts  /
-    '----------'
-
-Usage:
-======
-
-A usage example::
-
-    >> import fuefit
-
-    >> model = {
-        "engine": {
-            "gear_ratios":      [120.5, 75, 50, 43, 37, 32],
-            "resistance_coeffs":[100, 0.5, 0.04],
-        }
-    }
-
-    >> experiment = fuefit.Experiment(model)
-
-    >> model = experiment.run()
-
-    >> print(model['engine']
-
-
-For information on the model-data, check the schema::
-
-    print(fuefit.instances.model_schema())
-
-
-
 @author: ankostis@gmail.com, Apr-2014, JRC, (c) AGPLv3 or later
 
 '''
 
-#from setuptools import setup
-from cx_Freeze import setup, Executable
 import os
+from cx_Freeze import Executable
+from cx_Freeze import setup
+# from distutils.core import setup
+# from setuptools import setup
+#import py2exe
 
 projname = 'fuefit'
 mydir = os.path.dirname(__file__)
 
-## Version-trick to have version-info in a single place,
-## taken from: http://stackoverflow.com/questions/2058802/how-can-i-get-the-version-defined-in-setup-py-setuptools-in-my-package
-##
-def readversioninfo(fname):
-    fglobals = {'__version_info__':('x', 'x', 'x')} # In case reading the version fails.
-    exec(open(os.path.join(mydir, projname, fname)).read(), fglobals)  # To read __version_info__
-    return fglobals['__version_info__']
+# # Version-trick to have version-info in a single place,
+# # taken from: http://stackoverflow.com/questions/2058802/how-can-i-get-the-version-defined-in-setup-py-setuptools-in-my-package
+# #
+def read_project_version(fname):
+    fglobals = {'__version__':'x.x.x'}  # In case reading the version fails.
+    exec(open(os.path.join(mydir, projname, fname)).read(), fglobals)
+    return fglobals['__version__']
 
 # Trick to use README file as long_description.
 #  It's nice, because now 1) we have a top level README file and
 #  2) it's easier to type in the README file than to put a raw string in below ...
-def readtxtfile(fname):
+def read_text_lines(fname):
     with open(os.path.join(mydir, fname)) as fd:
-        return fd.read()
+        return fd.readlines()
+
+readme_lines = read_text_lines('README.txt')
 
 setup(
-    name = projname,
-    packages = [projname],
+    name=projname,
+    packages=[projname],
 #     package_data= {'projname': ['data/*.csv']},
-    test_suite="fuefit.test", #TODO: check setup.py testsuit indeed works.
-    version = '.'.join(readversioninfo('_version.py')),
-    description = __doc__.strip().split("\n")[0],
-    author = "ankostis",
-    author_email = "ankostis@gmail.com",
-    url = "https://github.com/ankostis/fuefit",
-    license = "GNU Affero General Public License v3 or later (AGPLv3+)",
-    keywords = ['fuel', 'fuel-consumption', 'engine', 'engine-map', 'emissions', 'fitting', 'vehicles', 'cars', 'automotive'],
-    classifiers = [
+    version=read_project_version('_version.py'),
+    description=readme_lines[1],
+    long_description='\n'.join(readme_lines),
+    author="ankostis",
+    author_email="ankostis@gmail.com",
+    url="https://github.com/ankostis/fuefit",
+    license="GNU Affero General Public License v3 or later (AGPLv3+)",
+    keywords=['fuel', 'fuel-consumption', 'engine', 'engine-map', 'emissions', 'fitting', 'vehicles', 'cars', 'automotive'],
+    classifiers=[
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
         "Development Status :: 4 - Beta",
@@ -137,8 +95,7 @@ setup(
         "Topic :: Scientific/Engineering",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
-    long_description = __doc__,
-    install_requires = [
+    requires=[
         'enum34',
         'numpy',
         'pandas',
@@ -149,27 +106,42 @@ setup(
         'networkx',
         'pint',
     ],
-    test_requires = [
-    ],
-    options = {
+    scripts = ['fuefit.py'],
+    options={
         'build_exe': {
-            "excludes": [ "tkinter","PyQt4","PySide",
+            "excludes": [
+                "jsonschema", #!!!! Schemas do not work in library-zip, so needs manuall to copy directly into app-dir
+                "numpy", "scipy", #!!!! lostesso
+                "PyQt4", "PySide",
                 "IPython", "numexpr",
                 "pygments", "pyreadline", "jinja2",
                 "setuptools",
                 "statsmodels", "docutils",
-                "xml", "xmlrpc",
+                "xmlrpc", "pytz",
                 "nose",
                 "Cython", "pydoc_data", "sphinx", "docutils",
-                #urllib<--email<--http<--pandas
-                #distutils" <-- pandas.compat
-                ],
+                "multiprocessing", "lib2to3", "_markerlib",
+#                 #urllib<--email<--http<--pandas
+#                 #distutils" <-- pandas.compat
+            ],
+            'includes': [
+                'matplotlib.backends.backend_tkagg',
+            ],
+            'include_files': [
+                ## MANUAL COPY into build/exe-dir
+                ##     from: https://bitbucket.org/anthony_tuininga/cx_freeze/issue/43/import-errors-when-using-cx_freeze-with
+                #  site_packages(32bit/64bit)/
+                #    jsonschema
+                #    numpy
+                #    scipy
+            ],
             'include_msvcr': True,
-            'compressed': True,
-            'include_in_shared_zip': True,
+            'compressed': False,
+#            'create_shared_zip': False,
+#             'include_in_shared_zip': True,
         }, 'bdist_msi': {
             'add_to_path': False,
         },
     },
-    executables = [Executable("fuefit/main.py")]
+    executables=[Executable("fuefit.py", )], #base="Win32GUI")],
 )

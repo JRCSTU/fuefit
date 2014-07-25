@@ -757,7 +757,7 @@ def execute_funcs_map(funcs_map, dests, *args, **kwargs):
         if callable(func):
             a_func = func
             break
-    if a_func is None:
+    else:
         raise DependenciesError('No function found in funcs_map(%s)!'%funcs_map, funcs_map)
     named_args  = name_all_func_args(a_func, *args, **kwargs)
     sources     = tell_paths_from_named_args(named_args)
