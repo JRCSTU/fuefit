@@ -19,18 +19,22 @@
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 
-import pandas as pd
-import numpy as np
 import logging
-from fuefit import pdcalc, ensure_modelpath_Series, ensure_modelpath_DataFrame
-import jsonpointer as jsonp
+
 from matplotlib import pyplot as plt
+
+import jsonpointer as jsonp
+import numpy as np
+import pandas as pd
+
+from . import pdcalc
+from .utils import ensure_modelpath_Series, ensure_modelpath_DataFrame
 
 
 log = logging.getLogger(__file__)
 
 
-def run_processor(opts, mdl):
+def run(opts, mdl):
 
     ensure_modelpath_Series(mdl, '/engine')
 #     ensure_modelpath_Series(mdl, '/params')

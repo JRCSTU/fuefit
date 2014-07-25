@@ -41,10 +41,14 @@ import jsonschema as jsons
 import operator as ops
 import pandas as pd
 
-from . import _version, DEBUG, model, str2bool, Lazy
+from . import model
+from ._version import __version__ # @UnusedImport
 from .model import json_dump, json_dumps, validate_model
-from .processor import run_processor
+from . import processor
+from .utils import str2bool, Lazy
 
+
+DEBUG   = False
 
 logging.basicConfig(level=logging.DEBUG)
 log     = logging.getLogger(__file__)
@@ -122,7 +126,7 @@ def main(argv=None):
     doc_lines       = main.__doc__.splitlines()
     desc            = doc_lines[0]
     epilog          = dedent('\n'.join(doc_lines[1:]))
-    parser = build_args_parser(program_name, _version, desc, epilog)
+    parser = build_args_parser(program_name, __version__, desc, epilog)
 
     opts = parser.parse_args(argv)
 
@@ -161,7 +165,7 @@ def main(argv=None):
         log.info("Input Model(strict: %s): %s", opts.strict, Lazy(lambda: json_dumps(mdl, 'to_string')))
         mdl = validate_model(mdl, additional_props)
 
-        mdl = run_processor(opts, mdl)
+        mdl = processor.run(opts, mdl)
 
         store_model_parts(mdl, outfiles)
 
@@ -320,7 +324,7 @@ def parse_many_file_args(many_file_args, filemode):
         try:
             path = pandas_kws.pop('model_path')
             if (len(path) > 0 and not path.startswith('/')):
-                raise argparse.ArgumentTypeError('Only absolute model-paths (those starting with '/') are supported: %s' % (path))
+                raise argparse.ArgumentTypeError("Only absolute model-paths (those starting with '/') are supported: %s" % (path))
         except KeyError:
             pass
 

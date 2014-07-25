@@ -73,7 +73,7 @@ def redirected(**kwargs):
                 old_filenos[channel_name] = os.dup(stdchannel.fileno())
                 dupped = True
             except:
-                ## Failback if not a real file (i.e. Eclipse's console).
+                # # Failback if not a real file (i.e. Eclipse's console).
                 #
                 old_channels[channel_name] = stdchannel
                 dupped = False

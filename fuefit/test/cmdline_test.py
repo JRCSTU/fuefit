@@ -23,26 +23,27 @@ Created on Apr 17, 2014
 
 @author: ankostis
 '''
-import unittest
+import argparse
 from collections import OrderedDict
 import functools
-import argparse
+import io
 import os
-import io, sys
+import sys
+import unittest
 
-
-from ..main import (build_args_parser, validate_file_opts, parse_key_value_pair, parse_many_file_args,
-        assemble_model, validate_model, FileSpec, main, store_model_parts)
-from ..model import (json_dumps, base_model)
-from .redirect import redirected  # @UnresolvedImport
+from ..cmdline import build_args_parser, validate_file_opts, parse_key_value_pair, parse_many_file_args, assemble_model, \
+    validate_model, FileSpec, main, store_model_parts
+from ..model import json_dumps, base_model
+from .redirect import redirected # @UnresolvedImport
 
 
 class TestFuncs(unittest.TestCase):
 
     def setUp(self):
         unittest.TestCase.setUp(self)
+        os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
-        self._test_fnames = ('temp.csv', 'strange.ext')
+        self._test_fnames = ('~temp.csv', '~strange.ext')
         for tfn in self._test_fnames:
             if (not os.path.exists(tfn)):
                 tf = open(tfn, "w")
@@ -182,7 +183,7 @@ class TestFuncs(unittest.TestCase):
     def testColumnNames_fail(self):
         self.checkParseOpt_fail('-c', self._failColumns, self._failColumnsMsg)
     def testColumnNames_good(self):
-        self.checkParseOpt_good('-I temp.csv -c', self._goodColumns)
+        self.checkParseOpt_good('-I ~temp.csv -c', self._goodColumns)
 
     def testColumnRenames_fail(self):
         self.checkParseOpt_fail('-r', self._failColumns, self._failColumnsMsg)

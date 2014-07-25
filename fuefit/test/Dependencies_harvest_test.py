@@ -23,12 +23,13 @@ Created on Apr 23, 2014
 
 @author: ankostis
 '''
-import unittest
 import logging
+import unittest
+
+from ..pdcalc import _build_func_dependencies_graph, harvest_func, harvest_funcs_factory, _filter_common_prefixes, \
+    Dependencies, DependenciesError, _validate_func_relations
 import itertools as it
 
-from fuefit.pdcalc import _build_func_dependencies_graph, harvest_func, harvest_funcs_factory, _filter_common_prefixes, \
-    Dependencies, DependenciesError, _validate_func_relations
 
 def gen_all_prefix_pairs(path):
     ''' R.foo.com' --> [('R.foo.com', 'R.foo'), ('R.foo', 'R')] but outer reversed'''

@@ -23,14 +23,17 @@ Created on Apr 23, 2014
 
 @author: ankostis
 '''
-from fuefit.pdcalc import DependenciesError, execute_funcs_map, execute_plan
-import unittest
 from collections import OrderedDict
 import logging
+import unittest
+
 from networkx.classes.digraph import DiGraph
+
+from ..pdcalc import DependenciesError, execute_funcs_map, execute_plan
 import pandas as pd
 
 from ..pdcalc import Dependencies, _research_calculation_routes, tell_paths_from_named_args
+
 
 def lstr(lst):
     return '\n'.join([str(e) for e in lst])

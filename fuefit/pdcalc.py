@@ -26,18 +26,22 @@ inspired by XForms:
     @calculation
     execute_funcs_map()
 '''
-import logging
 from collections import OrderedDict, defaultdict
 from collections.abc import Mapping, Iterable
-import itertools as it
 import inspect
+import logging
+import re
+
+from networkx.exception import NetworkXError
+
+import itertools as it
 import networkx as nx
 import pandas as pd
-from networkx.exception import NetworkXError
-import re
-from .mymock import MagicMock
-from . import DEBUG
 
+
+from .mymock import MagicMock
+
+DEBUG= False
 
 _root_name = 'R'
 _root_len = len(_root_name)+1
