@@ -24,6 +24,7 @@ inspired by XForms:
 .. seealso::
     Dependencies
     @calculation
+    @calculation_factory [TODO]
     execute_funcs_map()
 '''
 from collections import OrderedDict, defaultdict
@@ -549,7 +550,7 @@ class Dependencies:
         Factory method for building `Dependencies` by harvesting multiple functions and func_factories, at once
 
         :param funcs_map: a mapping or a sequence of pairs ``(what --> bool_or_null)`` with values:
-            True  -- when `what` is a funcs_factory,
+            True  -- when `what` is a funcs_factory, a function returning a sequence of functions processing the data
             False -- when `what` is a standalone_function, or
             None  -- when `what` is an explicit relation 3-tuple (item, deps, func) to be fed
                     directly to :func:`Dependencies.add_func_rel()`, where:
@@ -741,13 +742,36 @@ def execute_plan(plan, *args, **kwargs):
     return results
 
 
+def execute_funcs_factory(funcs_fact, dests, *args, **kwargs):
+    '''A one-off way to run calculations from a funcions-factory (see :func:`execute_funcs_map()`)'''
+    return execute_funcs_map({funcs_fact: True}, dests, *args, **kwargs)
+
 def execute_funcs_map(funcs_map, dests, *args, **kwargs):
     '''
     A one-off way to run calculations from a funcs_map as defined in :meth:`Dependencies:from_funcs_map()`.
 
     :param funcs_map: a dictionary similar to the one used by :meth:`Dependencies.from_funcs_map()`
-    :param args: the actual args to use, and the names of these args would come rom the first function
+    :param seq dests: what is required as the final outcome of the execution,
+            ie: for the func-functory::
+
+                 def some_funcs(foo, bar):
+                     def func_1():
+                         foo['a1'] = ...
+                     ...
+                     def func_n(): ...
+                         foo['a2'] = ...
+                         bar['b1'] = ...
+
+                     return [func_1, ..., func_n]
+
+            the `dests` may be::
+
+                ['foo.a1', 'foo.a2', 'bar.b1']
+
+    :param args: the actual args to use for invoking the functions in the map,
+            and the names of these args would come rom the first function
             to be invoked (which ever that might be!).
+
 
     .. Note:: Do not use it to run the calculations repeatedly.  Preffer to cache the function-relations
             into an intermediate :class:`Dependencies` instance, instead.

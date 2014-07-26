@@ -21,8 +21,6 @@
 
 import logging
 
-from matplotlib import pyplot as plt
-
 import jsonpointer as jsonp
 import numpy as np
 import pandas as pd
@@ -35,31 +33,44 @@ log = logging.getLogger(__file__)
 
 
 def run(opts, mdl):
+    """
+    :param mdl: the model to process, all params and data
+    :param map opts: flags controlling non-functional aspects of the process (ie error-handling and logging, gui, etc)
+    """
 
     ensure_modelpath_Series(mdl, '/engine')
 #     ensure_modelpath_Series(mdl, '/params')
     ensure_modelpath_DataFrame(mdl, '/engine_points')
 
-    funcs_map = {
-        norm_to_std_map: True
-    }
     params  = mdl['params']
     engine  = mdl['engine']
     dfin    = mdl['engine_points']
-    pdcalc.execute_funcs_map(funcs_map, ('df.cm', 'df.pme', 'df.pmf'), params, engine, dfin)
+    pdcalc.execute_funcs_factory(norm_to_std_map, ('df.cm', 'df.pme', 'df.pmf'), params, engine, dfin)
 
-    fitted_params = fit_map(engine, dfin)
+    fitted_params = fit_map(dfin)
     engine['fc_map_params'] = fitted_params
 
     (X1, X2, Y) = reconstruct_enginemap(dfin, fitted_params)
-    if jsonp.resolve_pointer(mdl, '/params/plot_maps', False):
-        plot_map(X1, X2, Y, dfin)
-        plt.show()
 
-    dfout = pd.DataFrame({'pmf': X1.flatten(), 'cm': X2.flatten(), 'pme': Y.flatten()})
+    dfout = dict(zip(['pmf', 'cm', 'pme'], (X1, X2, Y)))
+
     dfout = std_to_norm_map(params, engine, dfout)
 
-    mdl['engine_map'] = dfout
+    if jsonp.resolve_pointer(mdl, '/params/plot_maps', False):
+        columns = ['pmf', 'cm', 'pme']
+#         columns = ['fc', 'rpm', 'pme']
+#         columns = ['pmf', 'rpm', 'pme']
+#         columns = ['fc_norm', 'cm', 'pme']
+
+#         columns = ['cm', 'pme', 'pmf']
+#         columns = ['rpm', 'pme', 'pmf', ]
+#         columns = ['rpm', 'p', 'fc']
+        plot_map(dfin, dfout, columns)
+
+    ## Flatten 2D-vectors to make a DataFrame
+    #
+    dfout = {col: vec.flatten() for (col, vec) in dfout.items()}
+    mdl['engine_map'] = pd.DataFrame(dfout)
 
     return mdl
 
@@ -90,17 +101,17 @@ def norm_to_std_map(params, engine, df):
 def std_to_norm_map(params, engine, dfout):
     from math import pi
 
-    dfout['rps']       = dfout.cm * 1000 / (2 * engine.stroke)
-    dfout['rpm']       = dfout.rps * 60
+    dfout['rps']       = dfout['cm'] * 1000 / (2 * engine.stroke)
+    dfout['rpm']       = dfout['rps'] * 60
     dfout['rpm_norm']  = dfout['rpm'] / (engine.rpm_rated - engine.rpm_idle) + engine.rpm_idle
 
-    dfout['torque']    = dfout.pme * (engine.capacity * 10e-3) / (4 * pi * 10e-5)
-    dfout['p']         = dfout.torque * (dfout.rps * 2 * pi) / 1000
+    dfout['torque']    = dfout['pme'] * (engine.capacity * 10e-3) / (4 * pi * 10e-5)
+    dfout['p']         = dfout['torque'] * (dfout['rps'] * 2 * pi) / 1000
 
-    dfout['fc']        = (dfout.pmf * (engine.capacity * 10e-2) * (3600 * dfout.rps * 2 * pi)) / (4 * pi * engine.fuel_lhv * 10e-5)
-    dfout['fc_norm']   = dfout.fc / engine.p_max
+    dfout['fc']        = (dfout['pmf'] * (engine.capacity * 10e-2) * (3600 * dfout['rps'] * 2 * pi)) / (4 * pi * engine.fuel_lhv * 10e-5)
+    dfout['fc_norm']   = dfout['fc'] / engine.p_max
 
-    dfout['p_norm']    = dfout.p / engine.p_max
+    dfout['p_norm']    = dfout['p'] / engine.p_max
 
     return dfout
 
@@ -115,7 +126,7 @@ def fitfunc(X, a, b, c, a2, b2, loss0, loss2):
     return z
 
 
-def fit_map(engine, df):
+def fit_map(df):
     from scipy.optimize import curve_fit as curve_fit
     #from .robustfit import curve_fit
 
@@ -147,18 +158,30 @@ def reconstruct_enginemap(dfin, fitted_params):
     return (X1, X2, Y)
 
 
-def plot_map(X1, X2, Y, dfin):
-    plt.plot(dfin.pmf, dfin.cm, '.c', alpha=0.4)
-    plt.contour(Y, cmap=plt.cm.coolwarm, hold=True)  # @UndefinedVariable
+def plot_map(dfin, dfout, columns):
+    (X1, X2, Y) = [dfout[col] for col in columns]
 
     x1min = X1.min(); x1max = X1.max();
     x2min = X2.min(); x2max = X2.max();
-    plt.imshow(Y, cmap=plt.cm.copper, extent=(x1min, x1max, x2min, x2max))   # @UndefinedVariable
+    extent=(x1min, x1max, x2min, x2max)
+    levels = np.arange(Y.min(), Y.max(), (Y.max() - Y.min()) / 10.0)
+
+#     import matplotlib
+#     matplotlib.use('WebAgg')
+    from matplotlib import pyplot as plt
+
+    plt.plot(dfin[columns[0]], dfin[columns[1]], '.c')
+
+    cntr = plt.contourf(X1, X2, Y, cmap=plt.cm.get_cmap(plt.cm.copper, len(levels)-1), extent=extent)  # @UndefinedVariable
+    colorbar = plt.colorbar(cntr)
+    colorbar.set_label(columns[2], color='blue')
 
     ax = plt.gca()
-    ax.set_title('Fitted engine_map')
+    ax.set_title('Fitted normalized engine_map')
     ax.set_aspect('auto'); ax.set_adjustable('box-forced')
-    ax.set_xlabel('pmf', color='red'); ax.set_ylabel('cm', color='green')
+    ax.set_xlabel(columns[0], color='red'); ax.set_ylabel(columns[1], color='green')
+
+    plt.show()
 
 
 def proc_vehicle(dfin, model):

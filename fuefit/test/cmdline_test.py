@@ -139,7 +139,7 @@ class TestFuncs(unittest.TestCase):
 
             self.assertIsNone(opts)
             self.assertFalse(mystdout.getvalue(), mystdout.getvalue())
-            self.assertTrue(mystderr.getvalue().splitlines()[-1].find(badMsg) > 0, mystderr.getvalue())
+            self.assertIn(badMsg, mystderr.getvalue().splitlines()[-1], mystderr.getvalue())
 
         ## Test multiple bads in 1 line
         self.check_exits(cmdline.split() + bads, exit_code)
@@ -172,7 +172,7 @@ class TestFuncs(unittest.TestCase):
         self.assertIsNone(opts)
         self.assertFalse(mystderr.getvalue(), mystderr.getvalue())
         ## On errors, help-msg is not printed.
-        self.assertTrue(mystdout.getvalue().find('DESC') > 0, mystdout.getvalue())  # @UndefinedVariable
+        self.assertIn("DESC", mystdout.getvalue(), mystdout.getvalue())  # @UndefinedVariable
 
 
     def testModelOverrides_fail(self):
@@ -214,7 +214,7 @@ class TestFuncs(unittest.TestCase):
         ]
         for many_file_args in cases:
             with self.assertRaises(argparse.ArgumentTypeError, msg=many_file_args):
-                parse_many_file_args(many_file_args, 'r')
+                parse_many_file_args(many_file_args, 'r', None)
             with self.assertRaises(argparse.ArgumentTypeError, msg=many_file_args):
                 parse_many_file_args(many_file_args, 'r')
 
@@ -244,7 +244,7 @@ class TestFuncs(unittest.TestCase):
         ]
         for (open_modes, many_file_args) in cases:
             for open_mode in open_modes:
-                res = parse_many_file_args(many_file_args, open_mode)
+                res = parse_many_file_args(many_file_args, open_mode, None)
 
         argparse.ArgumentTypeError(parse_many_file_args, functools.reduce(lambda x, y: x+y, cases), 'r')
 
@@ -290,7 +290,7 @@ class TestFuncs(unittest.TestCase):
         fname = 'test_table.csv'
         opts = {'m':[[('fuel','diesel')]] }
         filespecs = [
-            FileSpec(pd.read_csv, fname, open(fname, 'r'), 'CSV', '/engine_points', None, {})
+            FileSpec(pd.read_csv, fname, open(fname, 'r'), 'CSV', '/engine_points', None, None, {})
         ]
         opts = argparse.Namespace(**opts)
         mdl = assemble_model(filespecs, opts.m)
@@ -304,7 +304,7 @@ class TestFuncs(unittest.TestCase):
         fname = 'test_table.csv'
         model_overrides = [[('fuel','diesel')]]
         filespecs = [
-            FileSpec(pd.read_csv, fname, open(fname, 'r'), 'CSV', '/engine_points', None, {})
+            FileSpec(pd.read_csv, fname, open(fname, 'r'), 'CSV', '/engine_points', None, None, {})
         ]
         mdl = assemble_model(filespecs, model_overrides)
         validate_model(mdl)
@@ -314,7 +314,7 @@ class TestFuncs(unittest.TestCase):
         mystdout = io.StringIO()
         mdl = {}
         filespecs = [
-            FileSpec('write_csv', '<mystream>', mystdout, 'CSV', '', None, {})
+            FileSpec('write_csv', '<mystream>', mystdout, 'CSV', '', None, None, {})
         ]
 
         mystdout = io.StringIO()
@@ -325,7 +325,7 @@ class TestFuncs(unittest.TestCase):
         mystdout = io.StringIO()
         mdl = base_model()
         filespecs = [
-            FileSpec('write_csv', '<mystream>', mystdout, 'CSV', '', None, {})
+            FileSpec('write_csv', '<mystream>', mystdout, 'CSV', '', None, None, {})
         ]
         store_model_parts(mdl, filespecs)
         self.assertEqual(json_dumps(mdl), mystdout.getvalue(), mystdout.getvalue())
@@ -337,11 +337,11 @@ class TestFuncs(unittest.TestCase):
         v = 'TEST_value'
         mdl['engine'][k] = v
         filespecs = [
-            FileSpec('write_csv', '<mystream>', mystdout, 'CSV', '', None, {})
+            FileSpec('write_csv', '<mystream>', mystdout, 'CSV', '', None, None, {})
         ]
         store_model_parts(mdl, filespecs)
-        self.assertTrue(mystdout.getvalue().find(k) > 0, mystdout.getvalue())
-        self.assertTrue(mystdout.getvalue().find(v) > 0, mystdout.getvalue())
+        self.assertIn(k, mystdout.getvalue(), mystdout.getvalue())
+        self.assertIn(v, mystdout.getvalue(), mystdout.getvalue())
 
     #def testWriteModelparts_dataframe(self):
 
@@ -357,14 +357,14 @@ class TestMain(unittest.TestCase):
                 -I engine.csv file_frmt=SERIES model_path=/engine header@=None
                 -m /engine/fuel=petrol
                 -O - model_path= -v -d'''.split())
-        self.assertGreater(sys.stdout.getvalue().strip().find('rpm'), 0)
+        self.assertIn('rpm', sys.stdout.getvalue().strip(), 0)
 
     def test_run_main_stdout2(self):
         main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["rpm","p","fc"]
                 -I engine.csv file_frmt=SERIES model_path=/engine header@=None
                 -m /engine/fuel=petrol
                 -O - model_path=/engine_map  index?=false -v -d'''.split())
-        self.assertGreaterEqual(sys.stdout.getvalue().strip().find('rpm'), 0)
+        self.assertIn('rpm', sys.stdout.getvalue().strip(), 0)
 
     def test_run_main_fileout(self):
         out_fname = '~t.json'
@@ -380,6 +380,26 @@ class TestMain(unittest.TestCase):
             txt = fp.read()
         self.assertIn('rpm', txt.strip())
         self.assertIn('rpm', txt.strip())
+
+    def test_run_main_stdout3(self):
+        main('''
+            -vd
+            -I FuelFit_real.csv header+=0 names@='rpm_norm,p_norm,fc_norm'.split(',')
+            -I engine.csv file_frmt=SERIES model_path=/engine header@=None
+            -m /engine/fuel=petrol'''.split())
+        self.assertEqual(len(sys.stdout.getvalue().strip()), 0)
+
+    def test_run_main_stdout4(self):
+        main('''
+            -vd
+            -I FuelFit_real.csv header+=0
+              --irenames rpm_norm _ fc_norm
+            -I engine.csv file_frmt=SERIES model_path=/engine header@=None
+              --irenames
+            -m /engine/fuel=petrol
+        '''.split())
+
+
 
     def tearDown(self):
         unittest.TestCase.tearDown(self)

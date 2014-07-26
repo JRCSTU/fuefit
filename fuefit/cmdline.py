@@ -145,10 +145,10 @@ def main(argv=None):
 
         opts = validate_file_opts(opts)
 
-        infiles     = parse_many_file_args(opts.I, 'r')
+        infiles     = parse_many_file_args(opts.I, 'r', opts.irenames)
         log.info("Input-files: %s", infiles)
 
-        outfiles    = parse_many_file_args(opts.O, 'w')
+        outfiles    = parse_many_file_args(opts.O, 'w', None)
         log.info("Output-files: %s", outfiles)
 
     except (ValueError) as ex:
@@ -226,7 +226,8 @@ _value_parsers = {
     '*': float,
     '?': str2bool,
     ':': json.loads,
-    '@': ast.literal_eval ## best-effort security: http://stackoverflow.com/questions/3513292/python-make-eval-safe
+    '@': eval,
+    #'@': ast.literal_eval ## best-effort security: http://stackoverflow.com/questions/3513292/python-make-eval-safe
 }
 
 
@@ -248,13 +249,24 @@ def parse_key_value_pair(arg):
         raise argparse.ArgumentTypeError("Not a KEY=VALUE syntax: %s"%arg)
 
 
-_column_specifier_regex = re.compile(r'^\s*([^(]+)\s*(\(([^)]+)\))?\s*$')
+_column_specifier_regex = re.compile('''^\s*
+                                        (?P<name>.+?)       # column-name
+                                        (?P<units>          # start parenthezied-units optional-group
+                                            \(              # units enclosed in ()
+                                                [^)]*
+                                            \)
+                                            |
+                                            \[              # units enclosed in []
+                                                [^\]]*
+                                            \]
+                                        )?                  # end parenthesized-units
+                                        \s*$''', re.X)
 def parse_column_specifier(arg):
     """Argument-type for --icolumns, syntaxed like: COL_NAME [(UNITS)]."""
 
     m = _column_specifier_regex.match(arg)
     if m:
-        return m.groups()
+        return m.groupdict()
     else:
         raise argparse.ArgumentTypeError("Not a COLUMN_SPEC syntax: %s"%arg)
 
@@ -280,12 +292,12 @@ def validate_file_opts(opts):
     return opts
 
 
-FileSpec = collections.namedtuple('FileSpec', ('io_method', 'fname', 'file', 'frmt', 'path', 'append', 'kws'))
+FileSpec = collections.namedtuple('FileSpec', ('io_method', 'fname', 'file', 'frmt', 'path', 'append', 'renames', 'kws'))
 
-def parse_many_file_args(many_file_args, filemode):
+def parse_many_file_args(many_file_args, filemode, col_renames=None):
     io_file_indx = _io_file_modes[filemode]
 
-    def parse_file_args(fname, *kv_args):
+    def parse_file_args(n, fname, *kv_args):
         frmt    = _default_pandas_format
         path    = _default_df_path[io_file_indx]
         append  = _default_out_file_append
@@ -334,9 +346,19 @@ def parse_many_file_args(many_file_args, filemode):
         except KeyError:
             pass
 
-        return FileSpec(method, fname, file, frmt, path, append, pandas_kws)
+        ## Here we apply a single --irenames to all input-files.
+        #
+        if col_renames is None:
+            renames = None
+        elif len(col_renames) == 1:
+            renames = col_renames[0]
+        else:
+            renames = col_renames[n]
+        return FileSpec(method, fname, file, frmt, path, append, renames, pandas_kws)
 
-    return [parse_file_args(*file_args) for file_args in many_file_args]
+    if not many_file_args:
+        return [] # FIXME: Why enumeration on None does not work?
+    return [parse_file_args(n, *file_args) for (n, file_args) in enumerate(many_file_args)]
 
 
 def load_file_as_df(filespec):
@@ -347,6 +369,18 @@ def load_file_as_df(filespec):
         dfin = method(**filespec.kws)
     else:
         dfin = method(filespec.file, **filespec.kws)
+
+    if (filespec.renames):
+        old_cols = dfin.columns
+        new_cols = [old if new['name'] == '_' else new['name'] for (old, new) in zip(old_cols, filespec.renames)]
+
+        ## If length of rename-columns differ from DF's.
+        #    columns at the end are left unchanged,
+        #    but will scream if given more renames!
+        #
+        new_cols += list(old_cols[len(new_cols):])
+        dfin.columns = new_cols
+
 
     dfin = dfin.convert_objects(convert_numeric=True)
 
@@ -497,8 +531,8 @@ def build_args_parser(program_name, version, desc, epilog):
             but without accepting integers.
             The number of renamed-columns for each input-file must be equal or less
             than those in the --icolumns for the respective inpute-file.
-            Use 'X' for columns to be left intact."""),
-                        action='append', nargs='+',
+            Use '_' for columns to be left intact."""),
+                        action='append', nargs='*',
                         type=parse_column_specifier, metavar='COLUMN_SPEC')
     grp_io.add_argument('-m', help=dedent("""\
             override a model value.
