@@ -249,24 +249,30 @@ def parse_key_value_pair(arg):
         raise argparse.ArgumentTypeError("Not a KEY=VALUE syntax: %s"%arg)
 
 
-_column_specifier_regex = re.compile('''^\s*
-                                        (?P<name>.+?)       # column-name
+_column_specifier_regex = re.compile(r'''^\s*
+                                        (?P<name>[^([]+?)   # column-name
+                                        \s*
                                         (?P<units>          # start parenthezied-units optional-group
-                                            \(              # units enclosed in ()
-                                                [^)]*
-                                            \)
-                                            |
                                             \[              # units enclosed in []
                                                 [^\]]*
                                             \]
+                                            |
+                                            \(              # units enclosed in ()
+                                                [^)]*
+                                            \)
                                         )?                  # end parenthesized-units
                                         \s*$''', re.X)
+_units_cleaner_regex = re.compile(r'^[[(]|[\])]$')
 def parse_column_specifier(arg):
     """Argument-type for --icolumns, syntaxed like: COL_NAME [(UNITS)]."""
 
     m = _column_specifier_regex.match(arg)
     if m:
-        return m.groupdict()
+        res = m.groupdict()
+        units = res['units']
+        if units:
+            res['units'] = _units_cleaner_regex.sub('', units)
+        return res
     else:
         raise argparse.ArgumentTypeError("Not a COLUMN_SPEC syntax: %s"%arg)
 

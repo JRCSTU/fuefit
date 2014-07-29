@@ -17,6 +17,8 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
+from argparse import ArgumentTypeError
+from fuefit.cmdline import parse_column_specifier
 '''Check cmdline parsing and model building.
 
 Created on Apr 17, 2014
@@ -55,7 +57,19 @@ class TestFuncs(unittest.TestCase):
         self._failColumnsMsg = 'Not a COLUMN_SPEC syntax'
         self._failColumns = ['', '(dd)', 'quant((bad units))', 'quant --> ((bad units))', 'quant (complex ( units ))',
                 'quant (open units']
-        self._goodColumns = ['quant', 'spaced quant', 'quant (units)', 'quant (spaced units)', 'Pnorm (kJ / sec)']
+        self._goodColumns = [
+            ('quant',                   ('quant', None)),
+            ('spaced quant',            ('spaced quant', None)),
+            ('quant (units)',           ('quant', 'units')),
+            ('quant (spaced units)',    ('quant', 'spaced units')),
+            ('Pnorm (kJ / sec)',        ('Pnorm', 'kJ / sec')),
+
+            ('quant [units]',           ('quant', 'units')),
+            ('quant [spaced units]',    ('quant', 'spaced units')),
+            ('Pnorm [kJ / sec]',        ('Pnorm', 'kJ / sec')),
+            ('Pnorm [kJ/(sec)]',        ('Pnorm', 'kJ/(sec)')),
+            ('Pnorm [(kJ*2)/(sec)]',    ('Pnorm', '(kJ*2)/(sec)')),
+        ]
 
         self._failKVPairsMsg = 'Not a KEY=VALUE syntax'
         self._failKVPairs = ['no_value', 'spa ced', 'spaced key = key', '3number=val',
@@ -158,8 +172,16 @@ class TestFuncs(unittest.TestCase):
             self.check_ok(cmdline.split() + list(goods))
 
 
-#     def test0(self):
-#         main('-mfuel=diesel'.split())
+    def checkColumnFormat_bad(self, frmts, ex_msg):
+        for frmt in frmts:
+            with self.assertRaisesRegex(ArgumentTypeError, ex_msg, msg=frmt):
+                parse_column_specifier(frmt)
+
+    def checkColumnFormat_good(self, frmt_cases):
+        for (frmt, (quant, units)) in frmt_cases:
+            res = parse_column_specifier(frmt)
+            self.assertEqual(res['name'], quant, (frmt, res))
+            self.assertEqual(res['units'], units, (frmt, res))
 
 
     def testHelpMsg(self):
@@ -180,15 +202,23 @@ class TestFuncs(unittest.TestCase):
     def testModelOverrides_good(self):
         self.checkParseOpt_good('-I funcs_map -m', self._goodKVPairs.keys())
 
-    def testColumnNames_fail(self):
-        self.checkParseOpt_fail('-c', self._failColumns, self._failColumnsMsg)
-    def testColumnNames_good(self):
-        self.checkParseOpt_good('-I ~temp.csv -c', self._goodColumns)
 
-    def testColumnRenames_fail(self):
+    def testColumnNames_fail(self):
+        self.checkColumnFormat_bad(self._failColumns, ex_msg = 'Not a COLUMN_SPEC syntax')
+    def testColumnNames_good(self):
+        self.checkColumnFormat_good(self._goodColumns)
+
+    def testColumnNamesInParser_fail(self):
+        self.checkParseOpt_fail('-c', self._failColumns, self._failColumnsMsg)
+    def testColumnNamesInParser_good(self):
+        cols = [frmt for (frmt, _) in self._goodColumns]
+        self.checkParseOpt_good('-I ~temp.csv -c', cols)
+
+    def testColumnRenamesInParser_fail(self):
         self.checkParseOpt_fail('-r', self._failColumns, self._failColumnsMsg)
-    def testColumnRenames_good(self):
-        self.checkParseOpt_good('-I funcs_map -r', self._goodColumns)
+    def testColumnRenamesInParser_good(self):
+        cols = [frmt for (frmt, _) in self._goodColumns]
+        self.checkParseOpt_good('-I funcs_map -r', cols)
 
 
     def testKVPairs_fail(self):
@@ -244,7 +274,7 @@ class TestFuncs(unittest.TestCase):
         ]
         for (open_modes, many_file_args) in cases:
             for open_mode in open_modes:
-                res = parse_many_file_args(many_file_args, open_mode, None)
+                parse_many_file_args(many_file_args, open_mode, None)
 
         argparse.ArgumentTypeError(parse_many_file_args, functools.reduce(lambda x, y: x+y, cases), 'r')
 
@@ -390,13 +420,24 @@ class TestMain(unittest.TestCase):
         self.assertEqual(len(sys.stdout.getvalue().strip()), 0)
 
     def test_run_main_stdout4(self):
-        main('''
-            -vd
+        main('''-vd
             -I FuelFit_real.csv header+=0
               --irenames rpm_norm _ fc_norm
             -I engine.csv file_frmt=SERIES model_path=/engine header@=None
               --irenames
             -m /engine/fuel=petrol
+        '''.split())
+
+
+    def test_run_main_stdout5_icolumns(self):
+        main('''-vd
+            -I FuelFit_real.csv header+=0
+              --irenames rpm_norm _ fc_norm
+            -I engine.csv file_frmt=SERIES model_path=/engine header@=None
+              --irenames
+            -m /engine/fuel=petrol
+            -O - model_path=/engine_map index?=false
+            -m /params/plot_maps@=False
         '''.split())
 
 
