@@ -1,8 +1,8 @@
 #################################################################################
 fuefit: Fit fuel-consumption engine-maps on a physical formula with 6 parameters.
 #################################################################################
-  :Copyright:   2014 EUROPEAN COMMISSION (JRC)
-  :License:     AGPL
+:Copyright:   2014 European Commission (JRC)
+:License:     AGPL
 
 
 Overview:
@@ -32,13 +32,13 @@ An "execution" or a "run" can be depicted with the following diagram::
 Cmd-line usage:
 ===============
 
-python fuefit -v\
-    -I fuefit/test/FuelFit.xlsx sheetname+=0 header@=None names:='["p","rpm","fc"]' \
-    -I fuefit/test/engine.csv file_frmt=SERIES model_path=/engine header@=None \
-    -m /engine/fuel=petrol \
-    -O ~t1.csv model_path=/engine_points index?=false \
-    -O ~t2.csv model_path=/engine_map index?=false \
-    -O ~t.csv model_path= -m /params/plot_maps@=True
+    python fuefit -v\
+        -I fuefit/test/FuelFit.xlsx sheetname+=0 header@=None names:='["p","rpm","fc"]' \
+        -I fuefit/test/engine.csv file_frmt=SERIES model_path=/engine header@=None \
+        -m /engine/fuel=petrol \
+        -O ~t1.csv model_path=/engine_points index?=false \
+        -O ~t2.csv model_path=/engine_map index?=false \
+        -O ~t.csv model_path= -m /params/plot_maps@=True
 
 
 Python usage:
