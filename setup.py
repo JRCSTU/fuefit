@@ -41,13 +41,13 @@ Tested with Python 3.4.
 
 '''
 
+from distutils.core import setup
 import os
-from cx_Freeze import Executable
-from cx_Freeze import setup
-# from distutils.core import setup
-# from setuptools import setup
-#import py2exe
 
+from setuptools import setup
+
+
+#import py2exe
 projname = 'fuefit'
 mydir = os.path.dirname(__file__)
 
@@ -66,7 +66,7 @@ def read_text_lines(fname):
     with open(os.path.join(mydir, fname)) as fd:
         return fd.readlines()
 
-readme_lines = read_text_lines('README.txt')
+readme_lines = read_text_lines('README.rst')
 
 setup(
     name=projname,
@@ -102,46 +102,15 @@ setup(
         'xlrd',
         'scipy',
         'jsonschema',
-        'jsonpointer',
         'networkx',
         'pint',
+        'xlwings',
     ],
-    scripts = ['fuefit.py'],
+    entry_points={
+        'console_scripts': [
+            'fuefitcmd = fuefit.cmdline:main',
+        ],
+    }, 
     options={
-        'build_exe': {
-            "excludes": [
-                "jsonschema", #!!!! Schemas do not work in library-zip, so needs manuall to copy directly into app-dir
-                "numpy", "scipy", #!!!! lostesso
-                "PyQt4", "PySide",
-                "IPython", "numexpr",
-                "pygments", "pyreadline", "jinja2",
-                "setuptools",
-                "statsmodels", "docutils",
-                "xmlrpc", "pytz",
-                "nose",
-                "Cython", "pydoc_data", "sphinx", "docutils",
-                "multiprocessing", "lib2to3", "_markerlib",
-#                 #urllib<--email<--http<--pandas
-#                 #distutils" <-- pandas.compat
-            ],
-            'includes': [
-                'matplotlib.backends.backend_tkagg',
-            ],
-            'include_files': [
-                ## MANUAL COPY into build/exe-dir
-                ##     from: https://bitbucket.org/anthony_tuininga/cx_freeze/issue/43/import-errors-when-using-cx_freeze-with
-                #  site_packages(32bit/64bit)/
-                #    jsonschema
-                #    numpy
-                #    scipy
-            ],
-            'include_msvcr': True,
-            'compressed': False,
-#            'create_shared_zip': False,
-#             'include_in_shared_zip': True,
-        }, 'bdist_msi': {
-            'add_to_path': False,
-        },
     },
-    executables=[Executable("fuefit.py", )], #base="Win32GUI")],
 )

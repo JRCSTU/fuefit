@@ -26,9 +26,10 @@ Created on Apr 23, 2014
 import logging
 import unittest
 
+import itertools as it
+
 from ..pdcalc import _build_func_dependencies_graph, harvest_func, harvest_funcs_factory, _filter_common_prefixes, \
     Dependencies, DependenciesError, _validate_func_relations
-import itertools as it
 
 
 def gen_all_prefix_pairs(path):
@@ -55,10 +56,10 @@ def funcs_fact(params, engine, dfin):
     from math import pi
 
     def f1(): engine['fuel_lhv'] = params['fuel'][engine['fuel']]['lhv']
-    def f2(): dfin['rpm']     = dfin.rpm_norm * (engine.rpm_rated - engine.rpm_idle) + engine.rpm_idle
+    def f2(): dfin['n']     = dfin.n_norm * (engine.n_rated - engine.n_idle) + engine.n_idle
     def f3(): dfin['p']       = dfin.p_norm * engine.p_max
     def f4(): dfin['fc']      = dfin.fc_norm * engine.p_max
-    def f5(): dfin['rps']     = dfin.rpm / 60
+    def f5(): dfin['rps']     = dfin.n / 60
     def f6(): dfin['torque']  = (dfin.p * 1000) / (dfin.rps * 2 * pi)
     def f7(): dfin['pme']     = (dfin.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-6)
     def f8(): dfin['pmf']     = ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-3)) * (dfin.fc / (3600 * dfin.rps * 2 * pi)) * 10e-5
@@ -70,7 +71,7 @@ def funcs_fact2(dfin, engine, dfout):
     def f0(): return dfin.cm + dfin.pmf + dfin.pme
 
     def f1(): engine['eng_map_params']      = f0()
-    def f2(): dfout['rpm','p','fc'] = engine['eng_map_params']
+    def f2(): dfout['n','p','fc'] = engine['eng_map_params']
     def f3(): dfout['fc_norm'] = dfout.fc / dfout.p
 
     return (f1, f2, f3)

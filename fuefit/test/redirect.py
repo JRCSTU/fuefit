@@ -82,10 +82,12 @@ def redirected(**kwargs):
                 dest_file = open(os.devnull, 'w')
             elif hasattr(destination, 'startswith'):  # A string => treat as filename
                 dest_file = open(destination, 'w')
-            elif hasattr(destination, 'fileno'):  # A file-like object
-                dest_file = destination
             else:
-                dest_file = None
+                try:
+                    _ = destination.fileno()  # A file-like object
+                    dest_file = destination
+                except Exception:
+                    dest_file = None
 
             if dest_file and dupped:
                 os.dup2(dest_file.fileno(), stdchannel.fileno())

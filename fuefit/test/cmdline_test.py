@@ -17,14 +17,14 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
-from argparse import ArgumentTypeError
-from fuefit.cmdline import parse_column_specifier
 '''Check cmdline parsing and model building.
 
 Created on Apr 17, 2014
 
 @author: ankostis
 '''
+
+from argparse import ArgumentTypeError
 import argparse
 from collections import OrderedDict
 import functools
@@ -33,8 +33,13 @@ import os
 import sys
 import unittest
 
-from ..cmdline import build_args_parser, validate_file_opts, parse_key_value_pair, parse_many_file_args, assemble_model, \
+from fuefit.cmdline import parse_column_specifier
+
+from ..cmdline import (
+    build_args_parser, validate_file_opts, parse_key_value_pair, 
+    parse_many_file_args, assemble_model, 
     validate_model, FileSpec, main, store_model_parts
+)
 from ..model import json_dumps, base_model
 from .redirect import redirected # @UnresolvedImport
 
@@ -320,7 +325,7 @@ class TestFuncs(unittest.TestCase):
         fname = 'test_table.csv'
         opts = {'m':[[('fuel','diesel')]] }
         filespecs = [
-            FileSpec(pd.read_csv, fname, open(fname, 'r'), 'CSV', '/engine_points', None, None, {})
+            FileSpec(pd.read_csv, fname, open(fname, 'r'), 'CSV', '/measured_eng_points', None, None, {})
         ]
         opts = argparse.Namespace(**opts)
         mdl = assemble_model(filespecs, opts.m)
@@ -334,7 +339,7 @@ class TestFuncs(unittest.TestCase):
         fname = 'test_table.csv'
         model_overrides = [[('fuel','diesel')]]
         filespecs = [
-            FileSpec(pd.read_csv, fname, open(fname, 'r'), 'CSV', '/engine_points', None, None, {})
+            FileSpec(pd.read_csv, fname, open(fname, 'r'), 'CSV', '/measured_eng_points', None, None, {})
         ]
         mdl = assemble_model(filespecs, model_overrides)
         validate_model(mdl)
@@ -383,38 +388,38 @@ class TestMain(unittest.TestCase):
         os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
     def test_run_main_stdout1(self):
-        main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["rpm","p","fc"]
+        main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["n","p","fc"]
                 -I engine.csv file_frmt=SERIES model_path=/engine header@=None
                 -m /engine/fuel=petrol
                 -O - model_path= -v -d'''.split())
-        self.assertIn('rpm', sys.stdout.getvalue().strip(), 0)
+        self.assertIn('n', sys.stdout.getvalue().strip(), 0)
 
     def test_run_main_stdout2(self):
-        main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["rpm","p","fc"]
+        main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["n","p","fc"]
                 -I engine.csv file_frmt=SERIES model_path=/engine header@=None
                 -m /engine/fuel=petrol
                 -O - model_path=/engine_map  index?=false -v -d'''.split())
-        self.assertIn('rpm', sys.stdout.getvalue().strip(), 0)
+        self.assertIn('n', sys.stdout.getvalue().strip(), 0)
 
     def test_run_main_fileout(self):
         out_fname = '~t.json'
-        main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["rpm","p","fc"]
+        main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["n","p","fc"]
                 -I engine.csv file_frmt=SERIES model_path=/engine header@=None
                 -m /engine/fuel=petrol
-                -O ~t1.csv model_path=/engine_points index?=false
+                -O ~t1.csv model_path=/measured_eng_points index?=false
                 -O ~t2.csv model_path=/engine_map index?=false
                 -O {} model_path=
                 -m /params/plot_maps?=False
                 '''.format(out_fname).split())
         with open(out_fname, 'r') as fp:
             txt = fp.read()
-        self.assertIn('rpm', txt.strip())
-        self.assertIn('rpm', txt.strip())
+        self.assertIn('n', txt.strip())
+        self.assertIn('n', txt.strip())
 
     def test_run_main_stdout3(self):
         main('''
             -vd
-            -I FuelFit_real.csv header+=0 names@='rpm_norm,p_norm,fc_norm'.split(',')
+            -I FuelFit_real.csv header+=0 names@='n_norm,p_norm,fc_norm'.split(',')
             -I engine.csv file_frmt=SERIES model_path=/engine header@=None
             -m /engine/fuel=petrol'''.split())
         self.assertEqual(len(sys.stdout.getvalue().strip()), 0)
@@ -422,7 +427,7 @@ class TestMain(unittest.TestCase):
     def test_run_main_stdout4(self):
         main('''-vd
             -I FuelFit_real.csv header+=0
-              --irenames rpm_norm _ fc_norm
+              --irenames n_norm _ fc_norm
             -I engine.csv file_frmt=SERIES model_path=/engine header@=None
               --irenames
             -m /engine/fuel=petrol
@@ -432,7 +437,7 @@ class TestMain(unittest.TestCase):
     def test_run_main_stdout5_icolumns(self):
         main('''-vd
             -I FuelFit_real.csv header+=0
-              --irenames rpm_norm _ fc_norm
+              --irenames n_norm _ fc_norm
             -I engine.csv file_frmt=SERIES model_path=/engine header@=None
               --irenames
             -m /engine/fuel=petrol

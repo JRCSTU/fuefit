@@ -17,7 +17,19 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
-"""The command-line entry-point for using all functionality of fuefit tool.
+"""
+The command-line entry-point for using all functionality of the tool.
+
+Example
+=======
+
+    python fuefit \
+        -I fuefit/test/FuelFit.xlsx model_path=/measured_eng_points sheetname+=0 header@=None names:='["p","n","fc"]' \
+        -I fuefit/test/engine.csv file_frmt=SERIES model_path=/engine header@=None \
+        -m /engine/fuel=petrol \
+        -O ~t1.csv model_path=/measured_eng_points index?=false \
+        -O ~t2.csv model_path=/engine_map index?=false \
+        -O ~t.csv model_path= -m /params/plot_maps@=True
 
 .. Seealso::
     :func:`main()`
@@ -31,21 +43,24 @@ import json
 import logging
 import os
 import re
+import shutil
 import sys
 from textwrap import dedent
 
 from pandas.core.generic import NDFrame
 
-import jsonpointer as jsonp
+from fuefit.model import JsonPointerException
 import jsonschema as jsons
 import operator as ops
 import pandas as pd
 
 from . import model
+from . import processor
 from ._version import __version__ # @UnusedImport
 from .model import json_dump, json_dumps, validate_model
-from . import processor
-from .utils import str2bool, Lazy
+from .utils import (str2bool, Lazy, generate_filenames)
+
+
 
 
 DEBUG   = False
@@ -118,7 +133,7 @@ def main(argv=None):
 
     global log, DEBUG
 
-    program_name    = 'fuefit' #os.path.basename(sys.argv[0])
+    program_name    = 'fuefitcmd' #os.path.basename(sys.argv[0])
 
     if argv is None:
         argv = sys.argv[1:]
@@ -143,6 +158,29 @@ def main(argv=None):
 
         log.debug("Args: %s\n  +--Opts: %s", argv, opts)
 
+        if opts.excel:
+            copy_excel_template_files(opts.excel)
+            return
+        
+        if opts.excelrun:
+            from os.path import expanduser
+            destdir = expanduser("~")
+            files_copied = copy_excel_template_files(destdir)          #@UnusedVariable
+            xls_file = files_copied[0]
+            
+            ## From http://stackoverflow.com/questions/434597/open-document-with-default-application-in-python
+            #     and http://www.dwheeler.com/essays/open-files-urls.html
+            import subprocess
+            try:
+                os.startfile(xls_file)
+            except AttributeError:
+                if sys.platform.startswith('darwin'):
+                    subprocess.call(('open', xls_file))
+                elif os.name == 'posix':
+                    subprocess.call(('xdg-open', xls_file))
+            return
+        
+
         opts = validate_file_opts(opts)
 
         infiles     = parse_many_file_args(opts.I, 'r', opts.irenames)
@@ -165,7 +203,7 @@ def main(argv=None):
         log.info("Input Model(strict: %s): %s", opts.strict, Lazy(lambda: json_dumps(mdl, 'to_string')))
         mdl = validate_model(mdl, additional_props)
 
-        mdl = processor.run(opts, mdl)
+        mdl = processor.run(mdl, opts)
 
         store_model_parts(mdl, outfiles)
 
@@ -175,12 +213,43 @@ def main(argv=None):
         indent = len(program_name) * " "
         parser.exit(4, "%s: Model validation failed due to: %s\n%s\n"%(program_name, ex, indent))
 
-    except jsonp.JsonPointerException as ex:
+    except JsonPointerException as ex:
         if DEBUG:
             log.exception('Invalid model operation!')
         indent = len(program_name) * " "
         parser.exit(4, "%s: Model operation failed due to: %s\n%s\n"%(program_name, ex, indent))
 
+
+
+def copy_excel_template_files(dest_dir):
+    import pkg_resources as pkg
+    
+    if dest_dir == '<CWD>':
+        dest_dir = os.getcwd()
+    else:
+        dest_dir = os.path.abspath(dest_dir)
+
+    try:
+        os.mkdir(dest_dir)
+        log.info('Created destination-directory(%s).', dest_dir)
+    except:
+        pass ## Might already exist
+    
+    files_to_copy = ['excel\fuefit_excel_runner.xlsm', 'excel\fuefit_excel_runner.py']
+    files_to_copy = [pkg.resource_filename('fuefit', f) for f in files_to_copy] #@UndefinedVariable
+    files_copied = []
+    for src_fname in files_to_copy:
+        dest_fname = os.path.basename(src_fname)
+        fname_genor = generate_filenames(os.path.join(dest_dir, dest_fname))
+        dest_fname = next(fname_genor)
+        while os.path.exists(dest_fname):
+            dest_fname = next(fname_genor)
+            
+        log.info('Copying `xlwings` template-file: %s --> %s', src_fname, dest_fname)
+        shutil.copy(src_fname, dest_fname)
+        files_copied.append(dest_fname)
+    
+    return files_copied
 
 
 
@@ -214,7 +283,7 @@ def get_file_format_from_extension(fname):
     return None
 
 
-_default_df_path            = ('/engine_points', '/engine_map')
+_default_df_path            = ('/measured_eng_points', '/engine_map')
 _default_out_file_append    = False
 ## When option `-m MODEL_PATH=VALUE` contains a relative path,
 # the following is preppended:
@@ -252,7 +321,7 @@ def parse_key_value_pair(arg):
 _column_specifier_regex = re.compile(r'''^\s*
                                         (?P<name>[^([]+?)   # column-name
                                         \s*
-                                        (?P<units>          # start parenthezied-units optional-group
+                                        (?P<units>          # start parenthesized-units optional-group
                                             \[              # units enclosed in []
                                                 [^\]]*
                                             \]
@@ -397,7 +466,7 @@ def load_model_part(mdl, filespec):
     dfin = load_file_as_df(filespec)
     log.debug("  +-input-file(%s):\n%s", filespec.fname, dfin.head())
     if filespec.path:
-        jsonp.set_pointer(mdl, filespec.path, dfin)
+        model.set_jsonpointer(mdl, filespec.path, dfin)
     else:
         mdl = dfin
     return mdl
@@ -419,7 +488,7 @@ def assemble_model(infiles, model_overrides):
             try:
                 if (not json_path.startswith('/')):
                     json_path = _default_model_overridde_path + json_path
-                jsonp.set_pointer(mdl, json_path, value)
+                model.set_jsonpointer(mdl, json_path, value)
             except Exception as ex:
                 raise Exception("Failed setting model-value(%s) due to: %s" %(json_path, value, ex)) from ex
 
@@ -447,8 +516,9 @@ def store_part_as_df(filespec, part):
 def store_model_parts(mdl, outfiles):
     for filespec in outfiles:
         try:
-            part = jsonp.resolve_pointer(mdl, filespec.path)
-            if part is jsonp._nothing:
+            try:
+                part = model.resolve_jsonpointer(mdl, filespec.path)
+            except JsonPointerException:
                 log.warning('Nothing found at model(%s) to write to file(%s).', filespec.path, filespec.fname)
             else:
                 store_part_as_df(filespec, part)
@@ -545,11 +615,11 @@ def build_args_parser(program_name, version, desc, epilog):
             * The MODEL_PATH is a json-pointer absolute or relative path, see:
                     https://python-json-pointer.readthedocs.org/en/latest/tutorial.html
               Relative paths are resolved against '/engine', for instance:
-                    -Mrpm_idle=850   -M/engine/p_max=660
+                    -Mn_idle=850   -M/engine/p_max=660
               would set the following model's property:
                     {
                       "engine": {
-                          "rpm_idle": 850,
+                          "n_idle": 850,
                           "p_max": 660,
                           ...
                       }
@@ -583,6 +653,12 @@ def build_args_parser(program_name, version, desc, epilog):
                         #default=[('- file_frmt=%s model_path=%s file_append=%s'%('CSV', _default_df_path[1],  _default_out_file_append)).split()],
                         metavar='ARG')
 
+    xlusive_group = parser.add_mutually_exclusive_group()
+    xlusive_group.add_argument('--gui', help='start GUI to run a single experiment', action='store_true')
+    xlusive_group.add_argument('--excel', help="copy `xlwings` excel & python template files into DESTPATH or current-working dir, to run a batch of experiments", 
+        nargs='?', const='<CWD>', metavar='DESTPATH')
+    xlusive_group.add_argument('--excelrun', help="Copy `xlwings` excel & python template files into USERDIR and open Excel-file, to run a batch of experiments", action='store_true')
+    
 
     grp_various = parser.add_argument_group('Various', 'Options controlling various other aspects.')
     #parser.add_argument('--gui', help='start in GUI mode', action='store_true')
@@ -598,3 +674,7 @@ def build_args_parser(program_name, version, desc, epilog):
 
     return parser
 
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,8 @@
+enum34
+numpy
+pandas
+xlrd
+scipy
+jsonschema
+networkx
+pint

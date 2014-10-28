@@ -29,10 +29,13 @@ import unittest
 
 from networkx.classes.digraph import DiGraph
 
-from ..pdcalc import DependenciesError, execute_funcs_map, execute_plan
 import pandas as pd
 
-from ..pdcalc import Dependencies, _research_calculation_routes, tell_paths_from_named_args
+from ..pdcalc import (
+    DependenciesError, execute_funcs_map, execute_plan,
+    Dependencies, _research_calculation_routes,
+    tell_paths_from_named_args
+)
 
 
 def lstr(lst):
@@ -65,10 +68,10 @@ def funcs_fact1(params, engine, dfin, dfout):
     from math import pi
 
     def f1(): engine['fuel_lhv'] = params['fuel'][engine['fuel']]['lhv']
-    def f2(): dfin['rpm']     = dfin.rpm_norm * (engine.rpm_rated - engine.rpm_idle) + engine.rpm_idle
+    def f2(): dfin['n']     = dfin.n_norm * (engine.n_rated - engine.n_idle) + engine.n_idle
     def f3(): dfin['p']       = dfin.p_norm * engine.p_max
     def f4(): dfin['fc']      = dfin.fc_norm * engine.p_max
-    def f5(): dfin['rps']     = dfin.rpm / 60
+    def f5(): dfin['rps']     = dfin.n / 60
     def f6(): dfin['torque']  = (dfin.p * 1000) / (dfin.rps * 2 * pi)
     def f7(): dfin['pme']     = (dfin.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-6)
     def f8(): dfin['pmf']     = ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-3)) * (dfin.fc / (3600 * dfin.rps * 2 * pi)) * 10e-5
@@ -81,7 +84,7 @@ def funcs_fact2(params, engine, dfin, dfout):
 
     def f11(): engine['eng_map_params'] = f10()
     def f12():
-        dfout['rpm']    = engine['eng_map_params']
+        dfout['n']    = engine['eng_map_params']
         dfout['p']      = engine['eng_map_params'] * 2
         dfout['fc']     = engine['eng_map_params'] * 4
     def f13(): dfout['fc_norm']         = dfout.fc / dfout.p
@@ -90,7 +93,7 @@ def funcs_fact2(params, engine, dfin, dfout):
 
 def funcs_fact3(params, engine, dfin, dfout):
     def f12():
-        dfout['rpm']    = engine['eng_map_params']
+        dfout['n']    = engine['eng_map_params']
         dfout['p']      = engine['eng_map_params'] * 2
         dfout['fc']     = engine['eng_map_params'] * 4
     def f13(): dfout['fc_norm']         = dfout.fc / dfout.p
@@ -117,9 +120,9 @@ def get_params():
 def get_engine():
     return {
         'fuel': 'diesel',
-#         'engine_points': '',
-        'rpm_idle': 100,
-        'rpm_rated' : 12,
+#         'measured_eng_points': '',
+        'n_idle': 100,
+        'n_rated' : 12,
         'p_max'     : 2,
         'capacity'  : 1300,
         'stroke'    : 12,
@@ -173,7 +176,7 @@ class Test(unittest.TestCase):
         graph = deps._build_deps_graph()
 
         inp = ('dfin.fc', 'dfin.fc_norm', 'dfin.XX')
-        out = ('dfout.fc', 'dfout.rpm')
+        out = ('dfout.fc', 'dfout.n')
         (_, _, cn_nodes, _) = _research_calculation_routes(graph, inp, out)
         self.assertTrue('dfin.fc_norm' not in cn_nodes)
 
@@ -281,7 +284,7 @@ class Test(unittest.TestCase):
 
         ## TODO, Check dotted.var.names.
         engine = SR(get_engine())
-        dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]})
+        dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'n':[10,20], 'pme':[100,200], 'some_foo':[1,2]})
         dfout = DF({})
         args = OrderedDict([
             ('params', SR(get_params())),
@@ -289,7 +292,7 @@ class Test(unittest.TestCase):
             ('dfin',  dfin),
             ('dfout', dfout),
         ])
-        out = ('dfout.rpm', 'dfout.fc_norm')
+        out = ('dfout.n', 'dfout.fc_norm')
 
         engine_c = engine.copy()
         dfin_c = dfin.copy()
@@ -307,7 +310,7 @@ class Test(unittest.TestCase):
         deps.add_func_rel('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv'))
 
         engine = SR(get_engine())
-        dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]})
+        dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'n':[10,20], 'pme':[100,200], 'some_foo':[1,2]})
         dfout = DF({})
         args = OrderedDict([
             ('params', SR(get_params())),
@@ -315,7 +318,7 @@ class Test(unittest.TestCase):
             ('dfin',  dfin),
             ('dfout', dfout),
         ])
-        out = ('dfout.rpm', 'dfout.fc_norm')
+        out = ('dfout.n', 'dfout.fc_norm')
 
         engine_c = engine.copy()
         dfin_c = dfin.copy()
@@ -336,7 +339,7 @@ class Test(unittest.TestCase):
         deps.add_func_rel('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv'))
 
         engine = SR(get_engine())
-        dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]})
+        dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'n':[10,20], 'pme':[100,200], 'some_foo':[1,2]})
         dfout = DF({})
         args = OrderedDict([
             ('params', SR(get_params())),
@@ -344,7 +347,7 @@ class Test(unittest.TestCase):
             ('dfin',  dfin),
             ('dfout', dfout),
         ])
-        out = ('dfout.rpm', 'dfout.fc_norm')
+        out = ('dfout.n', 'dfout.fc_norm')
 
         engine_c = engine.copy()
         dfin_c = dfin.copy()
@@ -361,9 +364,9 @@ class Test(unittest.TestCase):
     def testSmoke_funcs_map_good(self):
         params = SR(get_params())
         engine = SR(get_engine())
-        dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'rpm':[10,20], 'pme':[100,200], 'some_foo':[1,2]})
+        dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'n':[10,20], 'pme':[100,200], 'some_foo':[1,2]})
         dfout = DF({})
-        out = ('dfout.rpm', 'dfout.fc_norm')
+        out = ('dfout.n', 'dfout.fc_norm')
 
         engine_c = engine.copy()
         dfin_c = dfin.copy()

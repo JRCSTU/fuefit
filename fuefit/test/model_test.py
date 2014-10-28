@@ -22,8 +22,10 @@
 @author: ankostis@gmail.com
 @since 19 Apr 2014
 '''
-import jsonschema
 import unittest
+
+import jsonschema
+
 from .. import model
 
 
@@ -41,46 +43,37 @@ class Test(unittest.TestCase):
         self.assertRaises(jsonschema.ValidationError, validator.validate, instance)
 
     def testModelBase_fail(self):
-        import jsonpointer as jsonp
-
         mdl = model.base_model()
 
         self.assertRaises(jsonschema.ValidationError, model.model_validator().validate, mdl)
 
-        jsonp.set_pointer(mdl, '/engine/fuel', 'BAD_FUEL')
+        model.set_jsonpointer(mdl, '/engine/fuel', 'BAD_FUEL')
         self.assertRaisesRegex(jsonschema.ValidationError, "Failed validating 'oneOf' in schema.*properties.*engine", model.model_validator().validate, mdl)
 
 
     def testModel_FAIL_extraFuel(self):
-        import jsonpointer as jsonp
-
         mdl = model.base_model()
-        jsonp.set_pointer(mdl, '/engine/fuel', 'diesel')
+        model.set_jsonpointer(mdl, '/engine/fuel', 'diesel')
         mdl['params']['fuel']['EXTRA_FUEL'] = 'somethign'
 
         self.assertRaisesRegex(jsonschema.ValidationError, "Additional properties .*EXTRA_FUEL", model.model_validator().validate, mdl)
 
     def testModel_FAIL_missLhv(self):
-        import jsonpointer as jsonp
-
         mdl = model.base_model()
-        jsonp.set_pointer(mdl, '/engine/fuel', 'diesel')
+        model.set_jsonpointer(mdl, '/engine/fuel', 'diesel')
         mdl['params']['fuel']['petrol'] = {}
 
         self.assertRaisesRegex(jsonschema.ValidationError, "'lhv' is a required", model.model_validator().validate, mdl)
 
 
     def testModel_GOOD(self):
-        import jsonpointer as jsonp
-
         mdl = model.base_model()
-        jsonp.set_pointer(mdl, '/engine/fuel', 'diesel')
+        model.set_jsonpointer(mdl, '/engine/fuel', 'diesel')
 
         validator = model.model_validator()
         validator.validate(mdl)
 
     def testModel_units_GOOD(self):
-        import jsonpointer as jsonp
         from pint import UnitRegistry
         ureg = UnitRegistry()
 
@@ -98,9 +91,9 @@ class Test(unittest.TestCase):
 
         for (args, res) in cases:
             mdl = model.base_model()
-            jsonp.set_pointer(mdl, '/engine/fuel', 'diesel')
+            model.set_jsonpointer(mdl, '/engine/fuel', 'diesel')
 
-            jsonp.set_pointer(mdl, *args)
+            model.set_jsonpointer(mdl, *args)
             validator.validate(mdl)
 
 

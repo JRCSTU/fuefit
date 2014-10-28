@@ -19,11 +19,15 @@
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 '''wltc module: Model json-all_schemas for WLTC gear-shift calculator.'''
 
+from collections.abc import Mapping, Sequence 
 import json
+
+from pandas.core.generic import NDFrame
+
 import jsonschema as jsons
 import operator as ops
 import pandas as pd
-from pandas.core.generic import NDFrame
+
 
 def model_schema(additional_properties = False):
     """The json-schema for input/output of the fuefit experiment.
@@ -62,14 +66,14 @@ def model_schema(additional_properties = False):
                                     The maximum rated engine power as declared by the manufacturer.
                                     Required if Pnorm or FCnorm exists in input-file's or example-map's columns.""")
                             },
-                            "rpm_rated": {
+                            "n_rated": {
                                 "title": "rated engine revolutions (rad/min)",
                                 "$ref": "#/definitions/positiveQuantityOrNumOrNull",
                                 "description": dedent("""\
                                     The engine's revolutions where maximum-power is attained.
                                     Required if RPMnorm exists in input-file's or example-map columns."""),
                             },
-                            "rpm_idle": {
+                            "n_idle": {
                                 "title": "idling revolutions (rad/min)",
                                 "$ref": "#/definitions/positiveQuantityOrNumOrNull",
                                 "description": dedent("""\
@@ -115,9 +119,9 @@ def model_schema(additional_properties = False):
                     }  #engine-props
                 ]
             }, #engine
-            'engine_points':{
+            'measured_eng_points':{
                 "type": "DataFrame"
-            }, #engine_points
+            }, #measured_eng_points
             "params": {
                 "title": "experiment parameters and constants",
                 "type": "object", "additionalProperties": additional_properties,
@@ -332,8 +336,8 @@ def base_model():
         'engine': {
             "fuel":     None,
             "p_max":  None,
-            "rpm_idle":   None,
-            "rpm_rated":  None,
+            "n_idle":   None,
+            "n_rated":  None,
             "stroke":    None,
             "capacity":    None,
             "bore":    None,
@@ -382,11 +386,9 @@ class MergeMode(Enum):
     OVERLAP_HEAD  = 4
     OVERLAP_TAIL  = 5
 
-from collections.abc import Sequence as _seqtype
-from collections.abc import Mapping  as _maptype
 
 def islist(obj):
-    return isinstance(obj, _seqtype) and not isinstance(obj, str)
+    return isinstance(obj, Sequence) and not isinstance(obj, str)
 
 def merge(a, b, path=[], list_merge_mode = MergeMode.REPLACE, raise_struct_mismatches = False):
     ''''Merges b into a.
@@ -406,12 +408,12 @@ def merge(a, b, path=[], list_merge_mode = MergeMode.REPLACE, raise_struct_misma
                 continue # same leaf value
 
             if raise_struct_mismatches:
-                if isinstance(av, _maptype) != isinstance(bv, _maptype):
+                if isinstance(av, Mapping) != isinstance(bv, Mapping):
                     issue_struct_mismatch('Dict', key, av, bv)
                 elif islist(av) != islist(bv):
                     issue_struct_mismatch('List', key, av, bv)
 
-            if isinstance(av, _maptype):
+            if isinstance(av, Mapping):
                 merge(av, bv, path + [str(key)])
                 continue
 
@@ -430,8 +432,144 @@ def merge(a, b, path=[], list_merge_mode = MergeMode.REPLACE, raise_struct_misma
 
 
 
+class JsonPointerException(Exception):
+    pass
+
+
+def jsonpointer_parts(jsonpointer):
+    """
+    Iterates over the ``jsonpointer`` parts.
+
+    :param str jsonpointer: a jsonpointer to resolve within document
+    :return: a generator over the parts of the json-pointer
+
+    :author: Julian Berman, ankostis
+    """
+
+    if jsonpointer:
+        parts = jsonpointer.split(u"/")
+        if parts.pop(0) != '':
+            raise JsonPointerException('Location must starts with /')
+    
+        for part in parts:
+            part = part.replace(u"~1", u"/").replace(u"~0", u"~")
+    
+            yield part
+
+_scream = object()
+def resolve_jsonpointer(doc, jsonpointer, default=_scream):
+    """
+    Resolve a ``jsonpointer`` within the referenced ``doc``.
+    
+    :param doc: the referrant document
+    :param str jsonpointer: a jsonpointer to resolve within document
+    :return: the resolved doc-item or raises :class:`JsonPointerException` 
+
+    :author: Julian Berman, ankostis
+    """
+    for part in jsonpointer_parts(jsonpointer):
+        if isinstance(doc, Sequence):
+            # Array indexes should be turned into integers
+            try:
+                part = int(part)
+            except ValueError:
+                pass
+        try:
+            doc = doc[part]
+        except (TypeError, LookupError):
+            if default is _scream:
+                raise JsonPointerException(
+                    "Unresolvable JSON pointer(%r)@(%s)" % (jsonpointer, part)
+                )
+            else:
+                return default
+        
+    return doc
+
+        
+def set_jsonpointer(doc, jsonpointer, value, object_factory=dict):
+    """
+    Resolve a ``jsonpointer`` within the referenced ``doc``.
+    
+    :param doc: the referrant document
+    :param str jsonpointer: a jsonpointer to the node to modify 
+    :raises: JsonPointerException (if jsonpointer empty, missing, invalid-contet)
+    """
+    
+    
+    parts = list(jsonpointer_parts(jsonpointer))
+        
+    ## Will scream if used on 1st iteration.
+    #
+    pdoc = None
+    ppart = None
+    for i, part in enumerate(parts):
+        if isinstance(doc, Sequence) and not isinstance(doc, str):
+            ## Array indexes should be turned into integers
+            #
+            doclen = len(doc)
+            if part == '-':
+                part = doclen
+            else:
+                try:
+                    part = int(part)
+                except ValueError:
+                    raise JsonPointerException("Expected numeric index(%s) for sequence at (%r)[%i]" % (part, jsonpointer, i))
+                else:
+                    if part > doclen:
+                        raise JsonPointerException("Index(%s) out of bounds(%i) of (%r)[%i]" % (part, doclen, jsonpointer, i))
+        try:
+            ndoc = doc[part]
+        except (LookupError):
+            break  ## Branch-extension needed.
+        except (TypeError): # Maybe indexing a string...
+            ndoc = object_factory()
+            pdoc[ppart] = ndoc
+            doc = ndoc
+            break  ## Branch-extension needed.
+    
+        doc, pdoc, ppart = ndoc, doc, part 
+    else:
+        doc = pdoc # If loop exhuasted, cancel last assignment.
+
+    ## Build branch with value-leaf.
+    #
+    nbranch = value
+    for part2 in reversed(parts[i+1:]):
+        ndoc = object_factory()
+        ndoc[part2] = nbranch
+        nbranch = ndoc
+        
+    ## Attach new-branch. 
+    try:
+        doc[part] = nbranch
+    except IndexError: # Inserting last sequence-element raises IndexError("list assignment index out of range")
+        doc.append(nbranch)
+    
+#    except (IndexError, TypeError) as ex:
+#        #if isinstance(ex, IndexError) or 'list indices must be integers' in str(ex):
+#        raise JsonPointerException("Incompatible content of JSON pointer(%r)@(%s)" % (jsonpointer, part))
+#        else:
+#            doc = {}
+#            parent_doc[parent_part] = doc 
+#            doc[part] = value 
+
+
+
+def ensure_modelpath_Series(mdl, json_path):
+    part = resolve_jsonpointer(mdl, json_path, None)
+    if not isinstance(part, pd.Series):
+        part = pd.Series(part)
+        set_jsonpointer(mdl, json_path, part)
+
+def ensure_modelpath_DataFrame(mdl, json_path):
+    part = resolve_jsonpointer(mdl, json_path, None)
+    if not isinstance(part, pd.Series):
+        part = pd.DataFrame(part) 
+        set_jsonpointer(mdl, json_path, part)
+
+
 
 if __name__ == "__main__":
-    import json
     print("Model: %s" % json.dumps(model_schema(), indent=2))
 

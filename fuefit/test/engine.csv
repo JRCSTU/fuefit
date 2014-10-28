@@ -1,7 +1,7 @@
 fuel,diesel
 p_max,95
-rpm_idle,850
-rpm_rated,150
+n_idle,850
+n_rated,150
 stroke,94.2
 capacity,2000
 bore,
