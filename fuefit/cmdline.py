@@ -1,22 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 #
-# Copyright 2013-2014 ankostis@gmail.com
-#
-# This file is part of fuefit.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, see <http://www.gnu.org/licenses/>.
+# Copyright 2014 European Commission (JRC);
+# Licensed under the EUPL (the 'Licence');
+# You may not use this work except in compliance with the Licence.
+# You may obtain a copy of the Licence at: http://ec.europa.eu/idabc/eupl
 """
 The command-line entry-point for using all functionality of the tool.
 
@@ -47,23 +35,20 @@ import shutil
 import sys
 from textwrap import dedent
 
+from fuefit import model
+from fuefit import processor
+from fuefit._version import __version__ # @UnusedImport
+from fuefit.model import JsonPointerException
+from fuefit.model import json_dump, json_dumps, validate_model
+from fuefit.utils import (str2bool, Lazy, generate_filenames)
 from pandas.core.generic import NDFrame
 
-from fuefit.model import JsonPointerException
 import jsonschema as jsons
 import operator as ops
 import pandas as pd
 
-from . import model
-from . import processor
-from ._version import __version__ # @UnusedImport
-from .model import json_dump, json_dumps, validate_model
-from .utils import (str2bool, Lazy, generate_filenames)
 
-
-
-
-DEBUG   = False
+EBUG   = False
 
 logging.basicConfig(level=logging.DEBUG)
 log     = logging.getLogger(__file__)
@@ -133,7 +118,7 @@ def main(argv=None):
 
     global log, DEBUG
 
-    program_name    = 'fuefitcmd' #os.path.basename(sys.argv[0])
+    program_name    = os.path.basename(sys.argv[0]) #'fuefitcmd'
 
     if argv is None:
         argv = sys.argv[1:]
@@ -235,8 +220,8 @@ def copy_excel_template_files(dest_dir):
     except:
         pass ## Might already exist
     
-    files_to_copy = ['excel\fuefit_excel_runner.xlsm', 'excel\fuefit_excel_runner.py']
-    files_to_copy = [pkg.resource_filename('fuefit', f) for f in files_to_copy] #@UndefinedVariable
+    files_to_copy = ['fuefit_excel_runner.xlsm', 'fuefit_excel_runner.py']
+    files_to_copy = [pkg.resource_filename('fuefit.excel', f) for f in files_to_copy] #@UndefinedVariable
     files_copied = []
     for src_fname in files_to_copy:
         dest_fname = os.path.basename(src_fname)
@@ -537,7 +522,7 @@ class RawTextHelpFormatter(argparse.RawDescriptionHelpFormatter):
 
 
 def build_args_parser(program_name, version, desc, epilog):
-    version_string  = '%%prog %s' % (version)
+    version_string  = '%s' % version
 
     parser = argparse.ArgumentParser(prog=program_name, description=desc, epilog=epilog, add_help=False,
                                      formatter_class=RawTextHelpFormatter)
@@ -571,7 +556,7 @@ def build_args_parser(program_name, version, desc, epilog):
               must either match them, be 1 (meaning, use them for all files), or be totally absent
               (meaning, use defaults for all files).
             * see REMARKS at the bottom regarding the parsing of KEY-VAULE pairs. """),
-                        action='append', nargs='+', required=True,
+                        action='append', nargs='+', 
                         #default=[('- file_frmt=%s model_path=%s'%('CSV', _default_df_dest)).split()],
                         metavar='ARG')
     grp_io.add_argument('-c', '--icolumns', help=dedent("""\

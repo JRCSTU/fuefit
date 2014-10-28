@@ -101,6 +101,7 @@ Just `cd` to the project's folder and enter:
 
     $ pip install --upgrade .                       ## Use `pip3` if both python-2 & 3 installed.
 
+To install for different Python versions, repeat step 3 for every required version.
 
 Particularly for the latest *WinPython* environments (*Windows* / *OS X*) you can install dependencies with: 
 

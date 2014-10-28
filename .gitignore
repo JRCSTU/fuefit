@@ -16,7 +16,6 @@ dist
 build
 eggs
 parts
-bin
 var
 sdist
 /MANIFEST
@@ -44,7 +43,6 @@ nosetests.xml
 ##
 .metadata
 .gradle
-bin/
 tmp/
 *.tmp
 *.bak
@@ -69,3 +67,7 @@ __pycache__/
 
 # TeXlipse plugin
 .texlipse/.settings
+
+fuefit-*.tgz
+fuefit-*.zip
+
