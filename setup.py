@@ -57,8 +57,6 @@ readme_lines = read_text_lines('README.rst')
 
 setup(
     name=projname,
-    packages=[projname],
-#     package_data= {'projname': ['data/*.csv']},
     version=read_project_version('_version.py'),
     description=readme_lines[1],
     long_description='\n'.join(readme_lines),
@@ -89,9 +87,11 @@ setup(
         "Topic :: Scientific/Engineering",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
-    requires=[
+    packages=['fuefit', 'fuefit.test', 'fuefit.excel'],
+#     package_data= {'projname': ['data/*.csv']},
+    include_package_data = True,
+    install_requires=[
         'enum34',
-        'numpy',
         'pandas',
         'xlrd',
         'scipy',
@@ -111,6 +111,7 @@ setup(
         'sphinx_rtd_theme',
         'matplotlib',
     ],
+    zip_safe=True,
     options={
         'build_sphinx' :{
             'build_dir': 'docs/_build',
