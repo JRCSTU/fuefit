@@ -1,34 +1,43 @@
-#################################################################################
-fuefit: Fit fuel-consumption engine-maps on a physical formula with 6 parameters.
-#################################################################################
+#########################################
+*fuefit* fits engine-maps on 6 parameters
+#########################################
 :Release:       |version|
-:Copyright:   2014 European Commission (JRC)
-:License:     AGPL
+:Copyright:     2014 European Commission (`JRC-IET <http://iet.jrc.ec.europa.eu/>`_)
+:License:       `EUPL 1.1+ <https://joinup.ec.europa.eu/software/page/eupl>`_
 
+
+Calculates fitted fuel-maps from measured engine data-points, based on 6 parameters with physical meaning.
+
+
+.. _before-intro:
 
 Introduction
 ============
+
 Overview
 --------
+Fuefit accepts as input data-points for RPM, Power and Fuel-Consumption
+(RPM, Power and Fuel-Consumption or equivalent quantities such as CM, PME/Torque and PMF) 
+and spits-out fitted fuel-maps according to the "normalized" formula [#]_:
 
-Fuefit accepts as input data-points for RPM, Power and Fuel-Consumprtion
-(or equivalent quantities such as CM, PME/Torque and PMF) and spits-out
-fitted fuel-maps according to the "normalized formula [1]_:
+.. math::
 
    (a + b*cm + c*cm**2)*pmf + (a2 + b2*cm)*pmf**2 + loss0 + loss2*cm**2
+
 
 The input and output models are JSON structures build with the help of pandas
 (so specific subtrees can be DataFrames or Series).
 An "execution" or a "run" can be depicted with the following diagram::
 
 
-          .-------------------.                         .-------------------.
-         /        Model      /     ____________        / Model(augmented)  /
-        /-------------------/     |            |      /-------------------/
-       / +--engine         /  ==> | Experiment | ==> / +...              /
-      /  +--engine_points /       |____________|    /  +--engine_map    /
-     /   +--params       /                         /                   /
-    '-------------------'                         '-------------------'
+          .-------------------.                         .--------------------------.
+         /        Model      /     ____________        /     Model(augmented)     /
+        /-------------------/     |            |      /--------------------------/
+       / +--engine         /  ==> | Experiment | ==> / +--engine                /
+      /  +--engine_points /       |____________|    /  | +--fc_map_params      /
+     /   +--params       /                         /   +--engine_map          /
+     /                  /                         /    +--fitted_eng_points  /
+    '------------------'                         '--------------------------'
 
 
 
@@ -40,21 +49,21 @@ use the following commands in a console:
 :Installation: ``$ pip install -r WinPython_requirments.txt -U .``
 :Cmd-line: ``$ fuefitcmd --help`` 
 :Excel: ``$ fuefitcmd --excelrun`` (*Windows*/*OS X* only)
-:Python-code:
+:Python-code: 
     .. code-block:: python
     
-    import pandas as pd
-    from fuefit import model, processor
-    
-    input_model = mdl = model.base_model()
-    input_model.update({...})                                       ## See "Python Usage" for model contents.
-    input_model['engine_points'] = pd.read_csv('measured.csv')      ## Pandas can also read Excel, matlab, ...
-    mdl = model.validate_model(mdl, additional_props) 
-    
-    output_model = processor.run(input_model)
-    
-    print(model.resolve_jsonpointer(output_model, '/engine/fc_map_params'))
-    print(output_model['fitted_eng_points'])
+        import pandas as pd
+        from fuefit import model, processor
+        
+        input_model = mdl = model.base_model()
+        input_model.update({...})                                     ## See "Python Usage" below.
+        input_model['engine_points'] = pd.read_csv('measured.csv')    ## Can also read Excel, matlab, ...
+        mdl = model.validate_model(mdl, additional_props) 
+        
+        output_model = processor.run(input_model)
+        
+        print(model.resolve_jsonpointer(output_model, '/engine/fc_map_params'))
+        print(output_model['fitted_eng_points'])
 
 
 .. Tip:: 
@@ -89,6 +98,7 @@ use the following commands in a console:
         * openssh, curl, wget
 
 
+.. _before-install:
 
 Install
 =======
@@ -101,7 +111,16 @@ Just `cd` to the project's folder and enter:
 
     $ pip install --upgrade .                       ## Use `pip3` if both python-2 & 3 installed.
 
-To install for different Python versions, repeat step 3 for every required version.
+
+Check that installation has worked:
+
+.. code-block:: console
+
+    $ fuefitcmd --version
+    0.0.2
+
+
+To install it for different Python versions, repeat step 3 for every required version.
 
 Particularly for the latest *WinPython* environments (*Windows* / *OS X*) you can install dependencies with: 
 
@@ -130,6 +149,7 @@ in `development mode <http://pythonhosted.org/setuptools/setuptools.html#develop
 
 
 
+.. _before-usage:
 
 Usage
 =====
@@ -144,7 +164,7 @@ To create the necessary template-files in your current-directory you should ente
 
 .. code-block:: console
 
-     $ fuefit --excel
+     $ fuefitcmd --excel
      
 
 You could type instead :samp:`fuefitcmd --excel {file_path}` to specify a different destination path.
@@ -171,18 +191,24 @@ All the above commands creates two files:
     To add more input-columns, you need to set as column *Headers* the *json-pointers* path of the desired 
     model item (see `Python usage`_ below,).
 
-:file:`fuefit_excel_runner.py`   
-    Utility python functions used by the above xls-file for running a batch of experiments.  
-     
+:file:`fuefit_excel_runner{#}.py`   
+    Python functions used by the above xls-file for running a batch of experiments.  
+    
     The particular functions included reads multiple vehicles from the input table with various  
     vehicle characteristics and/or experiment parameters, and then it adds a new worksheet containing 
     the cycle-run of each vehicle . 
     Of course you can edit it to further fit your needs.
 
 
-.. Note:: You may reverse the procedure described above and run the python-script instead.
+.. Note:: You may reverse the procedure described above and run the python-script instead:
+
+    .. code-block:: console
+    
+         $ python fuefit_excel_runner.py
+    
     The script will open the excel-file, run the experiments and add the new sheets, but in case any errors occur, 
-    this time you can debug them, if you had executed the script through *LiClipse*, or *IPython*! 
+    this time you can debug them, if you had executed the script through |liclipse|, or *IPython*! 
+
 
 Some general notes regarding the python-code in excel-cells:
 
@@ -237,6 +263,9 @@ Cmd-line usage
 
 Python usage
 ------------
+Example code:
+
+.. code-block:: pycon
 
     >> from fuefit import model, processor
 
@@ -262,25 +291,52 @@ Python usage
     >> print(output_model['fitted_eng_maps'])
 
 
-For information on the model-data, check the schema::
+For information on the model-data, check the schema:
+
+.. code-block:: pycon
 
     >> print(fuefit.model.model_schema())
 
 
 You can always check the Test-cases and the :mod:`fuefit.cmdline` for sample code.
+You explore documentation in Html by serving it with a web-server:
 
 
 
-Thanks also to
-==============
+.. _before-contribute:
 
-* Giorgos Fontaras for the physics, policy and admin support.
-
-
-
-Footnotes:
+Contribute
 ==========
+[TBD]
 
-.. [1] Bastiaan Zuurendonk, Maarten Steinbuch(2005):
+Development team
+----------------
+
+* Author:
+    * Kostis Anagnostopoulos
+* Contributing Authors:
+    * Giorgos Fontaras for the physics, policy and admin support.
+
+
+
+
+.. _before-indices:
+
+Footnotes
+=========
+
+.. _before-footer:
+
+.. [#] Bastiaan Zuurendonk, Maarten Steinbuch(2005):
         "Advanced Fuel Consumption and Emission Modeling using Willans line scaling techniques for engines",
-        Technische Universiteit Eindhoven, Department Mechanical Engineering, Dynamics and Control Technology Group
+        *Technische Universiteit Eindhoven*, 2005, 
+        Department Mechanical Engineering, Dynamics and Control Technology Group,
+        http://alexandria.tue.nl/repository/books/612441.pdf
+
+        
+.. |virtualenv| replace:: Python, *the* best language around
+.. _virtualenv: http://docs.python-guide.org/en/latest/dev/virtualenvs/
+
+.. |liclipse| replace:: LiClipse
+.. _liclipse: http://www.liclipse.com/
+

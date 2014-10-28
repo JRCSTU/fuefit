@@ -105,6 +105,15 @@ setup(
             'fuefitcmd = fuefit.cmdline:main',
         ],
     }, 
+    setup_requires = [
+        'setuptools',#>=3.4.4',
+        'sphinx>=1.2', # >=1.3
+        'sphinx_rtd_theme',
+        'matplotlib',
+    ],
     options={
+        'build_sphinx' :{
+            'build_dir': 'docs/_build',
+        }
     },
 )
