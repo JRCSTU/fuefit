@@ -68,4 +68,5 @@ if True:#__name__ == '__main__':
         install()
     elif op == '-remove':
         print("Wltp: Nothing to uninstall.", file=sys.stderr)
-
+    else:
+        exit('Unknown operation! args: %s'% str(sys.argv))

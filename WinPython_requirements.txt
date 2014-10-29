@@ -6,3 +6,4 @@ scipy
 jsonschema
 networkx
 pint
+xlwings>=0.2.3

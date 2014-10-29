@@ -53,8 +53,9 @@ Assuming a working python-environment, open a *command-shell* inside the sources
 (ie in *Windows* use :program:`cmd.exe` BUT with with Python in its :envvar:`PATH`)
 and try the following commands 
 
-:Installation:  ``$ pip install -r WinPython_requirments.txt .``    Notice the dot(.) at the end  
-:Excel:         ``$ fuefitcmd --excelrun``                          *Windows*/*OS X* only)
+:Installation:  ``$ pip install fuefit-0.0.2_beta3-py3-none-any.whl``  
+:Start-menu:    ``$ fuefitcmd --winmenu`` 
+:Excel:         ``$ fuefitcmd --excelrun``                          *Windows*/*OS X* only
 :Cmd-line:      ``$ fuefitcmd --help`` 
 :Python-code: 
     .. code-block:: python
@@ -74,17 +75,16 @@ and try the following commands
 
 
 .. Tip::
-    The commands above beginning with ``$`` work on an *unix* like operating system with a *POSIX* shell
-    (*Linux*, *OS X*). If you're using *Windows*, you'll have to run their *windows command shell* counterparts.
-    The same is true for the rest of this documentation.
-
+    The commands above beginning with ``$`` imply a *Unix* like operating system with a *POSIX* shell
+    (*Linux*, *OS X*). If you're using *Windows*, you'll have to run their counterparts
+    in the *windows command shell* :program:`cmd.exe`.
+    
     Although the commands are simple and easy to translate , it would be worthwile to install
-    `cygwin <https://www.cygwin.com/>`_ to get the same environment on *Windows* machines.
-    If you choose to do that, make sure that in the *cygwin*'s installation wizard the following packages
-    are also included::
+    `Cygwin <https://www.cygwin.com/>`_ to get the same environment on *Windows*.
+    If you choose to do that, include also the following packages in the *Cygwin*'s installation wizard::
 
         * git, git-completion
-        * make
+        * make, zip, unzip
         * openssh, curl, wget
 
 .. Tip:: 
@@ -109,14 +109,14 @@ and try the following commands
 
 Install
 =======
-Current |version| runs on Python-3.3+ .
+Current |version| runs on Python-3.3+ and is distributed on `Wheels <https://pypi.python.org/pypi/wheel>`_.
 
-You can install (or upgrade) the project the "standard" way using :command:`pip`.
-Just `cd` to the project's folder and enter:
+You can install (or upgrade) the project the "standard" way by using :command:`pip`.
 
 .. code-block:: console
 
-    $ pip install  .                       ## Use `pip3` if both python-2 & 3 installed.
+    $ pip install fuefit-0.0.2_beta3-py3-none-any.whl           ## Use `pip3` if both python-2 & 3 in PATH.
+
 
 Check that installation has worked:
 
@@ -124,6 +124,12 @@ Check that installation has worked:
 
     $ fuefitcmd --version
     0.0.2.beta2
+
+.. Tip:
+    To debug the installation, you can export a non-empty :envvar:`DISTUTILS_DEBUG` 
+    and *distutils* will print detailed information about what it is doing and/or 
+    print the whole command line when an external program (like a C compiler) fails.
+
 
 You may upgrade all dependencies to their latest version with :option:`--upgrade` (or :option:`-U` equivalently) 
 but then the build might take some considerable time to finish.
@@ -139,8 +145,8 @@ Particularly for the latest *WinPython* environments (*Windows* / *OS X*) you ca
 
 The previous command install dependencies in the system's folders.
 If you want to avoid that (because, for instance, you do not have *admin-rights*), but 
-you do not want to use a |virtualenv|_, you can install dependencies inside the project-folder 
-with this command:
+you do not want to use a `virtualenv <http://docs.python-guide.org/en/latest/dev/virtualenvs/>`_, 
+you can install dependencies inside the project-folder with this command:
 
 .. code-block:: console
 
@@ -215,7 +221,8 @@ All the above commands creates two files:
          $ python fuefit_excel_runner.py
     
     The script will open the excel-file, run the experiments and add the new sheets, but in case any errors occur, 
-    this time you can debug them, if you had executed the script through |liclipse|, or *IPython*! 
+    this time you can debug them, if you had executed the script through `LiClipse <http://www.liclipse.com/>`__, 
+    or *IPython*! 
 
 
 Some general notes regarding the python-code in excel-cells:
@@ -340,11 +347,4 @@ Footnotes
         *Technische Universiteit Eindhoven*, 2005, 
         Department Mechanical Engineering, Dynamics and Control Technology Group,
         http://alexandria.tue.nl/repository/books/612441.pdf
-
-        
-.. |virtualenv| replace:: Python, *the* best language around
-.. _virtualenv: http://docs.python-guide.org/en/latest/dev/virtualenvs/
-
-.. |liclipse| replace:: LiClipse
-.. _liclipse: http://www.liclipse.com/
 

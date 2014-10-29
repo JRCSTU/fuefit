@@ -1,13 +1,11 @@
 treish=HEAD
 ver=`python -m fuefit.cmdline --version | grep .`
-prog="fuefit-$ver"
-echo Arhives: "dist/${prog}.git.XXX"
+prog="fuefit.git-$ver"
+echo Arhives: "dist/${prog}.XXX"
 
-rm -f "dist/${prog}.git.tgz" "dist/${prog}.git.zip"
+rm -f "dist/${prog}.tgz" "dist/${prog}.zip"
 mkdir -p dist
-git archive --prefix=$prog/ --output="dist/${prog}.git.tgz" $treish 
-git archive --prefix=$prog/ --output="dist/${prog}.git.zip" $treish 
+git archive --prefix=$prog/ --output="dist/${prog}.tgz" $treish 
+git archive --prefix=$prog/ --output="dist/${prog}.zip" $treish 
 
-python setup.py sdist 
-python setup.py bdist_win32
-python setup.py bdist_win64
+python setup.py sdist bdist_wheel 

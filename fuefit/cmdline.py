@@ -35,11 +35,11 @@ import shutil
 import sys
 from textwrap import dedent
 
+from pandas.core.generic import NDFrame
+
 from fuefit import model, processor, utils
 from fuefit._version import __version__ # @UnusedImport
 from fuefit.model import (JsonPointerException, json_dump, json_dumps, validate_model)
-from pandas.core.generic import NDFrame
-
 import jsonschema as jsons
 import operator as ops
 import pandas as pd
@@ -153,6 +153,11 @@ def main(argv=None):
             xls_file = files_copied[0]
             
             utils.open_file_with_os(xls_file)
+            return
+        
+        if opts.winmenu:
+            add_windows_shortcuts_to_start_menu()
+            return
         
 
         opts = validate_file_opts(opts)
@@ -224,6 +229,12 @@ def copy_excel_template_files(dest_dir=None):
         files_copied.append(dest_fname)
     
     return files_copied
+
+
+def add_windows_shortcuts_to_start_menu():
+    from win32com.shell import shell, shellcon      #@UnresolvedImport
+    
+    print(shell.SHGetSpecialFolderPath(0, shellcon.CSIDL_STARTMENU))
 
 
 
@@ -627,12 +638,15 @@ def build_args_parser(program_name, version, desc, epilog):
                         #default=[('- file_frmt=%s model_path=%s file_append=%s'%('CSV', _default_df_path[1],  _default_out_file_append)).split()],
                         metavar='ARG')
 
+
     xlusive_group = parser.add_mutually_exclusive_group()
     xlusive_group.add_argument('--gui', help='start GUI to run a single experiment', action='store_true')
     xlusive_group.add_argument('--excel', help="copy `xlwings` excel & python template files into DESTPATH or current-working dir, to run a batch of experiments", 
-        nargs='?', const=None, metavar='DESTPATH')
+        nargs='?', const=os.getcwd(), metavar='DESTPATH')
     xlusive_group.add_argument('--excelrun', help="Copy `xlwings` excel & python template files into USERDIR and open Excel-file, to run a batch of experiments", 
-        nargs='?', const=None, metavar='DESTPATH')
+        nargs='?', const=os.getcwd(), metavar='DESTPATH')
+    xlusive_group.add_argument('--winmenu', help="Adds shortcuts into Windows StartMenu.", action='store_true')
+    #xlusive_group.add_argument('--docs', help="Builds project's html-documentation and opens browser on it.", action='store_true')
     
 
     grp_various = parser.add_argument_group('Various', 'Options controlling various other aspects.')

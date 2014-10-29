@@ -77,6 +77,11 @@ setup(
          "automotive", "vehicle", "vehicles", "car", "cars", "fuel", "consumption",
         "engine", "engine-map", "fitting",
     ],
+    document_names =  {
+        "description": "README.rst",
+        "license": "LICENSE.txt",
+        "changelog": "CHANGES.rst"
+    },
     classifiers=[
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
@@ -97,7 +102,9 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     packages=['fuefit', 'fuefit.test', 'fuefit.excel'],
-#     package_data= {'projname': ['data/*.csv']},
+#    extras_require = {
+#        'Docs':  ['sphinx >= 1.2'],
+#    },
     include_package_data = True,
     install_requires=[
         'enum34',
@@ -107,7 +114,7 @@ setup(
         'jsonschema',
         'networkx',
         'pint',
-        'xlwings',
+        'xlwings>=0.2.3',
     ],
     scripts = ['postinstall.py'],
     entry_points={
@@ -116,12 +123,13 @@ setup(
         ],
     }, 
     setup_requires = [
-        'setuptools',#>=3.4.4',
+        'setuptools',# >= 3.4.4',
+        'setuptools-git >= 0.3',
         'sphinx>=1.2', # >=1.3
         'sphinx_rtd_theme',
         'matplotlib',
     ],
-    zip_safe=True,
+    zip_safe=False,
     options={
         ## DO NOT WORK ...YET :-(
         'bdist_wininst': {
