@@ -7,7 +7,7 @@
 # You may obtain a copy of the Licence at: http://ec.europa.eu/idabc/eupl
 
 import argparse
-import os
+import sys, os
 
 
 ##############
@@ -51,3 +51,17 @@ def generate_filenames(filename):
     while True:
         yield '%s%i%s' % (f, i, e)
         i += 1
+
+
+def open_file_with_os(fpath):
+    ## From http://stackoverflow.com/questions/434597/open-document-with-default-application-in-python
+    #     and http://www.dwheeler.com/essays/open-files-urls.html
+    import subprocess
+    try:
+        os.startfile(fpath)
+    except AttributeError:
+        if sys.platform.startswith('darwin'):
+            subprocess.call(('open', fpath))
+        elif os.name == 'posix':
+            subprocess.call(('xdg-open', fpath))
+    return

@@ -1,12 +1,12 @@
-#########################################
-*fuefit* fits engine-maps on 6 parameters
-#########################################
+################################################
+*fuefit* fits engine-maps on physical parameters
+################################################
 :Release:       |version|
 :Copyright:     2014 European Commission (`JRC-IET <http://iet.jrc.ec.europa.eu/>`_)
 :License:       `EUPL 1.1+ <https://joinup.ec.europa.eu/software/page/eupl>`_
 
-
-Calculates fitted fuel-maps from measured engine data-points, based on 6 parameters with physical meaning.
+The *fuefit* is a python package that calculates fitted fuel-maps from measured engine data-points 
+based on parameters with physical meaning.
 
 
 .. _before-intro:
@@ -16,39 +16,46 @@ Introduction
 
 Overview
 --------
-Fuefit accepts as input data-points for RPM, Power and Fuel-Consumption
+The *Fuefit* calculator accepts engine data-points for as Input,
 (RPM, Power and Fuel-Consumption or equivalent quantities such as CM, PME/Torque and PMF) 
-and spits-out fitted fuel-maps according to the "normalized" formula [#]_:
+and spits-out fitted fuel-maps according to the following formula [#]_:
 
 .. math::
 
    (a + b*cm + c*cm**2)*pmf + (a2 + b2*cm)*pmf**2 + loss0 + loss2*cm**2
 
 
-The input and output models are JSON structures build with the help of pandas
-(so specific subtrees can be DataFrames or Series).
-An "execution" or a "run" can be depicted with the following diagram::
+An "execution" or a "run" of a calculation along with the most important pieces of data 
+are depicted in the following diagram::
 
 
           .-------------------.                         .--------------------------.
-         /        Model      /     ____________        /     Model(augmented)     /
+         /    Input-Model    /     ____________        /       Output-Model       /
         /-------------------/     |            |      /--------------------------/
-       / +--engine         /  ==> | Experiment | ==> / +--engine                /
+       / +--engine         /  ==> | Calculator | ==> / +--engine                /
       /  +--engine_points /       |____________|    /  | +--fc_map_params      /
      /   +--params       /                         /   +--engine_map          /
-     /                  /                         /    +--fitted_eng_points  /
-    '------------------'                         '--------------------------'
+    /                   /                         /    +--fitted_eng_points  /
+   '-------------------'                         '--------------------------'
 
+The *Input & Output Model* are trees of strings and numbers, assembled with:
+
+* sequences,
+* dictionaries,
+* :class:`pandas.DataFrame`,
+* :class:`pandas.Series`, and
+* URI-references to other model-trees (TODO).
 
 
 Quick-start
 -----------
-Assuming a working python-environment, you can `cd` to the downloaded sources of the project and 
-use the following commands in a console:
+Assuming a working python-environment, open a *command-shell* inside the sources of the project 
+(ie in *Windows* use :program:`cmd.exe` BUT with with Python in its :envvar:`PATH`)
+and try the following commands 
 
-:Installation: ``$ pip install -r WinPython_requirments.txt -U .``
-:Cmd-line: ``$ fuefitcmd --help`` 
-:Excel: ``$ fuefitcmd --excelrun`` (*Windows*/*OS X* only)
+:Installation:  ``$ pip install -r WinPython_requirments.txt .``    Notice the dot(.) at the end  
+:Excel:         ``$ fuefitcmd --excelrun``                          *Windows*/*OS X* only)
+:Cmd-line:      ``$ fuefitcmd --help`` 
 :Python-code: 
     .. code-block:: python
     
@@ -65,6 +72,20 @@ use the following commands in a console:
         print(model.resolve_jsonpointer(output_model, '/engine/fc_map_params'))
         print(output_model['fitted_eng_points'])
 
+
+.. Tip::
+    The commands above beginning with ``$`` work on an *unix* like operating system with a *POSIX* shell
+    (*Linux*, *OS X*). If you're using *Windows*, you'll have to run their *windows command shell* counterparts.
+    The same is true for the rest of this documentation.
+
+    Although the commands are simple and easy to translate , it would be worthwile to install
+    `cygwin <https://www.cygwin.com/>`_ to get the same environment on *Windows* machines.
+    If you choose to do that, make sure that in the *cygwin*'s installation wizard the following packages
+    are also included::
+
+        * git, git-completion
+        * make
+        * openssh, curl, wget
 
 .. Tip:: 
     To install *python*, you can try the free (as in beer) distribution
@@ -83,20 +104,6 @@ use the following commands in a console:
       :menuselection:`Start menu --> All Programs --> WinPython --> WinPython ControlPanel`, and then
       :menuselection:`Options --> Register Ditribution`.
       
-.. Tip::
-    The commands above beginning with ``$`` work on an *unix* like operating system with a *POSIX* shell
-    (*Linux*, *OS X*). If you're using *Windows*, you'll have to run their *windows command shell* counterparts.
-    The same is true for the rest of this documentation.
-
-    Although the commands are simple and easy to translate , it would be worthwile to install
-    `cygwin <https://www.cygwin.com/>`_ to get the same environment on *Windows* machines.
-    If you choose to do that, make sure that in the *cygwin*'s installation wizard the following packages
-    are also included::
-
-        * git, git-completion
-        * make
-        * openssh, curl, wget
-
 
 .. _before-install:
 
@@ -109,16 +116,17 @@ Just `cd` to the project's folder and enter:
 
 .. code-block:: console
 
-    $ pip install --upgrade .                       ## Use `pip3` if both python-2 & 3 installed.
-
+    $ pip install  .                       ## Use `pip3` if both python-2 & 3 installed.
 
 Check that installation has worked:
 
 .. code-block:: console
 
     $ fuefitcmd --version
-    0.0.2
+    0.0.2.beta2
 
+You may upgrade all dependencies to their latest version with :option:`--upgrade` (or :option:`-U` equivalently) 
+but then the build might take some considerable time to finish.
 
 To install it for different Python versions, repeat step 3 for every required version.
 

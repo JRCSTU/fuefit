@@ -28,13 +28,22 @@ Tested with Python 3.4.
 
 '''
 
-from distutils.core import setup
-import os
+from distutils.version import StrictVersion
+import sys, os
 
 from setuptools import setup
 
 
-#import py2exe
+## Fail early in ancient python-versions
+#
+py_verinfo = sys.version_info
+py_sver = StrictVersion("%s.%s.%s" % py_verinfo[:3])
+if py_verinfo[0] != 3 or py_sver < StrictVersion("3.3"):
+    exit("Sorry, only Python >= 3.3 is supported!")
+if sys.argv[-1] == 'setup.py':
+    exit("To install, run `python setup.py install`")
+    
+
 projname = 'fuefit'
 mydir = os.path.dirname(__file__)
 
@@ -100,6 +109,7 @@ setup(
         'pint',
         'xlwings',
     ],
+    scripts = ['postinstall.py'],
     entry_points={
         'console_scripts': [
             'fuefitcmd = fuefit.cmdline:main',
@@ -113,6 +123,11 @@ setup(
     ],
     zip_safe=True,
     options={
+        ## DO NOT WORK ...YET :-(
+        'bdist_wininst': {
+            'install_script': "postinstall.py",
+            'user_access_control': "auto",
+        },
         'build_sphinx' :{
             'build_dir': 'docs/_build',
         }

@@ -50,57 +50,57 @@ def model_schema(additional_properties = False):
                             "p_max": {
                                 "title": "maximum rated power",
                                 "$ref": "#/definitions/positiveQuantityOrNumOrNull",
-                                "description": dedent("""\
+                                "description": dedent("""
                                     The maximum rated engine power as declared by the manufacturer.
-                                    Required if Pnorm or FCnorm exists in input-file's or example-map's columns.""")
+                                    Required if `p_norm` or `fc_norm` exists in input-file's or example-map's columns.""")
                             },
                             "n_rated": {
                                 "title": "rated engine revolutions (rad/min)",
                                 "$ref": "#/definitions/positiveQuantityOrNumOrNull",
-                                "description": dedent("""\
+                                "description": dedent("""
                                     The engine's revolutions where maximum-power is attained.
-                                    Required if RPMnorm exists in input-file's or example-map columns."""),
+                                    Required if `n_norm` exists in input-file's or example-map columns."""),
                             },
                             "n_idle": {
                                 "title": "idling revolutions (rad/min)",
                                 "$ref": "#/definitions/positiveQuantityOrNumOrNull",
-                                "description": dedent("""\
+                                "description": dedent("""
                                     The engine's revolutions when idle.
-                                    Required if RPMnorm exists in input-file's or example-map columns."""),
+                                    Required if `n_norm` exists in input-file's or example-map columns."""),
                             },
                             'stroke': {
                                 "title": "piston stroke (mm)",
                                 "$ref": "#/definitions/positiveQuantityOrNumOrNull",
-                                'description': dedent("""\
-                                    The engine's stroke travelling distance.
+                                'description': dedent("""
+                                    The engine's stroke traveling distance.
                                     Required if CM is not among the inputs or requested to generate example-map with RPM column.""")
                             },
                             'capacity': {
                                 "title": "engine capacity (cm^3)",
                                 "$ref": "#/definitions/positiveQuantityOrNumOrNull",
-                                'description': dedent("""\
+                                'description': dedent("""
                                     The total displacement of all engine's pistons.
-                                    This value is ignored' if 'stroke', 'bore' and 'cylinders' are all present.
-                                    Required if PMF is not among the inputs or requested to generate example-map with FC column.""")
+                                    This value is ignored' if `stroke`, `bore` and `cylinders` are all present.
+                                    Required if `pmf` is not among the inputs or requested to generate example-map with `fc` column.""")
                             },
                             'bore': {
                                 "title": "piston bore (mm)",
                                 "$ref": "#/definitions/positiveQuantityOrNumOrNull",
-                                'description': dedent("""\
+                                'description': dedent("""
                                     The piston diameter.
-                                    The 'capacity' is calculated from 'stroke', 'bore' and 'cylinders' when are all present.""")
+                                    The `capacity` is calculated from `stroke`, `bore` and `cylinders` when are all present.""")
                             },
                             'cylinders': {
                                 "title": "number of cylinders (mm)",
                                 "$ref": "#/definitions/positiveIntegerOrNull",
-                                'description': dedent("""\
+                                'description': dedent("""
                                     The number of cyclinders in the engine.
-                                    The 'capacity' is calculated from 'stroke', 'bore' and 'cylinders' when are all present.""")
+                                    The `capacity` is calculated from `stroke`, `bore` and `cylinders` when are all present.""")
                             },
                             'engine_lhv': {
                                 "title": "Fuel's Specific Heat-Value (kjoule/kgr)",
                                 "$ref": "#/definitions/positiveInteger",
-                                'description': dedent("""\
+                                'description': dedent("""
                                     If set, overrides any value that would be selected from params based on 'engine/fuel'. """)
                             },
                         }
@@ -201,7 +201,7 @@ def model_schema(additional_properties = False):
                 "properties": {
                     "$merge": {
                         "enum": ["merge", "replace", "append_head", "append_tail", "overwrite_head", "overwrite_tail"],
-                        "description": dedent("""\
+                        "description": dedent("""
                             merge       := appends any non-existent elements
                             replace     := (default) all items replaced
                         """),
@@ -216,7 +216,7 @@ def model_schema(additional_properties = False):
                 "properties": {
                     "$merge": {
                         "type": "boolean",
-                        "description": dedent("""\
+                        "description": dedent("""
                             true    := (default) merge properties
                             false   := replace properties
                         """),
@@ -229,8 +229,8 @@ def model_schema(additional_properties = False):
                "items": [
                     {
                         "title": "normalized engine revolutions",
-                        "description": dedent("""\
-                            The normalized engine revolutions, within [0.0, 0.15]::
+                        "description": dedent("""
+                            The normalized engine revolutions, within [0.0, 0.15]:
                                 n_norm = (n - n_idle) / (n_rated  - n_idle) """),
                         "type": "array", "additionalItems": False,
                         "maxItems": 360,
@@ -245,9 +245,9 @@ def model_schema(additional_properties = False):
                     },
                     {
                         "title": "normalized full-load power curve",
-                        "description": dedent("""\
+                        "description": dedent("""
                             The normalised values of the full-power load against the p_rated,
-                            within [0, 1]::
+                            within [0, 1]:
                                 p_norm = p / p_rated
                         """),
                         "type": "array", "additionalItems": False,
@@ -262,9 +262,9 @@ def model_schema(additional_properties = False):
                         }
                     },
                 ],
-                "description": dedent("""\
+                "description": dedent("""
                     A 2-dimensional array holding the full load power curve in 2 rows
-                    Example::
+                    Example:
                         [
                             [ 0, 10, 20, 30, 40, 50, 60, 70. 80, 90 100, 110, 120 ],
                             [ 6.11, 21.97, 37.43, 51.05, 62.61, 72.49, 81.13, 88.7, 94.92, 98.99, 100., 96.28, 87.66 ]
