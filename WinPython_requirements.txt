@@ -3,7 +3,7 @@ numpy
 pandas
 xlrd
 scipy
-jsonschema
+jsonschema >= 2.4,
 networkx
 pint
-xlwings>=0.2.3
+xlwings >= 0.2.3

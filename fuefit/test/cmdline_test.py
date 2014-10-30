@@ -16,34 +16,60 @@ from argparse import ArgumentTypeError
 import argparse
 from collections import OrderedDict
 import functools
+import glob
 import io
+import logging
 import os
+import shutil
 import sys
+import tempfile
 import unittest
 
-from fuefit.cmdline import parse_column_specifier
-
-from ..cmdline import (
-    build_args_parser, validate_file_opts, parse_key_value_pair, 
-    parse_many_file_args, assemble_model, 
+from fuefit.__main__ import (
+    build_args_parser, validate_file_opts, parse_key_value_pair,
+    parse_many_file_args, assemble_model,
     validate_model, FileSpec, main, store_model_parts
 )
+from fuefit.__main__ import parse_column_specifier
+
 from ..model import json_dumps, base_model
 from .redirect import redirected # @UnresolvedImport
 
 
+def _init_logging(loglevel):
+    logging.basicConfig(level=loglevel)
+    logging.getLogger().setLevel(level=loglevel)
+
+_init_logging(logging.INFO)
+log = logging.getLogger(__name__)
+
+
+def join_my_path(fname):
+    return os.path.join(os.path.dirname(__file__), fname)
+
+def copy_test_data_files_to_cwd():
+    copy_paths = ['*.xlsx', '*.csv']
+    for path in copy_paths:
+        for f in glob.glob(join_my_path(path)):
+            shutil.copy(f, '.')
+
+
 class TestFuncs(unittest.TestCase):
 
-    def setUp(self):
-        unittest.TestCase.setUp(self)
-        os.chdir(os.path.dirname(os.path.realpath(__file__)))
+    @classmethod
+    def setUpClass(cls):
+        cls.temp_dir = tempfile.TemporaryDirectory()
+        os.chdir(cls.temp_dir.name)
 
+
+    def setUp(self):
         self._test_fnames = ('~temp.csv', '~strange.ext')
         for tfn in self._test_fnames:
             if (not os.path.exists(tfn)):
                 tf = open(tfn, "w")
                 tf.close()
-
+        copy_test_data_files_to_cwd()
+            
         _exit_code = None
         _exit_msg = None
 
@@ -310,7 +336,7 @@ class TestFuncs(unittest.TestCase):
     def testSmoke_BuildModel_model_overrideParse_n_print(self):
         import pandas as pd
 
-        fname = 'test_table.csv'
+        fname = join_my_path('test_table.csv')
         opts = {'m':[[('fuel','diesel')]] }
         filespecs = [
             FileSpec(pd.read_csv, fname, open(fname, 'r'), 'CSV', '/measured_eng_points', None, None, {})
@@ -324,7 +350,7 @@ class TestFuncs(unittest.TestCase):
     def testBuildModel_validate(self):
         import pandas as pd
 
-        fname = 'test_table.csv'
+        fname = join_my_path('test_table.csv')
         model_overrides = [[('fuel','diesel')]]
         filespecs = [
             FileSpec(pd.read_csv, fname, open(fname, 'r'), 'CSV', '/measured_eng_points', None, None, {})
@@ -368,13 +394,24 @@ class TestFuncs(unittest.TestCase):
 
     #def testWriteModelparts_dataframe(self):
 
+    @classmethod
+    def tearDownClass(cls):
+        try:
+            cls.temp_dir.cleanup()
+        except Exception:
+            log.warning('Minor failure while cleaning up!', exc_info=True)
+
 
 class TestMain(unittest.TestCase):
-    def setUp(self):
-        unittest.TestCase.setUp(self)
-        self.held, sys.stdout = sys.stdout, io.StringIO()
-        os.chdir(os.path.dirname(os.path.realpath(__file__)))
+    @classmethod
+    def setUpClass(cls):
+        cls.temp_dir = tempfile.TemporaryDirectory()
+        os.chdir(cls.temp_dir.name)
 
+    def setUp(self):
+        self.held, sys.stdout = sys.stdout, io.StringIO()
+        copy_test_data_files_to_cwd()
+    
     def test_run_main_stdout1(self):
         main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["n","p","fc"]
                 -I engine.csv file_frmt=SERIES model_path=/engine header@=None
@@ -436,9 +473,15 @@ class TestMain(unittest.TestCase):
 
 
     def tearDown(self):
-        unittest.TestCase.tearDown(self)
         self.held, sys.stdout = sys.stdout, self.held
         print(self.held.getvalue())
+
+    @classmethod
+    def tearDownClass(cls):
+        try:
+            cls.temp_dir.cleanup()
+        except Exception:
+            log.warning('Minor failure while cleaning up!', exc_info=True)
 
 if __name__ == "__main__":
     unittest.main()

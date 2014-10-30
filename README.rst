@@ -54,9 +54,9 @@ Assuming a working python-environment, open a *command-shell* inside the sources
 and try the following commands 
 
 :Installation:  ``$ pip install fuefit-0.0.2_beta3-py3-none-any.whl``  
-:Start-menu:    ``$ fuefitcmd --winmenu`` 
-:Excel:         ``$ fuefitcmd --excelrun``                          *Windows*/*OS X* only
-:Cmd-line:      ``$ fuefitcmd --help`` 
+:Start-menu:    ``$ fuefit --winmenu`` 
+:Excel:         ``$ fuefit --excelrun``                          *Windows*/*OS X* only
+:Cmd-line:      ``$ fuefit --help`` 
 :Python-code: 
     .. code-block:: python
     
@@ -122,7 +122,7 @@ Check that installation has worked:
 
 .. code-block:: console
 
-    $ fuefitcmd --version
+    $ fuefit --version
     0.0.2.beta2
 
 .. Tip:
@@ -178,12 +178,12 @@ To create the necessary template-files in your current-directory you should ente
 
 .. code-block:: console
 
-     $ fuefitcmd --excel
+     $ fuefit --excel
      
 
-You could type instead :samp:`fuefitcmd --excel {file_path}` to specify a different destination path.
+You could type instead :samp:`fuefit --excel {file_path}` to specify a different destination path.
 
-In *windows*/*OS X* you can type ``fuefitcmd --excelrun`` and the files will be created in your home-directory 
+In *windows*/*OS X* you can type ``fuefit --excelrun`` and the files will be created in your home-directory 
 and the excel will open them in one-shot.
 
 All the above commands creates two files:
@@ -267,7 +267,7 @@ Some general notes regarding the python-code in excel-cells:
 Cmd-line usage
 --------------
 
-    fuefitcmd -v\
+    fuefit -v\
         -I fuefit/test/FuelFit.xlsx sheetname+=0 header@=None names:='["p","rpm","fc"]' \
         -I fuefit/test/engine.csv file_frmt=SERIES model_path=/engine header@=None \
         -m /engine/fuel=petrol \

@@ -114,26 +114,30 @@ setup(
         'jsonschema',
         'networkx',
         'pint',
-        'xlwings>=0.2.3',
+        'xlwings >= 0.2.3',
     ],
-    scripts = ['postinstall.py'],
-    entry_points={
-        'console_scripts': [
-            'fuefitcmd = fuefit.cmdline:main',
-        ],
-    }, 
     setup_requires = [
         'setuptools',# >= 3.4.4',
         'setuptools-git >= 0.3',
-        'sphinx>=1.2', # >=1.3
+        'sphinx >=1.2', # >=1.3
         'sphinx_rtd_theme',
         'matplotlib',
     ],
+    tests_require = [
+        'nose',
+    ],
+    test_suite='nose.collector',
+    scripts = ['fuefit_postinstall.py'],
+    entry_points={
+        'console_scripts': [
+            'fuefit = fuefit.__main__:main',
+        ],
+    }, 
     zip_safe=False,
     options={
         ## DO NOT WORK ...YET :-(
         'bdist_wininst': {
-            'install_script': "postinstall.py",
+            'install_script': "fuefit_postinstall.py",
             'user_access_control': "auto",
         },
         'build_sphinx' :{

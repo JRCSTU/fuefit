@@ -6,6 +6,11 @@ Changes
 
 Releases
 ========
+v0.0.3, 30-Oct-2014 -- Beta release
+-----------------------------------
+* cmd: Rename fuefitcmd --> fuefit (back again)
+* build: Distribute on Wheels.
+
 
 v0.0.2, 28-Oct-2014 -- Beta release
 -----------------------------------
