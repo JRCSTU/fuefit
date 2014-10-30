@@ -77,11 +77,6 @@ setup(
          "automotive", "vehicle", "vehicles", "car", "cars", "fuel", "consumption",
         "engine", "engine-map", "fitting",
     ],
-    document_names =  {
-        "description": "README.rst",
-        "license": "LICENSE.txt",
-        "changelog": "CHANGES.rst"
-    },
     classifiers=[
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
@@ -127,19 +122,13 @@ setup(
         'nose',
     ],
     test_suite='nose.collector',
-    scripts = ['fuefit_postinstall.py'],
     entry_points={
         'console_scripts': [
-            'fuefit = fuefit.__main__:main',
+            'fuefit          = fuefit.__main__:main',
         ],
-    }, 
+    },
     zip_safe=False,
     options={
-        ## DO NOT WORK ...YET :-(
-        'bdist_wininst': {
-            'install_script': "fuefit_postinstall.py",
-            'user_access_control': "auto",
-        },
         'build_sphinx' :{
             'build_dir': 'docs/_build',
         }

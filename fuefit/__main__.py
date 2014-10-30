@@ -25,8 +25,11 @@ Example
 
 import argparse
 import ast
+from collections import OrderedDict
 import collections
+from distutils.spawn import find_executable
 import functools
+import glob
 import json
 import logging
 import os
@@ -35,24 +38,32 @@ import shutil
 import sys
 from textwrap import dedent
 
-from pandas.core.generic import NDFrame
-
 from fuefit import model, processor, utils
 from fuefit._version import __version__ # @UnusedImport
 from fuefit.model import (JsonPointerException, json_dump, json_dumps, validate_model)
+from pandas.core.generic import NDFrame
+
 import jsonschema as jsons
 import operator as ops
 import pandas as pd
+import pkg_resources as pkg
 
 
 DEBUG   = False
 
-def _init_logging(loglevel):
+def _init_logging(loglevel, name='fuefit-cmd', skip_root_level=False):
     logging.basicConfig(level=loglevel)
-    logging.getLogger().setLevel(level=loglevel)
+    rlog = logging.getLogger()
+    if not skip_root_level:
+        ## Force root-level, in case already configured otherwise.
+        rlog.setLevel(loglevel)
 
-_init_logging(logging.INFO)
-log = logging.getLogger(__name__)
+    log = logging.getLogger(name)
+    
+    return log
+
+    
+log = _init_logging(logging.INFO)
 
 def main(argv=None):
     """Calculates an engine-map by fitting data-points vectors, use --help for gettting help.
@@ -137,10 +148,13 @@ def main(argv=None):
         if (DEBUG or opts.verbose > 1):
             opts.strict = True
 
-        if opts.verbose == 1:
-            log.setLevel(logging.INFO)
+        if opts.verbose >= 2:
+            level = 0
+        elif opts.verbose >= 1:
+            level = logging.DEBUG
         else:
-            log.setLevel(logging.WARNING)
+            level = logging.INFO
+        _init_logging(level, name=program_name)
 
         log.debug("Args: %s\n  +--Opts: %s", argv, opts)
 
@@ -155,8 +169,8 @@ def main(argv=None):
             utils.open_file_with_os(xls_file)
             return
         
-        if opts.winmenu:
-            add_windows_shortcuts_to_start_menu()
+        if opts.winmenus:
+            add_windows_shortcuts_to_start_menu('winmenus')
             return
         
 
@@ -201,8 +215,6 @@ def main(argv=None):
 
 
 def copy_excel_template_files(dest_dir=None):
-    import pkg_resources as pkg
-    
     if not dest_dir == None:
         dest_dir = os.getcwd()
     else:
@@ -231,11 +243,43 @@ def copy_excel_template_files(dest_dir=None):
     return files_copied
 
 
-def add_windows_shortcuts_to_start_menu():
-    from win32com.shell import shell, shellcon      #@UnresolvedImport
+def add_windows_shortcuts_to_start_menu(my_option):
+    my_cmd_name = 'fuefit'
+    my_cmd_path = find_executable(my_cmd_name)
+    if not my_cmd_path:
+        exit("Please properly install the project before running the `--%s` command-option!" % my_option)
+    MY_WIN_GROUP = 'Python Fuefit Calculator'
     
-    print(shell.SHGetSpecialFolderPath(0, shellcon.CSIDL_STARTMENU))
+    wshell = utils.win_wshell()
+    startMenu_dir   = utils.win_folder(wshell, "StartMenu")
+    myDocs_dir      = utils.win_folder(wshell, "MyDocuments")
+    shcuts = OrderedDict([
+        ("Create new ExcelRunner files", {
+            'target_path':  'fuefit',
+            'target_args':  '--excelrun',
+            'wdir':         myDocs_dir,
+            'desc':         'Copy `xlwings` excel & python template files into `MyDocuments` and open the Excel-file, so you can run a batch of experiments.',
+            'icon_path':    pkg.resource_filename('fuefit', 'ExcelPython.ico'),        #@UndefinedVariable
+        }),
+    ])
 
+    ## Create a fresh-new Menu-group.
+    #
+    group_path = os.path.join(startMenu_dir, MY_WIN_GROUP)
+    if os.path.exists(group_path):
+        log.info('Removing old entries from existing StartMenu-group(%s).', MY_WIN_GROUP)
+        try:
+            for f in glob.glob(os.path.join(group_path, '*')):
+                os.unlink(f)
+        except Exception as ex:
+            log.warning('Minor failure while removing previous StartMenu-group: %s', ex)
+
+    os.makedirs(group_path, exist_ok=True)
+    
+    for name, shcut in shcuts.items():
+        path = os.path.join(group_path, '%s.lnk'%name)
+        log.info('Creating StartMenu-item: %s', path)
+        utils.win_create_shortcut(wshell, path, **shcut)
 
 
 ## The value of file_frmt=VALUE to decide which
@@ -245,7 +289,7 @@ def add_windows_shortcuts_to_start_menu():
 _io_file_modes = {'r':0, 'w':1}
 _read_clipboard_methods = (pd.read_clipboard, 'to_clipboard')
 _default_pandas_format  = 'AUTO'
-_pandas_formats = collections.OrderedDict([
+_pandas_formats =   ([
     ('AUTO', None),
     ('CSV', (pd.read_csv, 'to_csv')),
     ('TXT', (pd.read_csv, 'to_csv')),
@@ -645,7 +689,7 @@ def build_args_parser(program_name, version, desc, epilog):
         nargs='?', const=os.getcwd(), metavar='DESTPATH')
     xlusive_group.add_argument('--excelrun', help="Copy `xlwings` excel & python template files into USERDIR and open Excel-file, to run a batch of experiments", 
         nargs='?', const=os.getcwd(), metavar='DESTPATH')
-    xlusive_group.add_argument('--winmenu', help="Adds shortcuts into Windows StartMenu.", action='store_true')
+    xlusive_group.add_argument('--winmenus', help="Adds shortcuts into Windows StartMenu.", action='store_true')
     #xlusive_group.add_argument('--docs', help="Builds project's html-documentation and opens browser on it.", action='store_true')
     
 

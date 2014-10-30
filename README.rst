@@ -53,7 +53,7 @@ Assuming a working python-environment, open a *command-shell* inside the sources
 (ie in *Windows* use :program:`cmd.exe` BUT with with Python in its :envvar:`PATH`)
 and try the following commands 
 
-:Installation:  ``$ pip install fuefit-0.0.2_beta3-py3-none-any.whl``  
+:Installation:  ``$ pip install fuefit-|version|-py3-none-any.whl``  
 :Start-menu:    ``$ fuefit --winmenu`` 
 :Excel:         ``$ fuefit --excelrun``                          *Windows*/*OS X* only
 :Cmd-line:      ``$ fuefit --help`` 
@@ -84,7 +84,7 @@ and try the following commands
     If you choose to do that, include also the following packages in the *Cygwin*'s installation wizard::
 
         * git, git-completion
-        * make, zip, unzip
+        * make, zip, unzip, bzip2
         * openssh, curl, wget
 
 .. Tip:: 
