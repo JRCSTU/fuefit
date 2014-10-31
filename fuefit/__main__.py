@@ -5,22 +5,81 @@
 # Licensed under the EUPL (the 'Licence');
 # You may not use this work except in compliance with the Licence.
 # You may obtain a copy of the Licence at: http://ec.europa.eu/idabc/eupl
-"""
-The command-line entry-point for using all functionality of the tool.
+"""Fits fuel-consumption engine-maps based on parameters with physical meaning.
 
-Example
-=======
+DATA COLUMNS:
+-------------
+The engine-points table at `/engine_points` must contain at least one column 
+from each category below:
 
-    python fuefit \
+1. engine-speed:
+    N        (rad/min)
+    N_norm   (rad/min)  : normalized against N_idle + (N_rated - N_idle)
+    Omega    (rad/sec)
+    CM       (m/sec)    : Mean Piston speed
+2. work-capability:
+    P        (kW)
+    P_norm   (kW)       : normalized against P_MAX
+    T        (Nm)
+    PME      (bar)
+3. fuel-consumption:
+    FC       (g/h)
+    FC_norm  (g/h)      : normalized against P_MAX
+    PMF      (bar)
+    
+EXAMPLES:
+---------
+Assuming a CSV-file 'engine.csv' like this:
+        CM,PME,PMF
+        12,0.14,180
+        ...
+
+    ## Calculate and print fitted engine map's parameters
+    #     for a petrol vehicle with the above engine-point's CSV-table:
+
+    ## ...and if no header existed:
+    $ %(prog)s -m fuel=petrol -I engine.csv header@=None
+
+    ## Assume PME column contained normalized-Power in Watts,
+    #    instead of P in kW:
+    $ %(prog)s -m fuel=petrol -I engine.csv  -irenames X X 'Pnorm (w)'
+
+    ## Read the same table above but without header-row and
+    #    store results into Excel file, 1st sheet:
+    $ %(prog)s -m fuel=petrol -I engine.csv --icolumns CM PME PMF -I engine_map.xlsx sheetname+=0
+
+    ## Supply as inline-json more model-values required for columns [N, P, FC]
+    #    read from <stdin> as json 2D-array of values (no headers).
+    #    and store results in UTF-8 regardless of platform's default encoding:
+    $ %(prog)s -m '/engine:={"fuel":"petrol", "stroke":15, "capacity":1359}' \\
+            -I - file_frmt=JSON orient=values -c N P FC \\
+            -O engine_map.txt encoding=UTF-8
+
+
+Now, if input vectors are in 2 separate files, the 1st, 'engine_1.xlsx',
+having 5 columns with different headers than expected, like this:
+    OTHER1   OTHER2       N        "Fuel waste"   OTHER3
+    0       -1            12       0.14           "some text"
+    ...
+
+and the 2nd having 2 columns with no headers at all and
+the 1st column being 'Pnorm', then it, then use the following command:
+
+    $ %(prog)s -O engine_map -m fuel=petrol \\
+            -I=engine_1.xlsx sheetname+=0 \\
+            -c X   X   N   'Fuel consumption'  X \\
+            -r X   X   N   'FC(g/s)'           X \\
+            -I=engine_2.csv header@=None \\
+            -c Pnorm X
+
+Or to run directly the python-module (ie from sources):
+    $ python fuefit.__main__ \
         -I fuefit/test/FuelFit.xlsx model_path=/measured_eng_points sheetname+=0 header@=None names:='["p","n","fc"]' \
         -I fuefit/test/engine.csv file_frmt=SERIES model_path=/engine header@=None \
         -m /engine/fuel=petrol \
         -O ~t1.csv model_path=/measured_eng_points index?=false \
         -O ~t2.csv model_path=/engine_map index?=false \
         -O ~t.csv model_path= -m /params/plot_maps@=True
-
-.. Seealso::
-    :func:`main()`
 """
 
 import argparse
@@ -50,8 +109,9 @@ import pkg_resources as pkg
 
 
 DEBUG   = False
+PROG    = 'fuefit'
 
-def _init_logging(loglevel, name='fuefit-cmd', skip_root_level=False):
+def _init_logging(loglevel, name=PROG, skip_root_level=False):
     logging.basicConfig(level=loglevel)
     rlog = logging.getLogger()
     if not skip_root_level:
@@ -66,79 +126,43 @@ def _init_logging(loglevel, name='fuefit-cmd', skip_root_level=False):
 log = _init_logging(logging.INFO)
 
 def main(argv=None):
-    """Calculates an engine-map by fitting data-points vectors, use --help for gettting help.
+    """The command-line entry-point for using all functionality of the tool.
+    
+    KEY-VALUE SYNTAX:
+    -----------------
+    - All values are passed as string.  For other types,
+      substitute '=' with:.
+        +=     : integer
+        *=     : float
+        ?=     : boolean
+        :=     : parsed as json
+        @=     : parsed as python (with eval())
+    - Boolean string-values are case insensitive:
+        False  : false, off, no,  == 0
+        True   : true,  on,  yes, != 0
+    - String-values are case-sensitive.
 
-    REMARKS:
-    --------
-        * All string-values are case-sensitive.
-        * Boolean string-values are case insensitive:
-            False  : false, off, no,  == 0
-            True   : true,  on,  yes, != 0
-        * In KEY=VALUE pairs, the values are passed as string.  For other types,
-          substitute '=' with:.
-            +=     : integer
-            *=     : float
-            ?=     : boolean
-            :=     : parsed as json
-            @=     : parsed as python (with eval())
-
-    EXAMPLES:
-    ---------
-    Assuming a CSV-file 'engine.csv' like this:
-            CM,PME,PMF
-            12,0.14,180
-            ...
-
-        ## Calculate and print fitted engine map's parameters
-        #     for a petrol vehicle with the above engine-point's CSV-table:
-
-        ## ...and if no header existed:
-        >> %(prog)s -m fuel=petrol -I engine.csv header@=None
-
-        ## Assume PME column contained normalized-Power in Watts,
-        #    instead of P in kW:
-        >> %(prog)s -m fuel=petrol -I engine.csv  -irenames X X 'Pnorm (w)'
-
-        ## Read the same table above but without header-row and
-        #    store results into Excel file, 1st sheet:
-        >> %(prog)s -m fuel=petrol -I engine.csv --icolumns CM PME PMF -I engine_map.xlsx sheetname+=0
-
-        ## Supply as inline-json more model-values required for columns [RPM, P, FC]
-        #    read from <stdin> as json 2D-array of values (no headers).
-        #    and store results in UTF-8 regardless of platform's default encoding:
-        >> %(prog)s -m '/engine:={"fuel":"petrol", "stroke":15, "capacity":1359}' \\
-                -I - file_frmt=JSON orient=values -c RPM P FC \\
-                -O engine_map.txt encoding=UTF-8
-
-
-    Now, if input vectors are in 2 separate files, the 1st, 'engine_1.xlsx',
-    having 5 columns with different headers than expected, like this:
-        OTHER1   OTHER2       N        "Fuel waste"   OTHER3
-        0       -1            12       0.14           "some text"
-        ...
-
-    and the 2nd having 2 columns with no headers at all and
-    the 1st column being 'Pnorm', then it, then use the following command:
-
-        >> %(prog)s -O engine_map -m fuel=petrol \\
-                -I=engine_1.xlsx sheetname+=0 \\
-                -c X   X   N   'Fuel consumption'  X \\
-                -r X   X   RPM 'FC(g/s)'           X \\
-                -I=engine_2.csv header@=None \\
-                -c Pnorm X
     """
 
     global log, DEBUG
 
-    program_name    = os.path.basename(sys.argv[0])
-
+    ## Try to preserve the name we were called with.
+    #
+    program_name = os.path.basename(sys.argv[0])
+    if program_name.endswith('.py'):
+        program_name = PROG 
+        
     if argv is None:
         argv = sys.argv[1:]
 
+    mod_doc_lines   = globals()['__doc__'].splitlines()
+    mod_desc        = mod_doc_lines[0]
+    mod_epilog      = dedent('\n'.join(mod_doc_lines[1:]))
+    
     doc_lines       = main.__doc__.splitlines()
     desc            = doc_lines[0]
     epilog          = dedent('\n'.join(doc_lines[1:]))
-    parser = build_args_parser(program_name, __version__, desc, epilog)
+    parser = build_args_parser(program_name, __version__, mod_desc, epilog + mod_epilog)
 
     opts = parser.parse_args(argv)
 
@@ -254,7 +278,7 @@ def add_windows_shortcuts_to_start_menu(my_option):
     startMenu_dir   = utils.win_folder(wshell, "StartMenu")
     myDocs_dir      = utils.win_folder(wshell, "MyDocuments")
     shcuts = OrderedDict([
-        ("Create new ExcelRunner files", {
+        ("New Fuefit ExcelRunner files", {
             'target_path':  'fuefit',
             'target_args':  '--excelrun',
             'wdir':         myDocs_dir,
@@ -289,7 +313,7 @@ def add_windows_shortcuts_to_start_menu(my_option):
 _io_file_modes = {'r':0, 'w':1}
 _read_clipboard_methods = (pd.read_clipboard, 'to_clipboard')
 _default_pandas_format  = 'AUTO'
-_pandas_formats =   ([
+_pandas_formats =   OrderedDict([
     ('AUTO', None),
     ('CSV', (pd.read_csv, 'to_csv')),
     ('TXT', (pd.read_csv, 'to_csv')),
@@ -572,79 +596,71 @@ def build_args_parser(program_name, version, desc, epilog):
                                      formatter_class=RawTextHelpFormatter)
 
 
-    grp_io = parser.add_argument_group('Input/Output', 'Options controlling reading/writting of file(s) and for specifying model values.')
-    grp_io.add_argument('-I', help=dedent("""\
-            import file(s) into the model utilizing pandas-IO methods, see
+    grp_io = parser.add_argument_group('Input/Output', 'Options for reading/writing of file(s) and accessing model values.')
+    grp_io.add_argument('-I', help=dedent("""
+            import file(s) into model using pandas-IO methods, see:
                 http://pandas.pydata.org/pandas-docs/stable/io.html
-            Default: %(default)s]
-            * The syntax of this option is like this:
+            The syntax of this option is like this:
                     FILENAME [KEY=VALUE ...]]
-            * The FILENAME can be '-' to designate <stdin> or '+' to designate CLIPBOARD.
-            * Any KEY-VALUE pairs pass directly to pandas.read_XXX() options,
-              except from the following keys, which are consumed before reaching pandas:
-                ** file_frmt = [ AUTO | CSV | TXT | XLS | JSON | SERIES ]
-                  selects which pandas.read_XXX() method to use:
-                    *** AUTO: the format is deduced from the filename's extension (ie Excel files).
-                    *** JSON: different sub-formats are selected through the 'orient' keyword
-                      of Pandas specified with a key-value pair
-                      (see: http://pandas.pydata.org/pandas-docs/dev/generated/pandas.io.json.read_json.html).
-                    *** SERIES: uses `pd.Series.from_csv()`.
-                    *** Defaults to AUTO, unless reading <stdin> or <clipboard>, which then is CSV.
-                ** model_path = MODEL_PATH
-                  specifies the destination (or source) of the dataframe within the model
-                  as json-pointer path (see -m option).
-                  If many input-files have the same --model_path, the dataframes are
-                  concatenated horizontally, therefore the number of rows (excluding header)
-                  for all those data-files must be equal.
-            * When multiple input-files given, the number of --icolumns and --irenames options,
-              must either match them, be 1 (meaning, use them for all files), or be totally absent
-              (meaning, use defaults for all files).
-            * see REMARKS at the bottom regarding the parsing of KEY-VAULE pairs. """),
+            Where:
+            
+            - FILENAME: '-' designates <stdin>, 
+                        '+' designates <clipboard>.
+            - KEY-VALUE: send as keywords to pandas.read_XXX()
+              except from the following:
+              - file_frmt=(AUTO|CSV|TXT|XLS|JSON|SERIES):
+                Selects which `pandas.read_XXX()` method to use:
+                - AUTO: deduced from the filename's extension.
+                - JSON: `read_json()` sub-formats selected with 
+                - SERIES: uses `pd.Series.from_csv()`.
+                  'orient' key-value pair, see: 
+                     http://pandas.pydata.org/pandas-docs/dev/generated/pandas.io.json.read_json.html
+                - Defaults to AUTO, or CSV for <stdin> <clipboard>
+              - model_path=/some/path:
+                Specifies destination of file-data within the model
+                using "json-pointer" paths (see -m option).
+                If many input-files have the same `model_path`, 
+                dataframes are concatenated horizontally, therefore
+                the number of rows (excluding header) for all files
+                must be equal.
+            - When multiple input-files given, the number of 
+              --icolumns and --irenames options must either:
+                - match them in count, 
+                - exist only one (meaning, use this for all files),
+                - or be totally absent.
+            - see REMARKS below regarding the parsing of VALUEs."""),
                         action='append', nargs='+', 
                         #default=[('- file_frmt=%s model_path=%s'%('CSV', _default_df_dest)).split()],
                         metavar='ARG')
-    grp_io.add_argument('-c', '--icolumns', help=dedent("""\
-            describes the columns-contents of input file(s) along with their units (see --I).
-            It must be followed either by an integer denoting the index of the header-row
-            within the tabular data, or by a list of column-names specifications,
-            obeying the following syntax:
-                COL_NAME [(UNITS)]
-            Accepted quantities and their default units are grouped in 3+1 quantity-types and
-            for each file exactly one from each of the 3 first categories must be present:
-            1. engine-speed:
-                RPM      (rad/min)
-                RPMnorm  (rad/min)  : normalized against RPMnorm * RPM_IDLE + (RPM_RATED - RPM_IDLE)
-                Omega    (rad/sec)
-                CM       (m/sec)    : Mean Piston speed
-            2. work-capability:
-                P        (kW)
-                Pnorm    (kW)       : normalized against P_MAX
-                T        (Nm)
-                PME      (bar)
-            3. fuel-consumption:
-                FC       (g/h)
-                FCnorm   (g/h)      : normalized against P_MAX
-                PMF      (bar)
-            4. Irellevant column:
-                X
-            Default when files include headers is 0 (1st row), otherwise it is 'RPM,P,FC'."""),
+    grp_io.add_argument('-c', '--icolumns', help=dedent("""
+            describes the columns-contents of input file(s) along 
+            with their units (see --I).
+            - COLUMN_SPEC can either be:
+              - the row-index of the header within the tabular data,
+              - a comma-separated list of column specifications, 
+                where each part obeys the following syntax:
+                  COL_NAME [(UNITS)]
+              - For irrelevant columns, just use `X`.
+            - Default: 0 (1st row) when files include headers, 
+              otherwise, it is application-specific."""),
                         action='append', nargs='+',
                         type=parse_column_specifier, metavar='COLUMN_SPEC')
-    grp_io.add_argument('-r', '--irenames', help=dedent("""\
+    grp_io.add_argument('-r', '--irenames', help=dedent("""
             renames the columns of input-file(s)  (see --I).
-            It must be followed by a list of column-names specifications like --icolumns,
-            but without accepting integers.
-            The number of renamed-columns for each input-file must be equal or less
-            than those in the --icolumns for the respective inpute-file.
-            Use '_' for columns to be left intact."""),
+            - COLUMN_SPEC is like --icolumns, but does not 
+              accept integers.
+            - The number of renamed-columns for each input-file 
+              must be equal or less than those in the --icolumns 
+              for the respective inpute-file.
+              Use '_' for columns to be left intact."""),
                         action='append', nargs='*',
                         type=parse_column_specifier, metavar='COLUMN_SPEC')
-    grp_io.add_argument('-m', help=dedent("""\
+    grp_io.add_argument('-m', help=dedent("""
             override a model value.
-            * The MODEL_PATH is a json-pointer absolute or relative path, see:
+            - MODEL_PATH: json-pointer absolute or relative path:
                     https://python-json-pointer.readthedocs.org/en/latest/tutorial.html
-              Relative paths are resolved against '/engine', for instance:
-                    -Mn_idle=850   -M/engine/p_max=660
+              Relative paths are resolved against '/engine':
+                    -Mn_idle=850  -M/engine/p_max=660
               would set the following model's property:
                     {
                       "engine": {
@@ -653,54 +669,63 @@ def build_args_parser(program_name, version, desc, epilog):
                           ...
                       }
                     }
-            * Any values from -m options are applied AFTER any files read by -I option.
-            * See REMARKS below for the parsing of KEY-VAULE pairs.
+            - Values from -m options are applied AFTER any files 
+              have been read by -I option.
+            - See REMARKS below for the parsing of KEY-VAULE pairs.
             """),
                         action='append', nargs='+',
                         type=parse_key_value_pair, metavar='MODEL_PATH=VALUE')
-    grp_io.add_argument('--strict', help=dedent("""\
-            validate model more strictly, ie no additional-properties allowed.
+    grp_io.add_argument('--strict', help=dedent("""
+            more strict model validation, ie additional-properties 
+            are not allowed.
             [default: %(default)s]"""),
             default=False, type=utils.str2bool,
             metavar='[TRUE | FALSE]')
-    grp_io.add_argument('-M', help=dedent("""\
+    grp_io.add_argument('-M', help=dedent("""
             get help description for the specfied model path.
             If no path specified, gets the default model-base. """),
                         action='append', nargs='*',
                         type=parse_key_value_pair, metavar='MODEL_PATH')
 
 
-    grp_io.add_argument('-O', help=dedent("""\
-            specifies output-file(s) to write model-portions into after calculations.
-            The syntax is indentical to -I, with these differences:
-            * Instead of <stdin>, <stdout> and write_XXX() methods are used wherever.
-            * One extra key-value pair:
-            ** file_append = [ TRUE | FALSE ]
-                    specify whether to augment pre-existing files, or overwrite them.
-            * Default: - file_frmt=CSV model_path=/engine_map """),
+#            - Instead of <stdin>, <stdout> and write_XXX() methods are used wherever.
+    grp_io.add_argument('-O', help=dedent("""
+            specifies the file(s) to write output-model 's parts.
+            - The syntax is indentical to -I, with one extra 
+              key-value pair:
+              - file_append = [ TRUE | FALSE ]
+                whether to append or overwrite pre-existing files.
+              - Default: - file_frmt=CSV model_path=/engine_map """),
                         action='append', nargs='+',
                         #default=[('- file_frmt=%s model_path=%s file_append=%s'%('CSV', _default_df_path[1],  _default_out_file_append)).split()],
                         metavar='ARG')
 
 
     xlusive_group = parser.add_mutually_exclusive_group()
-    xlusive_group.add_argument('--gui', help='start GUI to run a single experiment', action='store_true')
-    xlusive_group.add_argument('--excel', help="copy `xlwings` excel & python template files into DESTPATH or current-working dir, to run a batch of experiments", 
+    xlusive_group.add_argument('--gui', help="start GUI to run a single experiment", action='store_true')
+    xlusive_group.add_argument('--excel', help=dedent("""
+            copies ExcelRunner template files into DESTPATH
+            (or <current-working-directory> if DESTPATH missing). 
+        """), 
         nargs='?', const=os.getcwd(), metavar='DESTPATH')
-    xlusive_group.add_argument('--excelrun', help="Copy `xlwings` excel & python template files into USERDIR and open Excel-file, to run a batch of experiments", 
+    xlusive_group.add_argument('--excelrun', help=dedent("""
+            copies ExcelRunner template files into DESTPATH 
+            (or <current-working-directory> if DESTPATH missing), 
+            and opens the new Excel-file.
+        """), 
         nargs='?', const=os.getcwd(), metavar='DESTPATH')
     xlusive_group.add_argument('--winmenus', help="Adds shortcuts into Windows StartMenu.", action='store_true')
     #xlusive_group.add_argument('--docs', help="Builds project's html-documentation and opens browser on it.", action='store_true')
     
 
     grp_various = parser.add_argument_group('Various', 'Options controlling various other aspects.')
-    grp_various.add_argument('-d', "--debug", action="store_true", help=dedent("""\
+    grp_various.add_argument('-d', "--debug", action="store_true", help=dedent("""
             set debug-mode with various checks and error-traces
-            Suggested combining with --verbose counter-flag.
+            Try to combine it with --verbose counter-flag.
             Implies --strict true
             [default: %(default)s] """),
                         default=False)
-    grp_various.add_argument('-v', "--verbose", action="count", default=0, help="set verbosity level [default: %(default)s]")
+    grp_various.add_argument('-v', "--verbose", action="count", default=0, help="increase verbosity level: DEBUG --> ALL\n[default: %(default)s]")
     grp_various.add_argument("--version", action="version", version=version_string, help="prints version identifier of the program")
     grp_various.add_argument("--help", action="help", help='show this help message and exit')
 

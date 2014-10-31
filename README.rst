@@ -49,14 +49,27 @@ The *Input & Output Model* are trees of strings and numbers, assembled with:
 
 Quick-start
 -----------
-Assuming a working python-environment, open a *command-shell* inside the sources of the project 
-(ie in *Windows* use :program:`cmd.exe` BUT with with Python in its :envvar:`PATH`)
-and try the following commands 
+Assuming a working python-environment, open a *command-shell* (ie in *Windows* use :program:`cmd.exe` BUT 
+with :program:`python.exe` in its :envvar:`PATH`) and try the following commands 
 
 :Installation:  ``$ pip install fuefit-|version|-py3-none-any.whl``  
 :Start-menu:    ``$ fuefit --winmenu`` 
-:Excel:         ``$ fuefit --excelrun``                          *Windows*/*OS X* only
-:Cmd-line:      ``$ fuefit --help`` 
+:Excel:         ``$ fuefit --excelrun                             ## Windows & OS X only``
+:Cmd-line:
+    .. code-block:: console
+
+        $ fuefit --help
+        ...
+        
+        ## Change-directory into the `fuefit/test/` folder in the  *sources*.
+        $ fuefit -I FuelFit_real.csv header+=0 \
+            --irenames n_norm _ fc_norm \
+            -I engine.csv file_frmt=SERIES model_path=/engine header@=None \
+            --irenames \
+            -m /engine/fuel=petrol \
+            -O - model_path=/engine/fc_map_params \
+            -m /params/plot_maps@=True
+
 :Python-code: 
     .. code-block:: python
     
@@ -64,22 +77,24 @@ and try the following commands
         from fuefit import model, processor
         
         input_model = mdl = model.base_model()
-        input_model.update({...})                                     ## See "Python Usage" below.
-        input_model['engine_points'] = pd.read_csv('measured.csv')    ## Can also read Excel, matlab, ...
+        input_model.update({...})                                   ## See "Python Usage" below.
+        input_model['engine_points'] = pd.read_csv('measured.csv')  ## Can also read Excel, matlab, ...
         mdl = model.validate_model(mdl, additional_props) 
         
         output_model = processor.run(input_model)
         
         print(model.resolve_jsonpointer(output_model, '/engine/fc_map_params'))
         print(output_model['fitted_eng_points'])
+:Documentation:  
+    .. code-block:: console
 
+        ## Change-directory into the *sources* folder.
+        $ python setup.py build_sphinx
+        ## Open file: ./Docs/_build/html/index.html
 
 .. Tip::
-    The commands above beginning with ``$`` imply a *Unix* like operating system with a *POSIX* shell
-    (*Linux*, *OS X*). If you're using *Windows*, you'll have to run their counterparts
-    in the *windows command shell* :program:`cmd.exe`.
-    
-    Although the commands are simple and easy to translate , it would be worthwile to install
+    The commands beginning with ``$``, above, imply a *Unix* like operating system with a *POSIX* shell
+    (*Linux*, *OS X*). Although the commands are simple and easy to translate , it would be worthwile to install
     `Cygwin <https://www.cygwin.com/>`_ to get the same environment on *Windows*.
     If you choose to do that, include also the following packages in the *Cygwin*'s installation wizard::
 

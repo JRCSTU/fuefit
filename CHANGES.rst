@@ -6,11 +6,11 @@ Changes
 
 Releases
 ========
-v0.0.3, 30-Oct-2014 -- Beta release
+v0.0.3, 31-Oct-2014 -- Beta release
 -----------------------------------
 * cmd: Rename fuefitcmd --> fuefit (back again)
-* build: Distribute on Wheels.
-
+* cmd: Add StartMenu item in *Windows*.
+* build: Distribute on Wheels and Docs-archive.
 
 v0.0.2, 28-Oct-2014 -- Beta release
 -----------------------------------

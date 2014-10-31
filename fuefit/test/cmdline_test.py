@@ -467,6 +467,7 @@ class TestMain(unittest.TestCase):
               --irenames
             -m /engine/fuel=petrol
             -O - model_path=/engine_map index?=false
+            -O - model_path=/engine/fc_map_params
             -m /params/plot_maps@=False
         '''.split())
 
