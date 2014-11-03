@@ -6,8 +6,10 @@ Changes
 
 Releases
 ========
-v0.0.3, 31-Oct-2014 -- 1st public (beta) release
+v0.0.3, xx-Noe-2014 -- 1st public (beta) release
 ------------------------------------------------
+* TODO: ci: Use Travisci Continuous integration to check project health.
+* excel: Enhance excel-runner code to support any python-code. 
 * cmd: Rename fuefitcmd --> fuefit (back again)
 * cmd: Add StartMenu item in *Windows*.
 * build: Distribute on Wheels and Docs-archive.

@@ -61,7 +61,8 @@ with :program:`python.exe` in its :envvar:`PATH`) and try the following commands
     .. code-block:: console
 
         $ fuefit --version
-        0.0.3-beta.1
+        0.0.3-beta.2
+        
         $ fuefit --help
         ...
         
@@ -131,7 +132,7 @@ You can install (or upgrade) the project from the `PyPi` repo using the "standar
 
 .. code-block:: console
 
-    $ pip install fuefit --pre                                  ## Use `pip3` if both python-2 & 3 in PATH.
+    $ pip install fuefit                                        ## Use `pip3` if both python-2 & 3 in PATH.
 
 
 Check that installation has worked:
@@ -139,7 +140,8 @@ Check that installation has worked:
 .. code-block:: console
 
     $ fuefit --version
-    0.0.3.beta.1
+    0.0.3-beta.2
+        
 
 .. Tip:
     To debug the installation, you can export a non-empty :envvar:`DISTUTILS_DEBUG` 

@@ -4,5 +4,5 @@
 # You may not use this work except in compliance with the Licence.
 # You may obtain a copy of the Licence at: http://ec.europa.eu/idabc/eupl
 ## Authoritative project's version-info
-__version__ = "0.0.3-beta.1"
-__updated__ = "2014-11-03 15:22:39"
+__version__ = "0.0.3-beta.2"
+__updated__ = "2014-11-03 20:09:13"

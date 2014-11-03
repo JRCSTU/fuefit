@@ -133,7 +133,7 @@ setup(
     author="Kostis Anagnostopoulos @ European Commission (JRC)",
     author_email="ankostis@gmail.com",
     url="https://github.com/ankostis/fuefit",
-    download_url = download_url,
+    download_url=download_url,
     license = "European Union Public Licence 1.1 or later (EUPL 1.1+)",
     keywords = [
          "automotive", "vehicle", "vehicles", "car", "cars", "fuel", "consumption",
