@@ -92,6 +92,7 @@ def yield_sphinx_only_markup(lines):
         (r'\.\. seealso',           r'info'),
         (r'\.\. glossary',          r'rubric'),
         (r'\.\. figure::',          r'.. '),
+        (r'\.\. image::',          r'.. '),
 
 
         ## Other

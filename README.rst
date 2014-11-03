@@ -61,7 +61,7 @@ with :program:`python.exe` in its :envvar:`PATH`) and try the following commands
     .. code-block:: console
 
         $ fuefit --version
-        0.0.3-beta.2
+        0.0.3-beta.3
         
         $ fuefit --help
         ...
@@ -140,7 +140,7 @@ Check that installation has worked:
 .. code-block:: console
 
     $ fuefit --version
-    0.0.3-beta.2
+    0.0.3-beta.3
         
 
 .. Tip:
@@ -206,13 +206,13 @@ and the excel will open them in one-shot.
 
 All the above commands creates two files:
 
-:file:`fuefit_excel_runner.xlsm`
+:file:`fuefit_excel_runner{#}.xlsm`
     The python-enabled excel-file where input and output data are written, as seen in the screenshot below:
     
     .. image:: docs/xlwings_screenshot.png
         :scale: 50%
         :alt: Screenshot of the `fuefit_excel_runner.xlsm` file.
-        
+    
     After opening it the first tie, enable the macros on the workbook, select the python-code at the left and click 
     the :menuselection:`Run Selection as Pyhon` button; one sheet per vehicle should be created.
 
@@ -284,6 +284,7 @@ Some general notes regarding the python-code in excel-cells:
 
 Cmd-line usage
 --------------
+Example command::
 
     fuefit -v\
         -I fuefit/test/FuelFit.xlsx sheetname+=0 header@=None names:='["p","rpm","fc"]' \
@@ -340,7 +341,7 @@ You explore documentation in Html by serving it with a web-server:
 
 Contribute
 ==========
-[TBD]
+sad [TBD]
 
 Development team
 ----------------
