@@ -83,7 +83,6 @@ Or to run directly the python-module (ie from sources):
 """
 
 import argparse
-import ast
 from collections import OrderedDict
 import collections
 from distutils.spawn import find_executable
@@ -98,7 +97,7 @@ import sys
 from textwrap import dedent
 
 from fuefit import model, processor, utils
-from fuefit._version import __version__ # @UnusedImport
+from fuefit._version import __version__ as prog_ver# @UnusedImport
 from fuefit.model import (JsonPointerException, json_dump, json_dumps, validate_model)
 from pandas.core.generic import NDFrame
 
@@ -111,7 +110,7 @@ import pkg_resources as pkg
 DEBUG   = False
 PROG    = 'fuefit'
 
-def _init_logging(loglevel, name=PROG, skip_root_level=False):
+def _init_logging(loglevel, name='%s-cmd'%PROG, skip_root_level=False):
     logging.basicConfig(level=loglevel)
     rlog = logging.getLogger()
     if not skip_root_level:
@@ -160,9 +159,9 @@ def main(argv=None):
     mod_epilog      = dedent('\n'.join(mod_doc_lines[1:]))
     
     doc_lines       = main.__doc__.splitlines()
-    desc            = doc_lines[0]
+    desc            = doc_lines[0]    #@UnusedVariable 1st pandel-doc-line ignored
     epilog          = dedent('\n'.join(doc_lines[1:]))
-    parser = build_args_parser(program_name, __version__, mod_desc, epilog + mod_epilog)
+    parser = build_args_parser(program_name, prog_ver, mod_desc, epilog + mod_epilog)
 
     opts = parser.parse_args(argv)
 
@@ -268,42 +267,88 @@ def copy_excel_template_files(dest_dir=None):
 
 
 def add_windows_shortcuts_to_start_menu(my_option):
+    if sys.platform != 'win32':
+        exit('This options can run only under *Windows*!')
     my_cmd_name = 'fuefit'
     my_cmd_path = find_executable(my_cmd_name)
     if not my_cmd_path:
         exit("Please properly install the project before running the `--%s` command-option!" % my_option)
-    MY_WIN_GROUP = 'Python Fuefit Calculator'
+        
+    win_menu_group = 'Python Fuefit Calculator'
     
     wshell = utils.win_wshell()
     startMenu_dir   = utils.win_folder(wshell, "StartMenu")
     myDocs_dir      = utils.win_folder(wshell, "MyDocuments")
+    docs_url        = 'http://fuefit.readthedocs.org/'
+    prog_dir        = os.path.join(myDocs_dir, '%s_%s'%(PROG, prog_ver))
     shcuts = OrderedDict([
-        ("New Fuefit ExcelRunner files", {
+        ("Fuefit Demo folder.lnk", {
+            'target_path':  prog_dir,
+            'desc':         'Folder containing python and cmd-line test files: %s' % prog_dir,
+        }),
+        ("Create new Fuefit ExcelRunner files.lnk", {
             'target_path':  'fuefit',
             'target_args':  '--excelrun',
-            'wdir':         myDocs_dir,
+            'wdir':         prog_dir,
             'desc':         'Copy `xlwings` excel & python template files into `MyDocuments` and open the Excel-file, so you can run a batch of experiments.',
-            'icon_path':    pkg.resource_filename('fuefit', 'ExcelPython.ico'),        #@UndefinedVariable
+            'icon_path':    pkg.resource_filename('fuefit.excel', 'ExcelPython.ico'),        #@UndefinedVariable
+        }),
+        ("Fuefit Documentation site.url", {
+            'target_path':  docs_url,
         }),
     ])
 
+
+    try:
+        os.makedirs(prog_dir, exist_ok=True)
+    except Exception as ex:
+        log.error('Failed creating Program-folder(%s) due to: %s', prog_dir, ex, exc_info=1)
+        exit(-5)
+    
+    ## Copy Demos.
+    #
+    demo_dir = pkg.resource_filename('fuefit', 'test')                     #@UndefinedVariable
+    demo_files =['*.csv', '*.xls?', '*.bat', 'engine.py', 'cmdline_test.py']
+    for g in demo_files:
+        for src_f in glob.glob(os.path.join(demo_dir, g)):
+            f = os.path.basename(src_f)
+            dest_f = os.path.join(prog_dir, f)
+            if os.path.exists(dest_f):
+                log.debug('Removing previous entry(%s) from existing Program-folder(%s).', f, prog_dir)
+                try:
+                    os.unlink(dest_f)
+                except Exception as ex:
+                    log.error('Cannot clear existing item(%s) from Program-folder(%s) due to: %s', dest_f, prog_dir, ex)
+                    
+            try:
+                shutil.copy(src_f, dest_f)
+            except Exception as ex:
+                log.error('Failed copying item(%s) in program folder(%s): %s', src_f, prog_dir, ex, exc_info=1)
+
     ## Create a fresh-new Menu-group.
     #
-    group_path = os.path.join(startMenu_dir, MY_WIN_GROUP)
+    group_path = os.path.join(startMenu_dir, win_menu_group)
     if os.path.exists(group_path):
-        log.info('Removing old entries from existing StartMenu-group(%s).', MY_WIN_GROUP)
-        try:
-            for f in glob.glob(os.path.join(group_path, '*')):
+        log.debug('Removing all entries from existing StartMenu-group(%s).', win_menu_group)
+        for f in glob.glob(os.path.join(group_path, '*')):
+            try:
                 os.unlink(f)
-        except Exception as ex:
-            log.warning('Minor failure while removing previous StartMenu-group: %s', ex)
+            except Exception as ex:
+                log.warning('Minor failure while removing previous StartMenu-item(%s): %s', f, ex)
 
-    os.makedirs(group_path, exist_ok=True)
+    try:
+        os.makedirs(group_path, exist_ok=True)
+    except Exception as ex:
+        log.error('Failed creating StarMenu-group(%s) due to: %s', group_path, ex, exc_info=1)
+        exit(-6)
     
     for name, shcut in shcuts.items():
-        path = os.path.join(group_path, '%s.lnk'%name)
+        path = os.path.join(group_path, name)
         log.info('Creating StartMenu-item: %s', path)
-        utils.win_create_shortcut(wshell, path, **shcut)
+        try:
+            utils.win_create_shortcut(wshell, path, **shcut)
+        except Exception as ex:
+            log.error('Failed creating item(%s) in StartMenu-group(%s): %s', path, win_menu_group , ex, exc_info=1)
 
 
 ## The value of file_frmt=VALUE to decide which

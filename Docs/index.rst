@@ -3,7 +3,6 @@
 
 .. toctree::
     :numbered:
-    :maxdepth: 3
 
     intro
     install

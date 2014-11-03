@@ -12,7 +12,6 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import re
 import sys, os, io
 
 
@@ -56,8 +55,7 @@ if on_rtd:
             else:
                 return Mock()
 
-    MOCK_MODULES = [
-    ]
+    MOCK_MODULES = ['matplotlib', 'matplotlib.sphinxext', 'matplotlib.sphinxext.plot_directive']
     sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 ## Trick from https://github.com/rjw57/dtcwt/blob/0.9.0/docs/conf.py

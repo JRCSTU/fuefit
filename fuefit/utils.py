@@ -7,7 +7,6 @@
 # You may obtain a copy of the Licence at: http://ec.europa.eu/idabc/eupl
 
 import argparse
-import operator
 import sys, os
 
 
@@ -102,14 +101,19 @@ def win_create_shortcut(wshell, path, target_path, wdir=None, target_args=None, 
     :param wshell: win32com.client.Dispatch('WScript.Shell')
 
     """
+    
+    is_url = path.lower().endswith('.url')
     shcut = wshell.CreateShortCut(path)
     try:
         shcut.Targetpath = target_path
-        shcut.Arguments = target_args
-        shcut.Description = desc
-        shcut.WorkingDirectory = wdir
         if icon_path:
             shcut.IconLocation = icon_path
+        if desc:
+            shcut.Description = desc
+        if target_args:
+            shcut.Arguments = target_args
+        if wdir:
+            shcut.WorkingDirectory = wdir
     finally:
         shcut.save()
 

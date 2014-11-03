@@ -1,12 +1,16 @@
 ################################################
 *fuefit* fits engine-maps on physical parameters
 ################################################
+|dev-status| |docs-status| |pypi-status| |downloads-count| |github-issues|
+
 :Release:       |version|
+:Home:          https://github.com/ankostis/fuefit
+:Documentation: https://fuefit.readthedocs.org/
+:PyPI:          https://pypi.python.org/pypi/fuefit
 :Copyright:     2014 European Commission (`JRC-IET <http://iet.jrc.ec.europa.eu/>`_)
 :License:       `EUPL 1.1+ <https://joinup.ec.europa.eu/software/page/eupl>`_
 
-The *fuefit* is a python package that calculates fitted fuel-maps from measured engine data-points 
-based on parameters with physical meaning.
+The *fuefit* is a python package that calculates fitted fuel-maps from measured engine data-points based on parameters with physical meaning.
 
 
 .. _before-intro:
@@ -52,12 +56,12 @@ Quick-start
 Assuming a working python-environment, open a *command-shell* (ie in *Windows* use :program:`cmd.exe` BUT 
 with :program:`python.exe` in its :envvar:`PATH`) and try the following commands 
 
-:Installation:  ``$ pip install fuefit-|version|-py3-none-any.whl``  
-:Start-menu:    ``$ fuefit --winmenu`` 
-:Excel:         ``$ fuefit --excelrun                             ## Windows & OS X only``
+:Install:       ``$ pip install fuefit --pre``  
 :Cmd-line:
     .. code-block:: console
 
+        $ fuefit --version
+        0.0.3-beta.1
         $ fuefit --help
         ...
         
@@ -70,6 +74,8 @@ with :program:`python.exe` in its :envvar:`PATH`) and try the following commands
             -O - model_path=/engine/fc_map_params \
             -m /params/plot_maps@=True
 
+:Start-menu:    ``$ fuefit --winmenus                             ## Windows only``
+:Excel:         ``$ fuefit --excelrun                             ## Windows & OS X only``
 :Python-code: 
     .. code-block:: python
     
@@ -85,12 +91,6 @@ with :program:`python.exe` in its :envvar:`PATH`) and try the following commands
         
         print(model.resolve_jsonpointer(output_model, '/engine/fc_map_params'))
         print(output_model['fitted_eng_points'])
-:Documentation:  
-    .. code-block:: console
-
-        ## Change-directory into the *sources* folder.
-        $ python setup.py build_sphinx
-        ## Open file: ./Docs/_build/html/index.html
 
 .. Tip::
     The commands beginning with ``$``, above, imply a *Unix* like operating system with a *POSIX* shell
@@ -127,11 +127,11 @@ Install
 =======
 Current |version| runs on Python-3.3+ and is distributed on `Wheels <https://pypi.python.org/pypi/wheel>`_.
 
-You can install (or upgrade) the project the "standard" way by using :command:`pip`.
+You can install (or upgrade) the project from the `PyPi` repo using the "standard" way with :command:`pip`.
 
 .. code-block:: console
 
-    $ pip install fuefit-0.0.2_beta3-py3-none-any.whl           ## Use `pip3` if both python-2 & 3 in PATH.
+    $ pip install fuefit --pre                                  ## Use `pip3` if both python-2 & 3 in PATH.
 
 
 Check that installation has worked:
@@ -139,7 +139,7 @@ Check that installation has worked:
 .. code-block:: console
 
     $ fuefit --version
-    0.0.2.beta2
+    0.0.3.beta.1
 
 .. Tip:
     To debug the installation, you can export a non-empty :envvar:`DISTUTILS_DEBUG` 
@@ -364,3 +364,27 @@ Footnotes
         Department Mechanical Engineering, Dynamics and Control Technology Group,
         http://alexandria.tue.nl/repository/books/612441.pdf
 
+.. |docs-status| image:: https://readthedocs.org/projects/fuefit/badge/
+    :alt: Documentation status
+    :scale: 100%
+    :target: https://readthedocs.org/builds/fuefit/
+
+.. |pypi-status| image::  https://pypip.in/v/fuefit/badge.png
+    :target: https://pypi.python.org/pypi/fuefit/
+    :alt: Latest Version in PyPI
+
+.. |python-ver| image:: https://pypip.in/py_versions/fuefit/badge.svg
+    :target: https://pypi.python.org/pypi/fuefit/
+    :alt: Supported Python versions
+
+.. |dev-status| image:: https://pypip.in/status/fuefit/badge.svg
+    :target: https://pypi.python.org/pypi/fuefit/
+    :alt: Development Status
+
+.. |downloads-count| image:: https://pypip.in/download/fuefit/badge.svg?period=week
+    :target: https://pypi.python.org/pypi/fuefit/
+    :alt: Downloads
+
+.. |github-issues| image:: http://img.shields.io/github/issues/ankostis/fuefit.svg
+    :target: https://github.com/ankostis/fuefit/issues
+    :alt: Issues count
