@@ -115,9 +115,10 @@ with :program:`python.exe` in its :envvar:`PATH`) and try the following commands
       *Visual Studio*, if available
       (required for instance when upgrading ``numpy/scipy``, ``pandas`` or ``matplotlib`` with :command:`pip`).
       
-      Remember also to *Register your WinPython installation* from 
-      :menuselection:`Start menu --> All Programs --> WinPython --> WinPython ControlPanel`, and then
-      :menuselection:`Options --> Register Ditribution`.
+      You must also **Register your WinPython installation** and 
+      **add your installation into** :envvar:`PATH` (see :doc:`faq`).
+      To register it, go to :menuselection:`Start menu --> All Programs --> WinPython --> WinPython ControlPanel`, and then
+      :menuselection:`Options --> Register Distribution` .
       
 
 .. _before-install:

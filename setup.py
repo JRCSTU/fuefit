@@ -72,6 +72,7 @@ setup(
     author="Kostis Anagnostopoulos @ European Commission (JRC)",
     author_email="ankostis@gmail.com",
     url="https://github.com/ankostis/fuefit",
+    download_url = "https://pypi.python.org/pypi/fuefit",
     license = "European Union Public Licence 1.1 or later (EUPL 1.1+)",
     keywords = [
          "automotive", "vehicle", "vehicles", "car", "cars", "fuel", "consumption",
@@ -97,6 +98,7 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     packages=['fuefit', 'fuefit.test', 'fuefit.excel'],
+    package_data={'fuefit': ['docs'],},
 #    extras_require = {
 #        'Docs':  ['sphinx >= 1.2'],
 #    },

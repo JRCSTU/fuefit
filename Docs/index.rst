@@ -9,6 +9,7 @@
     install
     usage
     contribute
+    faq
     CHANGES
     indices
 
