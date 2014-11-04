@@ -97,9 +97,9 @@ def model_schema(additional_properties = False):
                                     The number of cyclinders in the engine.
                                     The `capacity` is calculated from `stroke`, `bore` and `cylinders` when are all present.""")
                             },
-                            'engine_lhv': {
+                            'fuel_lhv': {
                                 "title": "Fuel's Specific Heat-Value (kjoule/kgr)",
-                                "$ref": "#/definitions/positiveInteger",
+                                "$ref": "#/definitions/positiveNumber",
                                 'description': dedent("""
                                     If set, overrides any value that would be selected from params based on 'engine/fuel'. """)
                             },

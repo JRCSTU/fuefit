@@ -58,6 +58,7 @@ def run(mdl, opts=None):
     #
     fitted_eng_points = {col: vec.flatten() for (col, vec) in fitted_eng_points.items()}
     mdl['engine_map'] = pd.DataFrame(fitted_eng_points)
+    mdl['measured_eng_points'] = pd.DataFrame(dfin)
 
     return mdl
 
@@ -79,7 +80,7 @@ def norm_to_std_map(params, engine, measured_eng_points):
     def f7():
         measured_eng_points['pme']     = (measured_eng_points.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-6)
     def f8():
-        measured_eng_points['pmf']     = ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-3)) * (measured_eng_points.fc / (3600 * measured_eng_points.rps * 2 * pi)) * 10e-5
+        measured_eng_points['pmf']     = ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-6)) * (measured_eng_points.fc / (3600 * measured_eng_points.rps * 2 * pi)) * 10e-5
     def f9():
         measured_eng_points['cm']      = measured_eng_points.rps * 2 * engine.stroke / 1000
 
@@ -109,7 +110,7 @@ def fitfunc(X, a, b, c, a2, b2, loss0, loss2):
     cm = X['cm']
     assert not np.any(np.isnan(pmf)), np.any(np.isnan(pmf), axis=1)
     assert not np.any(np.isnan(cm)), np.any(np.isnan(cm), axis=1)
-    z = (a + b*cm + c*cm**2)*pmf + (a2 + b2*cm)*pmf**2 + loss0 + loss2*cm**2
+    z = (a + b*cm + c*cm**2)*pmf + (a2 + 0*b2*cm)*pmf**2 + loss0 + loss2*cm**2
     return z
 
 
@@ -118,10 +119,12 @@ def fit_map(df):
     #from .robustfit import curve_fit
 
     param_names = ('a', 'b', 'c', 'a2', 'b2', 'loss0', 'loss2')
+    p0=[0.45,0.0154,-0.00093,-0.0027,0,-2.17,-0.0037]
+
 
     Y = df.pme.values
 
-    (res, _) = curve_fit(fitfunc, df, Y)#, robust=False)
+    (res, _) = curve_fit(fitfunc, df, Y, p0=p0)#, robust=False)
     res_df = pd.Series(res, index=param_names)
     return res_df
 
