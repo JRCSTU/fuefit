@@ -423,7 +423,7 @@ class TestMain(unittest.TestCase):
         main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["n","p","fc"]
                 -I engine.csv file_frmt=SERIES model_path=/engine header@=None
                 -m /engine/fuel=petrol
-                -O - model_path=/engine_map  index?=false -v -d'''.split())
+                -O - model_path=/fitted_eng_points  index?=false -v -d'''.split())
         self.assertIn('n', sys.stdout.getvalue().strip(), 0)
 
     def test_run_main_fileout(self):
@@ -432,7 +432,7 @@ class TestMain(unittest.TestCase):
                 -I engine.csv file_frmt=SERIES model_path=/engine header@=None
                 -m /engine/fuel=petrol
                 -O ~t1.csv model_path=/measured_eng_points index?=false
-                -O ~t2.csv model_path=/engine_map index?=false
+                -O ~t2.csv model_path=/fitted_eng_points index?=false
                 -O {} model_path=
                 -m /params/plot_maps?=False
                 '''.format(out_fname).split())
@@ -466,8 +466,8 @@ class TestMain(unittest.TestCase):
             -I engine.csv file_frmt=SERIES model_path=/engine header@=None
               --irenames
             -m /engine/fuel=petrol
-            -O - model_path=/engine_map index?=false
-            -O - model_path=/engine/fc_map_params
+            -O - model_path=/fitted_eng_points index?=false
+            -O - model_path=/engine/fc_map_coeffs
             -m /params/plot_maps@=False
         '''.split())
 

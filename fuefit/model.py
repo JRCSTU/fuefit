@@ -101,7 +101,14 @@ def model_schema(additional_properties = False):
                                 "title": "Fuel's Specific Heat-Value (kjoule/kgr)",
                                 "$ref": "#/definitions/positiveNumber",
                                 'description': dedent("""
-                                    If set, overrides any value that would be selected from params based on 'engine/fuel'. """)
+                                    If set, overrides any value that would be selected from `/params/fuel/XXX` based on `/engine/fuel`. """)
+                            },
+                            'fc_map_coeffs': {
+                                "title": "Fitted coefficients",
+                                "type": "Series",
+                                'description': dedent("""
+                                    The result of the fitting: a, b, c, a2, b2, loss0, loss2
+                                    """)
                             },
                         }
                     }  #engine-props
@@ -111,7 +118,7 @@ def model_schema(additional_properties = False):
                 "type": "DataFrame"
             }, #measured_eng_points
             "params": {
-                "title": "experiment parameters and constants",
+                "title": "Experiment parameters and constants",
                 "type": "object", "additionalProperties": additional_properties,
                 "required": ['fuel'],
                 "properties": {
@@ -166,6 +173,10 @@ def model_schema(additional_properties = False):
             "positiveNumbers": {
                 "type": "array",
                "items": { "$ref": "#/definitions/positiveNumber" },
+            },
+            "numbers": {
+                "type": "array",
+               "items": { "type": "number" },
             },
 
             "quantity": {

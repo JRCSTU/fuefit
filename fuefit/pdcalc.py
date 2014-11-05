@@ -34,7 +34,7 @@ DEBUG= False
 
 _root_name = 'R'
 _root_len = len(_root_name)+1
-log = logging.getLogger(__file__)
+log = logging.getLogger(__name__)
 
 class DependenciesError(Exception):
     def __init__(self, msg, item=None):

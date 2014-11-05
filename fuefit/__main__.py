@@ -5,11 +5,11 @@
 # Licensed under the EUPL (the 'Licence');
 # You may not use this work except in compliance with the Licence.
 # You may obtain a copy of the Licence at: http://ec.europa.eu/idabc/eupl
-"""Fits fuel-consumption engine-maps based on parameters with physical meaning.
+"""Fits fuel-consumption engine-maps based on coefficients with physical meaning.
 
 DATA COLUMNS:
 -------------
-The engine-points table at `/engine_points` must contain at least one column 
+The engine-points table at :samp:`/{XXX}_engine_points` must contain at least one column 
 from each category below:
 
 1. engine-speed:
@@ -33,7 +33,7 @@ Assuming a CSV-file 'engine.csv' like this:
         12,0.14,180
         ...
 
-    ## Calculate and print fitted engine map's parameters
+    ## Calculate and print fitted engine map's coefficients
     #     for a petrol vehicle with the above engine-point's CSV-table:
 
     ## ...and if no header existed:
@@ -76,9 +76,10 @@ Or to run directly the python-module (ie from sources):
         -I fuefit/test/FuelFit.xlsx model_path=/measured_eng_points sheetname+=0 header@=None names:='["p","n","fc"]' \
         -I fuefit/test/engine.csv file_frmt=SERIES model_path=/engine header@=None \
         -m /engine/fuel=petrol \
-        -O ~t1.csv model_path=/measured_eng_points index?=false \
-        -O ~t2.csv model_path=/engine_map index?=false \
-        -O ~t.csv model_path= -m /params/plot_maps@=True
+        -m /params/plot_maps@=True \
+        -O ~t.csv                                   index?=false \
+        -O ~t1.csv model_path=/measured_eng_points  index?=false \
+        -O ~t2.csv model_path=/mesh_eng_points      index?=false
 """
 
 import argparse
@@ -380,7 +381,7 @@ def get_file_format_from_extension(fname):
     return None
 
 
-_default_df_path            = ('/measured_eng_points', '/engine_map')
+_default_df_path            = ('/measured_eng_points', '/fitted_eng_points')
 _default_out_file_append    = False
 ## When option `-m MODEL_PATH=VALUE` contains a relative path,
 # the following is preppended:
@@ -666,13 +667,13 @@ def build_args_parser(program_name, version, desc, epilog):
                 If many input-files have the same `model_path`, 
                 dataframes are concatenated horizontally, therefore
                 the number of rows (excluding header) for all files
-                must be equal.
+                - Defaults: model_path=%s
             - When multiple input-files given, the number of 
               --icolumns and --irenames options must either:
                 - match them in count, 
                 - exist only one (meaning, use this for all files),
                 - or be totally absent.
-            - see REMARKS below regarding the parsing of VALUEs."""),
+            - see REMARKS below regarding the parsing of VALUEs."""%_default_df_path[0]),
                         action='append', nargs='+', 
                         #default=[('- file_frmt=%s model_path=%s'%('CSV', _default_df_dest)).split()],
                         metavar='ARG')
@@ -739,7 +740,7 @@ def build_args_parser(program_name, version, desc, epilog):
               key-value pair:
               - file_append = [ TRUE | FALSE ]
                 whether to append or overwrite pre-existing files.
-              - Default: - file_frmt=CSV model_path=/engine_map """),
+              - Defaults: - file_frmt=CSV model_path=%s"""%_default_df_path[1]),
                         action='append', nargs='+',
                         #default=[('- file_frmt=%s model_path=%s file_append=%s'%('CSV', _default_df_path[1],  _default_out_file_append)).split()],
                         metavar='ARG')

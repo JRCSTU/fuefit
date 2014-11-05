@@ -10,7 +10,7 @@
 :Copyright:     2014 European Commission (`JRC-IET <http://iet.jrc.ec.europa.eu/>`_)
 :License:       `EUPL 1.1+ <https://joinup.ec.europa.eu/software/page/eupl>`_
 
-The *fuefit* is a python package that calculates fitted fuel-maps from measured engine data-points based on parameters with physical meaning.
+*Fuefit* is a python package that calculates fitted fuel-maps from measured engine data-points based on coefficients with physical meaning.
 
 
 .. _before-intro:
@@ -24,12 +24,13 @@ The *Fuefit* calculator performs the following:
 
 1) Accepts **fuel-consumption engine data points** as input
    (RPM, Power and Fuel-Consumption or equivalent quantities such as CM, PME/Torque and PMF/FC). 
-2) Uses those points to **fit the parameters** :math:`a, b, c, a2, b2, loss0, loss2` in the following formula:[#]_
+2) Uses those points to **fit the coefficients** :math:`a, b, c, a2, b2, loss0, loss2` in the following formula:[#]_
 
   .. (a + b*cm + c*cm**2)*pmf + (a2 + b2*cm)*pmf**2 + loss0 + loss2*cm**2
   .. math::
    
-        \mathbf{pme} = (a + b\times{\mathbf{cm}} + c\times{\mathbf{cm^2}})\times{\mathbf{pmf}} + (a2 + b2\times{\mathbf{cm}})\times{\mathbf{pmf^2}} + loss0 + loss2\times{\mathbf{cm^2}}
+        \mathbf{pme} = (a + b\times{\mathbf{cm}} + c\times{\mathbf{cm^2}})\times{\mathbf{pmf}} + 
+                (a2 + b2\times{\mathbf{cm}})\times{\mathbf{pmf^2}} + loss0 + loss2\times{\mathbf{cm^2}}
 
 3) **Spits-out the input engine-points** according to the fitting.
 
@@ -42,7 +43,7 @@ are depicted in the following diagram::
                 /        Input-Model          /                         /         Output-Model          /
                /-----------------------------/                         /-------------------------------/
               / +--engine                   /                         / +--engine                     /
-             /  |  +--...                  /                         /  |  +--fc_map_params          /
+             /  |  +--...                  /                         /  |  +--fc_map_coeffs          /
             /   +--params                 /     ____________        /   +--measured_eng_points      /
            /    |  +--...                /     |            |      /    |    n   p  fc  pme  ...   /
           /     +--measured_eng_points  /  ==> | Calculator | ==> /     |  ... ... ...  ...  ...  /
@@ -111,7 +112,7 @@ you can try the following commands:
             -I engine.csv file_frmt=SERIES model_path=/engine header@=None \
             --irenames \
             -m /engine/fuel=petrol \
-            -O - model_path=/engine/fc_map_params \
+            -O - model_path=/engine/fc_map_coeffs \
             -m /params/plot_maps@=True
 
 :Start-menu:    ``$ fuefit --winmenus                             ## Windows only``
@@ -129,7 +130,7 @@ you can try the following commands:
         
         output_model = processor.run(input_model)
         
-        print(model.resolve_jsonpointer(output_model, '/engine/fc_map_params'))
+        print(model.resolve_jsonpointer(output_model, '/engine/fc_map_coeffs'))
         print(output_model['fitted_eng_points'])
 
 .. Tip::
@@ -283,7 +284,7 @@ All the above commands creates two files:
     Python functions used by the above xls-file for running a batch of experiments.  
     
     The particular functions included reads multiple vehicles from the input table with various  
-    vehicle characteristics and/or experiment parameters, and then it adds a new worksheet containing 
+    vehicle characteristics and/or experiment coefficients, and then it adds a new worksheet containing 
     the cycle-run of each vehicle . 
     Of course you can edit it to further fit your needs.
 
@@ -322,8 +323,8 @@ Example command::
         -I fuefit/test/FuelFit.xlsx sheetname+=0 header@=None names:='["p","rpm","fc"]' \
         -I fuefit/test/engine.csv file_frmt=SERIES model_path=/engine header@=None \
         -m /engine/fuel=petrol \
-        -O ~t1.csv model_path=/engine_points index?=false \
-        -O ~t2.csv model_path=/engine_map index?=false \
+        -O ~t2.csv model_path=/fitted_eng_points    index?=false \
+        -O ~t2.csv model_path=/mesh_eng_points      index?=false \
         -O ~t.csv model_path= -m /params/plot_maps@=True
 
 
@@ -423,3 +424,15 @@ Footnotes
 .. |github-issues| image:: http://img.shields.io/github/issues/ankostis/fuefit.svg
     :target: https://github.com/ankostis/fuefit/issues
     :alt: Issues count
+
+
+.. glossary::
+
+    CM
+        Mean piston speed (measure for the engines operating speed)
+    
+    PME
+        Mean effective pressure (the engines ability to produce mechanical work)
+    
+    PMF
+        Available mean effective pressure (the maximum mean effective pressure which could be produced if n = 1)

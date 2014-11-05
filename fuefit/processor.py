@@ -12,11 +12,11 @@ from fuefit.model import resolve_jsonpointer
 import numpy as np
 import pandas as pd
 
-from . import pdcalc
-from .model import ensure_modelpath_Series, ensure_modelpath_DataFrame
+from . import pdcalc, model
+from collections import OrderedDict
 
 
-log = logging.getLogger(__file__)
+log = logging.getLogger(__name__)
 
 
 def run(mdl, opts=None):
@@ -25,83 +25,82 @@ def run(mdl, opts=None):
     :param map opts: flags controlling non-functional aspects of the process (ie error-handling and logging, gui, etc)
     """
 
-    ensure_modelpath_Series(mdl, '/engine')
-    ensure_modelpath_Series(mdl, '/params')
-    ensure_modelpath_DataFrame(mdl, '/measured_eng_points')
+    model.ensure_modelpath_Series(mdl, '/engine')
+    model.ensure_modelpath_Series(mdl, '/params')
+    model.ensure_modelpath_DataFrame(mdl, '/measured_eng_points')
 
-    params  = mdl['params']
-    engine  = mdl['engine']
-    dfin    = mdl['measured_eng_points']
-    pdcalc.execute_funcs_factory(norm_to_std_map, ('measured_eng_points.cm', 'measured_eng_points.pme', 'measured_eng_points.pmf'), params, engine, dfin)
+    params              = mdl['params']
+    engine              = mdl['engine']
+    measured_eng_points = mdl['measured_eng_points']
 
-    fitted_params = fit_map(dfin)
-    engine['fc_map_params'] = fitted_params
+    ## Identify quantities necessary for the FITTING, 
+    #    and calculate them.
+    outcomes = ('eng_points.cm', 'eng_points.pme', 'eng_points.pmf', 'engine.fuel_lhv')
+    pdcalc.execute_funcs_factory(norm_to_std_map, outcomes, params, engine, measured_eng_points)
 
-    (X1, X2, Y) = reconstruct_enginemap(dfin, fitted_params)
+    ## FIT
+    #
+    fitted_coeffs = fit_map(measured_eng_points)
+    engine['fc_map_coeffs'] = fitted_coeffs
 
-    fitted_eng_points = dict(zip(['pmf', 'cm', 'pme'], (X1, X2, Y)))
-
-    fitted_eng_points = std_to_norm_map(params, engine, fitted_eng_points)
+    fitted_eng_points   = reconstruct_eng_points_fitted(engine, fitted_coeffs, measured_eng_points)
+    std_to_norm_map(engine, fitted_eng_points)
 
     if resolve_jsonpointer(mdl, '/params/plot_maps', False):
+        mesh_eng_points     = generate_mesh_eng_points_fitted(measured_eng_points, fitted_coeffs, measured_eng_points)
         columns = ['pmf', 'cm', 'pme']
-#         columns = ['fc', 'n', 'pme']
-#         columns = ['pmf', 'n', 'pme']
-#         columns = ['fc_norm', 'cm', 'pme']
+        plot_map(measured_eng_points, mesh_eng_points, columns)
+        
+        ## Flatten 2D-vectors to make a DataFrame
+        #
+        mesh_eng_points = {col: vec.flatten() for (col, vec) in mesh_eng_points.items()}
+        mesh_eng_points = pd.DataFrame(mesh_eng_points)
+        ## Fill calced columns.
+        #
+        std_to_norm_map(engine, mesh_eng_points)
+        
+        mdl['mesh_eng_points'] = pd.DataFrame(mesh_eng_points)
+        
 
-#         columns = ['cm', 'pme', 'pmf']
-#         columns = ['n', 'pme', 'pmf', ]
-#         columns = ['n', 'p', 'fc']
-        plot_map(dfin, fitted_eng_points, columns)
+    mdl['measured_eng_points'] = measured_eng_points
+    mdl['fitted_eng_points'] = pd.DataFrame(fitted_eng_points)
 
-    ## Flatten 2D-vectors to make a DataFrame
-    #
-    fitted_eng_points = {col: vec.flatten() for (col, vec) in fitted_eng_points.items()}
-    mdl['engine_map'] = pd.DataFrame(fitted_eng_points)
-    mdl['measured_eng_points'] = pd.DataFrame(dfin)
-
+    #model.validate_model(mdl, additional_properties=False) TODO: Make OUT-MODEL pass validation. 
+    
     return mdl
 
 
-def norm_to_std_map(params, engine, measured_eng_points):
+def norm_to_std_map(params, engine, eng_points):
     from math import pi
-    def f1():
-        engine['fuel_lhv'] = params['fuel'][engine.fuel]['lhv']
-    def f2():
-        measured_eng_points['n']     = measured_eng_points.n_norm * (engine.n_rated - engine.n_idle) + engine.n_idle
-    def f3():
-        measured_eng_points['p']       = measured_eng_points.p_norm * engine.p_max
-    def f4():
-        measured_eng_points['fc']      = measured_eng_points.fc_norm * engine.p_max
-    def f5():
-        measured_eng_points['rps']     = measured_eng_points.n / 60
-    def f6():
-        measured_eng_points['torque']  = (measured_eng_points.p * 1000) / (measured_eng_points.rps * 2 * pi)
-    def f7():
-        measured_eng_points['pme']     = (measured_eng_points.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-6)
-    def f8():
-        measured_eng_points['pmf']     = ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-6)) * (measured_eng_points.fc / (3600 * measured_eng_points.rps * 2 * pi)) * 10e-5
-    def f9():
-        measured_eng_points['cm']      = measured_eng_points.rps * 2 * engine.stroke / 1000
+    
+    funcs = [
+        lambda: engine.__setitem__('fuel_lhv',           params['fuel'][engine.fuel]['lhv']),
+        lambda: eng_points.__setitem__('n',      eng_points.n_norm * (engine.n_rated - engine.n_idle) + engine.n_idle),
+        lambda: eng_points.__setitem__('p',      eng_points.p_norm * engine.p_max),
+        lambda: eng_points.__setitem__('fc',     eng_points.fc_norm * engine.p_max),
+        lambda: eng_points.__setitem__('rps',    eng_points.n / 60),
+        lambda: eng_points.__setitem__('torque', (eng_points.p * 1000) / (eng_points.rps * 2 * pi)),
+        lambda: eng_points.__setitem__('pme',    (eng_points.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-6)),
+        lambda: eng_points.__setitem__('pmf',    ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-6)) * (eng_points.fc / (3600 * eng_points.rps * 2 * pi)) * 10e-5),
+        lambda: eng_points.__setitem__('cm',     eng_points.rps * 2 * engine.stroke / 1000),
+    ]
 
-    return (f1, f2, f3, f4, f5, f6, f7, f8, f9)
+    return funcs
 
-def std_to_norm_map(params, engine, fitted_eng_points):
+def std_to_norm_map(engine, eng_points):
     from math import pi
 
-    fitted_eng_points['rps']       = fitted_eng_points['cm'] * 1000 / (2 * engine.stroke)
-    fitted_eng_points['n']       = fitted_eng_points['rps'] * 60
-    fitted_eng_points['n_norm']  = fitted_eng_points['n'] / (engine.n_rated - engine.n_idle) + engine.n_idle
+    eng_points['rps']       = eng_points.cm * 1000 / (2 * engine.stroke)
+    eng_points['n']         = eng_points.rps * 60
+    eng_points['n_norm']    = eng_points.n / (engine.n_rated - engine.n_idle) + engine.n_idle
+    
+    eng_points['torque']    = eng_points.pme * (engine.capacity * 10e-3) / (4 * pi * 10e-5)
+    eng_points['p']         = eng_points.torque * (eng_points.rps * 2 * pi) / 1000
 
-    fitted_eng_points['torque']    = fitted_eng_points['pme'] * (engine.capacity * 10e-3) / (4 * pi * 10e-5)
-    fitted_eng_points['p']         = fitted_eng_points['torque'] * (fitted_eng_points['rps'] * 2 * pi) / 1000
+    eng_points['fc']        = (eng_points.pmf * (engine.capacity * 10e-2) * (3600 * eng_points.rps * 2 * pi)) / (4 * pi * engine.fuel_lhv * 10e-5)
+    eng_points['fc_norm']   = eng_points.fc / engine.p_max
 
-    fitted_eng_points['fc']        = (fitted_eng_points['pmf'] * (engine.capacity * 10e-2) * (3600 * fitted_eng_points['rps'] * 2 * pi)) / (4 * pi * engine.fuel_lhv * 10e-5)
-    fitted_eng_points['fc_norm']   = fitted_eng_points['fc'] / engine.p_max
-
-    fitted_eng_points['p_norm']    = fitted_eng_points['p'] / engine.p_max
-
-    return fitted_eng_points
+    eng_points['p_norm']    = eng_points.p / engine.p_max
 
 
 
@@ -129,11 +128,18 @@ def fit_map(df):
     return res_df
 
 
-def reconstruct_enginemap(dfin, fitted_params):
+def reconstruct_eng_points_fitted(engine, fitted_coeffs, eng_points):
+    pme = fitfunc(eng_points, *fitted_coeffs)
+
+    fitted_eng_points = pd.DataFrame.from_items(zip(['pmf', 'cm', 'pme'], (eng_points.pmf, eng_points.cm, pme)))
+
+    return fitted_eng_points
+
+def generate_mesh_eng_points_fitted(engine, fitted_coeffs, eng_points):
     ## Construct X.
     #
-    dmin = dfin.loc[:, ['pmf', 'cm']].min(axis=0)
-    dmax = dfin.loc[:, ['pmf', 'cm']].max(axis=0)
+    dmin = eng_points.loc[:, ['pmf', 'cm']].min(axis=0)
+    dmax = eng_points.loc[:, ['pmf', 'cm']].max(axis=0)
     drng = (dmax - dmin)
     dmin -= 0.05 * drng
     dmax += 0.10 * drng
@@ -142,10 +148,12 @@ def reconstruct_enginemap(dfin, fitted_params):
     X1, X2 = np.mgrid[dmin[0]:dmax[0]:dstp[0], dmin[1]:dmax[1]:dstp[1]]
 
     X = {'pmf': X1, 'cm': X2}
-    Y = fitfunc(X, *fitted_params)
+    Y = fitfunc(X, *fitted_coeffs)
 
 
-    return (X1, X2, Y)
+    mesh_eng_points = OrderedDict(zip(['pmf', 'cm', 'pme'], (X1, X2, Y)))
+
+    return mesh_eng_points
 
 
 def plot_map(dfin, fitted_eng_points, columns):

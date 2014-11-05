@@ -6,7 +6,7 @@ General
 =======
 
 
-Can i copy/extend it?  What is its License, in practical terms?
+Can I copy/extend it?  What is its License, in practical terms?
 ---------------------------------------------------------------
 I'm not a lawyer, but in a broad view, the core algorithm of the project is "copylefted" with
 the *EUPL-1.1+ license*, and it includes files from other "non-copyleft" open source licenses like
@@ -17,7 +17,7 @@ copy it, modify or extend it, and distrbute it, as long as you always distribute
 Technical
 =========
 
-I followed the instructions but i still cannot install/run/do *X*.  What now?
+I followed the instructions but i still cannot install/run/get *X*.  What now?
 -----------------------------------------------------------------------------
 If you have no previous experience in python, setting up your environment and installing a new project
 is a demanding, but manageable, task.  Here is a checklist of things that might go wrong:
@@ -51,7 +51,7 @@ is a demanding, but manageable, task.  Here is a checklist of things that might 
     To change it, modify your "rc' files, ie: :file:`~/.bashrc` or :file:`~/.profile`.
   
 
-* Is the correct **version of python** running?
+* Is the correct **version of python** running? Of **fuefit**??
 
   Certain commands such as :command:`pip` come in 2 different versions *python-2 & 3*
   (:command:`pip2` and :command:`pip3`, respectively).  Most programs report their version-infos
@@ -63,6 +63,12 @@ is a demanding, but manageable, task.  Here is a checklist of things that might 
 
   This project is still in development, so the names of data and functions often differ from version to version.
   Check the :doc:`CHANGES` for point that you have to be aware of when upgrading.
+
+
+* Did you try **verbose reporting** for the command-line tool?
+
+    * Use :option:`-v` of :option:`--vv` to receive log-messages.
+    * Use :option:`-d` to enable debug-checks.
 
 
 * Did you `search <https://github.com/ankostis/fuefit/issues>`_ whether **a similar issue** has already been reported?
