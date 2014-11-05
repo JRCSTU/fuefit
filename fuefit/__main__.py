@@ -109,20 +109,25 @@ import pkg_resources as pkg
 
 DEBUG   = False
 PROG    = 'fuefit'
+NOTICE_LOG_LEVEL    = logging.INFO+5
+DEFAULT_LOG_LEVEL   = logging.INFO+1
 
 def _init_logging(loglevel, name='%s-cmd'%PROG, skip_root_level=False):
     logging.basicConfig(level=loglevel)
+    logging.addLevelName(NOTICE_LOG_LEVEL, 'NOTICE')
+    
     rlog = logging.getLogger()
     if not skip_root_level:
         ## Force root-level, in case already configured otherwise.
         rlog.setLevel(loglevel)
 
     log = logging.getLogger(name)
+    log.notice = lambda *args, **kws: log.log(NOTICE_LOG_LEVEL, *args, **kws)
     
     return log
 
     
-log = _init_logging(logging.INFO)
+log = _init_logging(DEFAULT_LOG_LEVEL)
 
 def main(argv=None):
     """The command-line entry-point for using all functionality of the tool.
@@ -176,7 +181,7 @@ def main(argv=None):
         elif opts.verbose >= 1:
             level = logging.DEBUG
         else:
-            level = logging.INFO
+            level = DEFAULT_LOG_LEVEL
         _init_logging(level, name=program_name)
 
         log.debug("Args: %s\n  +--Opts: %s", argv, opts)
@@ -225,7 +230,7 @@ def main(argv=None):
 
     except jsons.ValidationError as ex:
         if DEBUG:
-            log.error('Invalid input model!', exc_info=ex)
+            log.exception('Invalid input model!')
         indent = len(program_name) * " "
         parser.exit(4, "%s: Model validation failed due to: %s\n%s\n"%(program_name, ex, indent))
 
@@ -245,7 +250,7 @@ def copy_excel_template_files(dest_dir=None):
 
     try:
         os.mkdir(dest_dir)
-        log.info('Created destination-directory(%s).', dest_dir)
+        log.notice('Created destination-directory(%s).', dest_dir)
     except:
         pass ## Might already exist
     
@@ -259,7 +264,7 @@ def copy_excel_template_files(dest_dir=None):
         while os.path.exists(dest_fname):
             dest_fname = next(fname_genor)
             
-        log.info('Copying `xlwings` template-file: %s --> %s', src_fname, dest_fname)
+        log.notice('Copying "ExcelRunner" files: \n    %s --> %s', src_fname, dest_fname)
         shutil.copy(src_fname, dest_fname)
         files_copied.append(dest_fname)
     
@@ -287,8 +292,8 @@ def add_windows_shortcuts_to_start_menu(my_option):
             'desc':         'Folder containing python and cmd-line test files: %s' % prog_dir,
         }),
         ("Create new Fuefit ExcelRunner files.lnk", {
-            'target_path':  'fuefit',
-            'target_args':  '--excelrun',
+            'target_path':  'cmd',
+            'target_args':  '/K fuefit --excelrun',
             'wdir':         prog_dir,
             'desc':         'Copy `xlwings` excel & python template files into `MyDocuments` and open the Excel-file, so you can run a batch of experiments.',
             'icon_path':    pkg.resource_filename('fuefit.excel', 'ExcelPython.ico'),        #@UndefinedVariable
@@ -302,7 +307,7 @@ def add_windows_shortcuts_to_start_menu(my_option):
     try:
         os.makedirs(prog_dir, exist_ok=True)
     except Exception as ex:
-        log.error('Failed creating Program-folder(%s) due to: %s', prog_dir, ex, exc_info=1)
+        log.exception('Failed creating Program-folder(%s) due to: %s', prog_dir, ex)
         exit(-5)
     
     ## Copy Demos.
@@ -323,7 +328,7 @@ def add_windows_shortcuts_to_start_menu(my_option):
             try:
                 shutil.copy(src_f, dest_f)
             except Exception as ex:
-                log.error('Failed copying item(%s) in program folder(%s): %s', src_f, prog_dir, ex, exc_info=1)
+                log.exception('Failed copying item(%s) in program folder(%s): %s', src_f, prog_dir, ex)
 
     ## Create a fresh-new Menu-group.
     #
@@ -339,16 +344,16 @@ def add_windows_shortcuts_to_start_menu(my_option):
     try:
         os.makedirs(group_path, exist_ok=True)
     except Exception as ex:
-        log.error('Failed creating StarMenu-group(%s) due to: %s', group_path, ex, exc_info=1)
+        log.exception('Failed creating StarMenu-group(%s) due to: %s', group_path, ex)
         exit(-6)
     
     for name, shcut in shcuts.items():
         path = os.path.join(group_path, name)
-        log.info('Creating StartMenu-item: %s', path)
+        log.notice('Creating StartMenu-item: %s', path)
         try:
             utils.win_create_shortcut(wshell, path, **shcut)
         except Exception as ex:
-            log.error('Failed creating item(%s) in StartMenu-group(%s): %s', path, win_menu_group , ex, exc_info=1)
+            log.exception('Failed creating item(%s) in StartMenu-group(%s): %s', path, win_menu_group , ex)
 
 
 ## The value of file_frmt=VALUE to decide which
@@ -409,7 +414,7 @@ def parse_key_value_pair(arg):
             try:
                 value   = _value_parsers[type_sym](value)
             except Exception as ex:
-                raise argparse.ArgumentTypeError("Failed parsing key(%s)%s=VALUE(%s) due to: %s" %(key, type_sym, value, ex)) from ex
+                raise argparse.ArgumentTypeError("Failed parsing VALUE(%s) for key(%s)%s= due to: %s" %(value, key, type_sym, ex)) from ex
 
         return [key, value]
     else:

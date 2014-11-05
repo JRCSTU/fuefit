@@ -10,3 +10,7 @@ fuefit \
     -O ~t1.csv model_path=/measured_eng_points  index?=false \
     -O ~t2.csv model_path=/mesh_eng_points      index?=false \
     "${@}"
+
+if [ $? -ne 0 ]; then
+    echo "Invoke script with `-v -d` for more verbose output."
+fi
