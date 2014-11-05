@@ -13,9 +13,8 @@ The engine-points table at `/engine_points` must contain at least one column
 from each category below:
 
 1. engine-speed:
-    N        (rad/min)
-    N_norm   (rad/min)  : normalized against N_idle + (N_rated - N_idle)
-    Omega    (rad/sec)
+    N        (1/min)
+    N_norm   (1/min)    : normalized against N_idle + (N_rated - N_idle)
     CM       (m/sec)    : Mean Piston speed
 2. work-capability:
     P        (kW)

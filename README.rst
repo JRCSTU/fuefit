@@ -20,27 +20,40 @@ Introduction
 
 Overview
 --------
-The *Fuefit* calculator accepts engine data-points for as Input,
-(RPM, Power and Fuel-Consumption or equivalent quantities such as CM, PME/Torque and PMF) 
-and spits-out fitted fuel-maps according to the following formula [#]_:
+The *Fuefit* calculator performs the following:
 
-.. math::
+1) Accepts **fuel-consumption engine data points** as input
+   (RPM, Power and Fuel-Consumption or equivalent quantities such as CM, PME/Torque and PMF/FC). 
+2) Uses those points to **fit the parameters** :math:`a, b, c, a2, b2, loss0, loss2` in the following formula:[#]_
 
-   (a + b*cm + c*cm**2)*pmf + (a2 + b2*cm)*pmf**2 + loss0 + loss2*cm**2
+  .. (a + b*cm + c*cm**2)*pmf + (a2 + b2*cm)*pmf**2 + loss0 + loss2*cm**2
+  .. math::
+   
+        \mathbf{pme} = (a + b\times{\mathbf{cm}} + c\times{\mathbf{cm^2}})\times{\mathbf{pmf}} + (a2 + b2\times{\mathbf{cm}})\times{\mathbf{pmf^2}} + loss0 + loss2\times{\mathbf{cm^2}}
 
+3) **Spits-out the input engine-points** according to the fitting.
 
+     
 An "execution" or a "run" of a calculation along with the most important pieces of data 
 are depicted in the following diagram::
 
 
-          .-------------------.                         .--------------------------.
-         /    Input-Model    /     ____________        /       Output-Model       /
-        /-------------------/     |            |      /--------------------------/
-       / +--engine         /  ==> | Calculator | ==> / +--engine                /
-      /  +--engine_points /       |____________|    /  | +--fc_map_params      /
-     /   +--params       /                         /   +--engine_map          /
-    /                   /                         /    +--fitted_eng_points  /
-   '-------------------'                         '--------------------------'
+                 .-----------------------------.                         .-------------------------------.
+                /        Input-Model          /                         /         Output-Model          /
+               /-----------------------------/                         /-------------------------------/
+              / +--engine                   /                         / +--engine                     /
+             /  |  +--...                  /                         /  |  +--fc_map_params          /
+            /   +--params                 /     ____________        /   +--measured_eng_points      /
+           /    |  +--...                /     |            |      /    |    n   p  fc  pme  ...   /
+          /     +--measured_eng_points  /  ==> | Calculator | ==> /     |  ... ... ...  ...  ...  /
+         /          n    p    fc       /       |____________|    /      +--fitted_eng_points     /
+        /          --  ----  ---      /                         /       |    n    p   fc        /
+       /            0   0.0    0     /                         /        |  ...  ...  ...       /
+      /           600  42.5   25    /                         /         +--mesh_eng_points    /
+     /           ...    ...  ...   /                         /               n    p   fc     /
+    /                             /                         /              ...  ...  ...    /
+   '-----------------------------'                         '-------------------------------'
+
 
 The *Input & Output Model* are trees of strings and numbers, assembled with:
 
@@ -51,17 +64,43 @@ The *Input & Output Model* are trees of strings and numbers, assembled with:
 * URI-references to other model-trees (TODO).
 
 
+Apart from various engine-characteristics under ``/engine`` the table-columns such as `capacity` and `p_rated`, 
+the table under ``/measured_eng_points`` must contain *at least* one column 
+from each of the following categories (column-headers are case-insensitive):
+
+1. Engine-speed::
+
+    N        (1/min)
+    N_norm   (1/min)    : normalized against N_idle + (N_rated - N_idle)
+    CM       (m/sec)    : Mean Piston speed
+
+2. Work-capability::
+
+    P        (kW)
+    P_norm   (kW)       : normalized against P_MAX
+    T        (Nm)
+    PME      (bar)
+
+3. Fuel-consumption::
+
+    FC       (g/h)
+    FC_norm  (g/h)      : normalized against P_MAX
+    PMF      (bar)
+
+
+
 Quick-start
 -----------
-Assuming a working python-environment, open a *command-shell* (ie in *Windows* use :program:`cmd.exe` BUT 
-with :program:`python.exe` in its :envvar:`PATH`) and try the following commands 
+Assuming you have a working python-environment, open a *command-shell*, 
+(in *Windows* use :program:`cmd.exe` BUT with :program:`python.exe` in its :envvar:`PATH`), 
+you can try the following commands: 
 
 :Install:       ``$ pip install fuefit --pre``  
 :Cmd-line:
     .. code-block:: console
 
         $ fuefit --version
-        0.0.3-beta.3
+        0.0.4-alpha.1
         
         $ fuefit --help
         ...
@@ -121,6 +160,9 @@ with :program:`python.exe` in its :envvar:`PATH`) and try the following commands
       To register it, go to :menuselection:`Start menu --> All Programs --> WinPython --> WinPython ControlPanel`, and then
       :menuselection:`Options --> Register Distribution` .
       
+For more elaborate instructions, read the sections that follow.
+
+
 
 .. _before-install:
 
@@ -128,31 +170,45 @@ Install
 =======
 Current |version| runs on Python-3.3+ and is distributed on `Wheels <https://pypi.python.org/pypi/wheel>`_.
 
+First make sure that no older version are left over.  So run *twice* this command:
+
+.. code-block:: console
+
+    $ pip uninstall fuefit                                      ## Use `pip3` if both python-2 & 3 are in PATH.
+    
+    
 You can install (or upgrade) the project from the `PyPi` repo using the "standard" way with :command:`pip`.
 
 .. code-block:: console
 
-    $ pip install fuefit                                        ## Use `pip3` if both python-2 & 3 in PATH.
+    $ pip install fuefit
 
 
-Check that installation has worked:
+* If you want to install a *pre-release* version (the version-string is not plain numbers, but 
+  ends with ``alpha``, ``beta.2`` or something else), use additionally :option:`--pre`.
 
-.. code-block:: console
+* If you want to upgrade an existing instalation along with all its dependencies, 
+  add also :option:`--upgrade` (or :option:`-U` equivalently), but then the build might take some 
+  considerable time to finish.  Also there is the possibility the upgraded libraries might break existing programs(!)
+  so use it with caution, or from within a *virtualenv* (see below). 
 
-    $ fuefit --version
-    0.0.3-beta.3
-        
 
 .. Tip:
-    To debug the installation, you can export a non-empty :envvar:`DISTUTILS_DEBUG` 
+    To debug installation problems, you can export a non-empty :envvar:`DISTUTILS_DEBUG` 
     and *distutils* will print detailed information about what it is doing and/or 
     print the whole command line when an external program (like a C compiler) fails.
 
 
-You may upgrade all dependencies to their latest version with :option:`--upgrade` (or :option:`-U` equivalently) 
-but then the build might take some considerable time to finish.
+After installation, it is important that you check which version is visible in your path:
 
-To install it for different Python versions, repeat step 3 for every required version.
+.. code-block:: console
+
+    $ fuefit --version
+    0.0.4-alpha.1
+        
+
+
+To install it on different Python versions, repeat step 3 for every required version.
 
 Particularly for the latest *WinPython* environments (*Windows* / *OS X*) you can install dependencies with: 
 
@@ -243,43 +299,19 @@ All the above commands creates two files:
     or *IPython*! 
 
 
-Some general notes regarding the python-code in excel-cells:
+Some general notes regarding the python-code from excel-cells:
 
-* The *VBA* `xlwings` module contains the code from the respective library; do not edit, but you may replace it 
-  with a latest version. 
-* You can read & modify the *VBA* `xlwings_ext` module with code that will run on each invocation 
-  to import libraries such as 'numpy' and 'pandas', or pre-define utility python functions.
-* The name of the python-module to import is automatically calculated from the name of the Excel-file,
+* On each invocation, the predefined VBA module `pandalon` executes a dynamically generated python-script file
+  in the same folder where the excel-file resides, which, among others, imports the "sister" python-script file.
+  You can read & modify the sister python-script to import libraries such as 'numpy' and 'pandas', 
+  or pre-define utility python functions.
+* The name of the sister python-script is automatically calculated from the name of the Excel-file,
   and it must be valid as a python module-name.  Therefore do not use non-alphanumeric characters such as 
   spaces(` `), dashes(`-`) and dots(`.`) on the Excel-file.
-* Double-quotes(") do not work for denoting python-strings in the cells; use single-quotes(') instead.
-* You cannot enter multiline or indentated python-code such as functions and/or  ```if-then-else`` expressions; 
-  move such code into the python-file. 
-* There are two pre-defined python variables on each cell, `cr` and `cc`, refering to "cell_row" and 
-  "cell_column" coordinates of the cell, respectively.  For instance, to use the right-side column as 
-  a poor-man's debugging aid, you may use this statement in a cell:
-
-  .. code-block:: python
-    
-    Range((cr, cc+1)).value = 'Some string or number'
-
-* On errors, the log-file is written in :file:`{userdir}/AppData/Roaming/Microsoft/Excel/XLSTART/xlwings_log.txt` 
+* On errors, a log-file is written in the same folder where the excel-file resides, 
   for as long as **the message-box is visible, and it is deleted automatically after you click 'ok'!**
 * Read http://docs.xlwings.org/quickstart.html
 
-    
-.. Tip:: 
-    You can permanently enable your Excel installation to support *xlwings* by copying
-    the *VBA* modules of the demo-excel file ``xlwings`` and ``xlwings-ext`` into 
-    your :file:`PERSONAL.XLSB` workbook, as explaine here: 
-    http://office.microsoft.com/en-001/excel-help/copy-your-macros-to-a-personal-macro-workbook-HA102174076.aspx.
-    
-    You can even `add a new Ribbon-button <http://msdn.microsoft.com/en-us/library/bb386104.aspx>`_ 
-    to execute the selected cells as python-code.  Set this new button to invoke the ``RunSelectionAsPython()``
-    *VBA* function.
-
-    If you do the above, remember that *VBA*-code in your personal-workbook takes precedance over any code
-    present in your currently open workbook.
 
 
 Cmd-line usage
