@@ -331,7 +331,7 @@ Some general notes regarding the python-code from excel-cells:
 
 * An elaborate syntax to reference excel *cells*, *rows*, *columns* or *tables* from python code, and 
   to read them as :class:`pandas.DataFrame` is utilized by the Excel .
-  Read its syntax at :func:`fuefit.excel.fuefit_excel_runner.match_excel_ref`.
+  Read its syntax at :func:`fuefit.excel.fuefit_excel_runner.resolve_excel_ref`.
 * On each invocation, the predefined VBA module `pandalon` executes a dynamically generated python-script file
   in the same folder where the excel-file resides, which, among others, imports the "sister" python-script file.
   You can read & modify the sister python-script to import libraries such as 'numpy' and 'pandas', 

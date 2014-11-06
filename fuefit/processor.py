@@ -5,7 +5,11 @@
 # Licensed under the EUPL (the 'Licence');
 # You may not use this work except in compliance with the Licence.
 # You may obtain a copy of the Licence at: http://ec.europa.eu/idabc/eupl
+"""
+The core calculations required for transforming the Input-model to the Output one.
 
+Uses *pandalon*'s automatic dependency extraction from calculation functions.
+"""
 import logging
 
 from fuefit.model import resolve_jsonpointer
@@ -36,7 +40,7 @@ def run(mdl, opts=None):
     ## Identify quantities necessary for the FITTING, 
     #    and calculate them.
     outcomes = ('eng_points.cm', 'eng_points.pme', 'eng_points.pmf', 'engine.fuel_lhv')
-    pdcalc.execute_funcs_factory(norm_to_std_map, outcomes, params, engine, measured_eng_points)
+    pdcalc.execute_funcs_factory(eng_points_2_std_map, outcomes, params, engine, measured_eng_points)
 
     ## FIT
     #
@@ -70,7 +74,13 @@ def run(mdl, opts=None):
     return mdl
 
 
-def norm_to_std_map(params, engine, eng_points):
+def eng_points_2_std_map(params, engine, eng_points):
+    """
+    A factory of the calculation functions for reaching to the data necessary for the Fitting.
+
+    The order of the functions below not important, and the actual order of execution 
+    is calculated from their dependencies, based on the data-frame's column access.
+    """
     from math import pi
     
     funcs = [
@@ -79,6 +89,7 @@ def norm_to_std_map(params, engine, eng_points):
         lambda: eng_points.__setitem__('p',      eng_points.p_norm * engine.p_max),
         lambda: eng_points.__setitem__('fc',     eng_points.fc_norm * engine.p_max),
         lambda: eng_points.__setitem__('rps',    eng_points.n / 60),
+        #lambda: eng_points.__setitem__('rps',     eng_points.cm * 1000 / (2 * engine.stroke)),
         lambda: eng_points.__setitem__('torque', (eng_points.p * 1000) / (eng_points.rps * 2 * pi)),
         lambda: eng_points.__setitem__('pme',    (eng_points.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-6)),
         lambda: eng_points.__setitem__('pmf',    ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-6)) * (eng_points.fc / (3600 * eng_points.rps * 2 * pi)) * 10e-5),
@@ -107,8 +118,6 @@ def std_to_norm_map(engine, eng_points):
 def fitfunc(X, a, b, c, a2, b2, loss0, loss2):
     pmf = X['pmf']
     cm = X['cm']
-    assert not np.any(np.isnan(pmf)), np.any(np.isnan(pmf), axis=1)
-    assert not np.any(np.isnan(cm)), np.any(np.isnan(cm), axis=1)
     z = (a + b*cm + c*cm**2)*pmf + (a2 + 0*b2*cm)*pmf**2 + loss0 + loss2*cm**2
     return z
 
@@ -117,9 +126,13 @@ def fit_map(df):
     from scipy.optimize import curve_fit as curve_fit
     #from .robustfit import curve_fit
 
+    assert not np.any(np.isnan(df['pmf'])), \
+            "Cannot fit with NaNs in `pmf` data! \n%s" % np.any(np.isnan(df['pmf']), axis=1)
+    assert not np.any(np.isnan(df['cm'])), \
+            "Cannot fit with NaNs in `cm` data! \n%s" % np.any(np.isnan(df['cm']), axis=1)
+
     param_names = ('a', 'b', 'c', 'a2', 'b2', 'loss0', 'loss2')
     p0=[0.45,0.0154,-0.00093,-0.0027,0,-2.17,-0.0037]
-
 
     Y = df.pme.values
 

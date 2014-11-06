@@ -225,7 +225,7 @@ def _build_func_dependencies_graph(func_rels, graph = None):
 
     cycles = list(nx.simple_cycles(graph))
     if cycles:
-        raise DependenciesError('Cyclic dependencies! %s'%cycles, graph)
+        log.warning('Cyclic dependencies! %s', cycles)
 
     return graph
 
@@ -297,6 +297,11 @@ def _research_calculation_routes(graph, sources, dests):
     #
     data_graph = graph.copy()
     data_graph.remove_nodes_from(calc_inp_nodes)
+    
+    ## FIXME: IS it NEEDED?
+    isolates = nx.isolates(data_graph)
+    log.debug('Isolates: %s', isolates)
+    data_graph.remove_nodes_from(isolates)
     try:
         calc_nodes = set(list(calc_out_nodes) + _all_predecessors(data_graph, calc_out_nodes))
     except (KeyError, NetworkXError) as ex:

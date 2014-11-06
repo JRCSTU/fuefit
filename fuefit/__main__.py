@@ -109,12 +109,10 @@ import pkg_resources as pkg
 
 DEBUG   = False
 PROG    = 'fuefit'
-NOTICE_LOG_LEVEL    = logging.INFO+5
-DEFAULT_LOG_LEVEL   = logging.INFO+1
 
+DEFAULT_LOG_LEVEL   = logging.INFO
 def _init_logging(loglevel, name='%s-cmd'%PROG, skip_root_level=False):
     logging.basicConfig(level=loglevel)
-    logging.addLevelName(NOTICE_LOG_LEVEL, 'NOTICE')
     
     rlog = logging.getLogger()
     if not skip_root_level:
@@ -122,7 +120,7 @@ def _init_logging(loglevel, name='%s-cmd'%PROG, skip_root_level=False):
         rlog.setLevel(loglevel)
 
     log = logging.getLogger(name)
-    log.notice = lambda *args, **kws: log.log(NOTICE_LOG_LEVEL, *args, **kws)
+    log.trace = lambda *args, **kws: log.log(0, *args, **kws)
     
     return log
 
@@ -184,7 +182,7 @@ def main(argv=None):
             level = DEFAULT_LOG_LEVEL
         _init_logging(level, name=program_name)
 
-        log.debug("Args: %s\n  +--Opts: %s", argv, opts)
+        log.trace("Args: %s\n  +--Opts: %s", argv, opts)
 
         if opts.excel:
             copy_excel_template_files(opts.excel)
@@ -205,10 +203,10 @@ def main(argv=None):
         opts = validate_file_opts(opts)
 
         infiles     = parse_many_file_args(opts.I, 'r', opts.irenames)
-        log.info("Input-files: %s", infiles)
+        log.debug("Input-files: %s", infiles)
 
         outfiles    = parse_many_file_args(opts.O, 'w', None)
-        log.info("Output-files: %s", outfiles)
+        log.debug("Output-files: %s", outfiles)
 
     except (ValueError) as ex:
         if DEBUG:
@@ -221,7 +219,7 @@ def main(argv=None):
     try:
         additional_props = not opts.strict
         mdl = assemble_model(infiles, opts.m)
-        log.info("Input Model(strict: %s): %s", opts.strict, utils.Lazy(lambda: json_dumps(mdl, 'to_string')))
+        log.debug("Input Model(strict: %s): %s", opts.strict, utils.Lazy(lambda: json_dumps(mdl, 'to_string')))
         mdl = validate_model(mdl, additional_props)
 
         mdl = processor.run(mdl, opts)
@@ -250,7 +248,7 @@ def copy_excel_template_files(dest_dir=None):
 
     try:
         os.mkdir(dest_dir)
-        log.notice('Created destination-directory(%s).', dest_dir)
+        log.info('Created destination-directory(%s).', dest_dir)
     except:
         pass ## Might already exist
     
@@ -264,7 +262,7 @@ def copy_excel_template_files(dest_dir=None):
         while os.path.exists(dest_fname):
             dest_fname = next(fname_genor)
             
-        log.notice('Copying "ExcelRunner" files: \n    %s --> %s', src_fname, dest_fname)
+        log.info('Copying "ExcelRunner" files: \n    %s --> %s', src_fname, dest_fname)
         shutil.copy(src_fname, dest_fname)
         files_copied.append(dest_fname)
     
@@ -319,7 +317,7 @@ def add_windows_shortcuts_to_start_menu(my_option):
             f = os.path.basename(src_f)
             dest_f = os.path.join(prog_dir, f)
             if os.path.exists(dest_f):
-                log.debug('Removing previous entry(%s) from existing Program-folder(%s).', f, prog_dir)
+                log.trace('Removing previous entry(%s) from existing Program-folder(%s).', f, prog_dir)
                 try:
                     os.unlink(dest_f)
                 except Exception as ex:
@@ -334,7 +332,7 @@ def add_windows_shortcuts_to_start_menu(my_option):
     #
     group_path = os.path.join(startMenu_dir, win_menu_group)
     if os.path.exists(group_path):
-        log.debug('Removing all entries from existing StartMenu-group(%s).', win_menu_group)
+        log.trace('Removing all entries from existing StartMenu-group(%s).', win_menu_group)
         for f in glob.glob(os.path.join(group_path, '*')):
             try:
                 os.unlink(f)
@@ -349,7 +347,7 @@ def add_windows_shortcuts_to_start_menu(my_option):
     
     for name, shcut in shcuts.items():
         path = os.path.join(group_path, name)
-        log.notice('Creating StartMenu-item: %s', path)
+        log.info('Creating StartMenu-item: %s', path)
         try:
             utils.win_create_shortcut(wshell, path, **shcut)
         except Exception as ex:
@@ -542,7 +540,7 @@ def parse_many_file_args(many_file_args, filemode, col_renames=None):
 def load_file_as_df(filespec):
 # FileSpec(io_method, fname, file, frmt, path, append, kws)
     method = filespec.io_method
-    log.debug('Reading file with: pandas.%s(%s, %s)', method.__name__, filespec.fname, filespec.kws)
+    log.trace('Reading file with: pandas.%s(%s, %s)', method.__name__, filespec.fname, filespec.kws)
     if filespec.file is None:       ## ie. when reading CLIPBOARD
         dfin = method(**filespec.kws)
     else:
@@ -567,7 +565,7 @@ def load_file_as_df(filespec):
 
 def load_model_part(mdl, filespec):
     dfin = load_file_as_df(filespec)
-    log.debug("  +-input-file(%s):\n%s", filespec.fname, dfin.head())
+    log.trace("  +-input-file(%s):\n%s", filespec.fname, dfin.head())
     if filespec.path:
         model.set_jsonpointer(mdl, filespec.path, dfin)
     else:
@@ -606,7 +604,7 @@ def store_part_as_df(filespec, part):
     '''
 
     if isinstance(part, NDFrame):
-        log.debug('Writing file with: pandas.%s(%s, %s)', filespec.io_method, filespec.fname, filespec.kws)
+        log.trace('Writing file with: pandas.%s(%s, %s)', filespec.io_method, filespec.fname, filespec.kws)
         if filespec.file is None:       ## ie. when reading CLIPBOARD
             method = ops.methodcaller(filespec.io_method, **filespec.kws)
         else:
