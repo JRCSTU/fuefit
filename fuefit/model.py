@@ -5,7 +5,9 @@
 # Licensed under the EUPL (the 'Licence');
 # You may not use this work except in compliance with the Licence.
 # You may obtain a copy of the Licence at: http://ec.europa.eu/idabc/eupl
-'''Function for building and jsonschema-validating input and output model.'''
+'''
+Function for building and jsonschema-validating input and output model.
+'''
 
 from collections.abc import Mapping, Sequence 
 import json

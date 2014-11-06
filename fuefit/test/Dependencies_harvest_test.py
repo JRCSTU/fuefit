@@ -5,11 +5,8 @@
 # Licensed under the EUPL (the 'Licence');
 # You may not use this work except in compliance with the Licence.
 # You may obtain a copy of the Licence at: http://ec.europa.eu/idabc/eupl
-'''Check pdcalc's function-dependencies exploration, reporting and classes .
-
-Created on Apr 23, 2014
-
-@author: ankostis
+'''
+Check pdcalc's function-dependencies exploration, reporting and classes .
 '''
 import logging
 import unittest

@@ -9,6 +9,7 @@
     usage
     contribute
     faq
+    code
     CHANGES
     indices
 

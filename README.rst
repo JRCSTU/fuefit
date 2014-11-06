@@ -93,10 +93,15 @@ from each of the following categories (column-headers are case-insensitive):
 Quick-start
 -----------
 Assuming you have a working python-environment, open a *command-shell*, 
-(in *Windows* use :program:`cmd.exe` BUT with :program:`python.exe` in its :envvar:`PATH`), 
+(in *Windows* use :program:`cmd.exe` BUT ensure :program:`python.exe` is in its :envvar:`PATH`), 
 you can try the following commands: 
 
-:Install:       ``$ pip install fuefit --pre``  
+:Install:
+    .. code-block:: console
+
+        $ pip install fuefit --pre  
+        $ fuefit --winmenus                             ## Windows only
+    
 :Cmd-line:
     .. code-block:: console
 
@@ -115,7 +120,6 @@ you can try the following commands:
             -O - model_path=/engine/fc_map_coeffs \
             -m /params/plot_maps@=True
 
-:Start-menu:    ``$ fuefit --winmenus                             ## Windows only``
 :Excel:         ``$ fuefit --excelrun                             ## Windows & OS X only``
 :Python-code: 
     .. code-block:: python
@@ -161,7 +165,7 @@ you can try the following commands:
       To register it, go to :menuselection:`Start menu --> All Programs --> WinPython --> WinPython ControlPanel`, and then
       :menuselection:`Options --> Register Distribution` .
       
-For more elaborate instructions, read the sections that follow.
+For more elaborate instructions, read the next sections.
 
 
 
@@ -169,16 +173,18 @@ For more elaborate instructions, read the sections that follow.
 
 Install
 =======
-Current |version| runs on Python-3.3+ and is distributed on `Wheels <https://pypi.python.org/pypi/wheel>`_.
+Current |version| runs on Python-3.3+ and it is distributed on `Wheels <https://pypi.python.org/pypi/wheel>`_.
 
-First make sure that no older version are left over.  So run *twice* this command:
+Before installing it, make sure that there are no older versions left over.  
+So run this command until you cannot find any project installed:
 
 .. code-block:: console
 
     $ pip uninstall fuefit                                      ## Use `pip3` if both python-2 & 3 are in PATH.
     
     
-You can install (or upgrade) the project from the `PyPi` repo using the "standard" way with :command:`pip`.
+You can install the project directly from the |pypi|_ the "standard" way, 
+by typing the :command:`pip` in the console:
 
 .. code-block:: console
 
@@ -190,17 +196,25 @@ You can install (or upgrade) the project from the `PyPi` repo using the "standar
 
 * If you want to upgrade an existing instalation along with all its dependencies, 
   add also :option:`--upgrade` (or :option:`-U` equivalently), but then the build might take some 
-  considerable time to finish.  Also there is the possibility the upgraded libraries might break existing programs(!)
-  so use it with caution, or from within a *virtualenv* (see below). 
+  considerable time to finish.  Also there is the possibility the upgraded libraries might break 
+  existing programs(!) so use it with caution, or from within a |virtualenv|_. 
 
+* To install an older version issue the console command:
+  
+  .. code-block:: console
+  
+      $ pip install fuefit=1.1.1                    ## Use `--pre` if version-string has a build-suffix.
 
-.. Tip:
+* To install it for different Python environments, repeat the procedure using 
+  the appropriate :program:`python.exe` interpreter for each environment.
+
+* .. Tip::
     To debug installation problems, you can export a non-empty :envvar:`DISTUTILS_DEBUG` 
     and *distutils* will print detailed information about what it is doing and/or 
     print the whole command line when an external program (like a C compiler) fails.
 
 
-After installation, it is important that you check which version is visible in your path:
+After installation, it is important that you check which version is visible in your :envvar:`PATH`:
 
 .. code-block:: console
 
@@ -209,32 +223,45 @@ After installation, it is important that you check which version is visible in y
         
 
 
-To install it on different Python versions, repeat step 3 for every required version.
 
-Particularly for the latest *WinPython* environments (*Windows* / *OS X*) you can install dependencies with: 
+Installing from sources
+-----------------------
+If you download the sources you have more options for installation.
+There are various methods to get hold of them:
+
+* Download a `release-snapshot from github <https://github.com/ankostis/fuefit/releases>`_
+* Download the *source* distribution from |pypi|_.
+* Clone the *git-repository* at *github*.
+
+  Assuming you have a working installation of `git <http://git-scm.com/>`_
+  you can fetch and install the latest version of the project with the following series of commands:
+  
+  .. code-block:: console
+  
+      $ git clone "https://github.com/ankostis/fuefit.git" fuefit.git
+      $ cd fuefit.git
+      $ python setup.py install                                 ## Use `python3` if both python-2 & 3 installed.
+  
+
+When working with sources, you need to have installed all libraries that the project depends on. 
+Particularly for the latest *WinPython* environments (*Windows* / *OS X*) you can install 
+the necessary dependencies with: 
 
 .. code-block:: console
 
     $ pip install -r WinPython_requirements.txt -U .
 
 
-The previous command install dependencies in the system's folders.
-If you want to avoid that (because, for instance, you do not have *admin-rights*), but 
-you do not want to use a `virtualenv <http://docs.python-guide.org/en/latest/dev/virtualenvs/>`_, 
-you can install dependencies inside the project-folder with this command:
-
-.. code-block:: console
-
-    $ python setup.py install                       ## Use `python3` if you have installed both python-2 & 3.
-    
-
-The previous command install just the latest version of the project.
+The previous command installs a "snapshot" of the project as it is found in the sources.
 If you wish to link the project's sources with your python environment, install the project 
 in `development mode <http://pythonhosted.org/setuptools/setuptools.html#development-mode>`_:
 
 .. code-block:: console
 
     $ python setup.py develop
+
+
+.. Note:: This last command installs any missing dependencies inside the project-folder.
 
 
 
@@ -302,6 +329,9 @@ All the above commands creates two files:
 
 Some general notes regarding the python-code from excel-cells:
 
+* An elaborate syntax to reference excel *cells*, *rows*, *columns* or *tables* from python code, and 
+  to read them as :class:`pandas.DataFrame` is utilized by the Excel .
+  Read its syntax at :func:`fuefit.excel.fuefit_excel_runner.match_excel_ref`.
 * On each invocation, the predefined VBA module `pandalon` executes a dynamically generated python-script file
   in the same folder where the excel-file resides, which, among others, imports the "sister" python-script file.
   You can read & modify the sister python-script to import libraries such as 'numpy' and 'pandas', 
@@ -400,6 +430,12 @@ Footnotes
         Department Mechanical Engineering, Dynamics and Control Technology Group,
         http://alexandria.tue.nl/repository/books/612441.pdf
 
+.. |virtualenv| replace::  *virtualenv* (isolated Python environment)
+.. _virtualenv: http://docs.python-guide.org/en/latest/dev/virtualenvs/
+
+.. |pypi| replace:: *PyPi* repo
+.. _pypi: https://pypi.python.org/pypi/fuefit
+
 .. |docs-status| image:: https://readthedocs.org/projects/fuefit/badge/
     :alt: Documentation status
     :scale: 100%
@@ -424,7 +460,6 @@ Footnotes
 .. |github-issues| image:: http://img.shields.io/github/issues/ankostis/fuefit.svg
     :target: https://github.com/ankostis/fuefit/issues
     :alt: Issues count
-
 
 .. glossary::
 

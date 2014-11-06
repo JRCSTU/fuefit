@@ -5,7 +5,8 @@
 # Licensed under the EUPL (the 'Licence');
 # You may not use this work except in compliance with the Licence.
 # You may obtain a copy of the Licence at: http://ec.europa.eu/idabc/eupl
-''''fuefit: Fit fuel-consumption engine-maps on a physical formula with 6 parameters.
+''''
+fuefit: Fit fuel-consumption engine-maps on a physical formula with 6 parameters.
 
 
 Install:
@@ -22,10 +23,6 @@ Or get it directly from the PIP repository::
 
 
 Tested with Python 3.4.
-
-
-@author: ankostis@gmail.com, Apr-2014, JRC, (c) EUPL or later
-
 '''
 
 from distutils.version import StrictVersion
@@ -197,7 +194,7 @@ setup(
     zip_safe=False,
     options={
         'build_sphinx' :{
-            'build_dir': 'docs/_build',
+            'build_dir': 'Docs/_build',
         },
     },
 )

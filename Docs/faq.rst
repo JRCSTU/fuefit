@@ -18,7 +18,7 @@ Technical
 =========
 
 I followed the instructions but i still cannot install/run/get *X*.  What now?
------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 If you have no previous experience in python, setting up your environment and installing a new project
 is a demanding, but manageable, task.  Here is a checklist of things that might go wrong:
 

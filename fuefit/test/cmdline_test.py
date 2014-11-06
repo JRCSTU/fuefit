@@ -5,11 +5,8 @@
 # Licensed under the EUPL (the 'Licence');
 # You may not use this work except in compliance with the Licence.
 # You may obtain a copy of the Licence at: http://ec.europa.eu/idabc/eupl
-'''Check cmdline parsing and model building.
-
-Created on Apr 17, 2014
-
-@author: ankostis
+'''
+Check cmdline parsing and model building.
 '''
 
 from argparse import ArgumentTypeError
@@ -44,13 +41,13 @@ _init_logging(logging.INFO)
 log = logging.getLogger(__name__)
 
 
-def join_my_path(fname):
-    return os.path.join(os.path.dirname(__file__), fname)
+def from_my_path(*parts):
+    return os.path.join(os.path.dirname(__file__), *parts)
 
 def copy_test_data_files_to_cwd():
     copy_paths = ['*.xlsx', '*.csv']
     for path in copy_paths:
-        for f in glob.glob(join_my_path(path)):
+        for f in glob.glob(from_my_path(path)):
             shutil.copy(f, '.')
 
 
@@ -336,7 +333,7 @@ class TestFuncs(unittest.TestCase):
     def testSmoke_BuildModel_model_overrideParse_n_print(self):
         import pandas as pd
 
-        fname = join_my_path('test_table.csv')
+        fname = from_my_path('test_table.csv')
         opts = {'m':[[('fuel','diesel')]] }
         filespecs = [
             FileSpec(pd.read_csv, fname, open(fname, 'r'), 'CSV', '/measured_eng_points', None, None, {})
@@ -350,7 +347,7 @@ class TestFuncs(unittest.TestCase):
     def testBuildModel_validate(self):
         import pandas as pd
 
-        fname = join_my_path('test_table.csv')
+        fname = from_my_path('test_table.csv')
         model_overrides = [[('fuel','diesel')]]
         filespecs = [
             FileSpec(pd.read_csv, fname, open(fname, 'r'), 'CSV', '/measured_eng_points', None, None, {})
