@@ -106,7 +106,7 @@ you can try the following commands:
     .. code-block:: console
 
         $ fuefit --version
-        0.0.4-alpha.1
+        0.0.4-alpha.3
         
         $ fuefit --help
         ...
@@ -219,7 +219,7 @@ After installation, it is important that you check which version is visible in y
 .. code-block:: console
 
     $ fuefit --version
-    0.0.4-alpha.1
+    0.0.4-alpha.3
         
 
 
@@ -337,8 +337,9 @@ Some general notes regarding the python-code from excel-cells:
   You can read & modify the sister python-script to import libraries such as 'numpy' and 'pandas', 
   or pre-define utility python functions.
 * The name of the sister python-script is automatically calculated from the name of the Excel-file,
-  and it must be valid as a python module-name.  Therefore do not use non-alphanumeric characters such as 
-  spaces(` `), dashes(`-`) and dots(`.`) on the Excel-file.
+  and it must be valid as a python module-name.  Therefore:
+  * Do not use non-alphanumeric characters such as spaces(` `), dashes(`-`) and dots(`.`) on the Excel-file.
+  * If you rename the excel-file, rename also the python-file, or add this python :samp:`import <old_py_file> as mypy``
 * On errors, a log-file is written in the same folder where the excel-file resides, 
   for as long as **the message-box is visible, and it is deleted automatically after you click 'ok'!**
 * Read http://docs.xlwings.org/quickstart.html

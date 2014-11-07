@@ -140,8 +140,27 @@ def model_schema(additional_properties = False):
                             } #fuel-props
                         }, #fuel
                         'plot_maps': {
-                            "title": "plot engine-maps?",
-                            "type": "boolean",
+                            "title": "Plot engine-maps?",
+                            "type": ["boolean", "number"],
+                            "default": False,
+                        },
+                        'robust_fit': {
+                            "title": "Robust fitting?",
+                            "description": dedent("""
+                                When `robust`, outliers are excluded from the fitted-data,
+                                by using a non-linear iteratively-reweighted least-squares (IRLS) fitting-method.
+                                
+                                See :func:`fuefit.robustfit.curve_fit()` for more.
+                            """),
+                            "type": ["boolean", "number"],
+                            "default": False,
+                        },
+                        'limit_coeffs': {
+                            "title": "Enforce limits into the coefficients",
+                            "description": dedent("""
+                                Enforce limits into the fit-coefficients
+                            """),
+                            "type": ["boolean", "number"],
                             "default": False,
                         },
                 }
@@ -346,9 +365,12 @@ def base_model():
         },
         'params': {
             'fuel': {
-                'diesel':{'lhv':42700},
-                'petrol':{'lhv':43000},
-            }
+                'diesel':   {'lhv':42700},
+                'petrol':   {'lhv':43000},
+            },
+            'plot_maps':        False,
+            'robust_fit':       False,
+            'limit_coeffs':     False,
         }
     }
 

@@ -44,13 +44,13 @@ def run(mdl, opts=None):
 
     ## FIT
     #
-    fitted_coeffs = fit_map(measured_eng_points)
+    fitted_coeffs = fit_map(resolve_jsonpointer(mdl, '/params/robust_fit'), measured_eng_points)
     engine['fc_map_coeffs'] = fitted_coeffs
 
     fitted_eng_points   = reconstruct_eng_points_fitted(engine, fitted_coeffs, measured_eng_points)
     std_to_norm_map(engine, fitted_eng_points)
 
-    if resolve_jsonpointer(mdl, '/params/plot_maps', False):
+    if resolve_jsonpointer(mdl, '/params/plot_maps'):
         mesh_eng_points     = generate_mesh_eng_points_fitted(measured_eng_points, fitted_coeffs, measured_eng_points)
         columns = ['pmf', 'cm', 'pme']
         plot_map(measured_eng_points, mesh_eng_points, columns)
@@ -122,9 +122,11 @@ def fitfunc(X, a, b, c, a2, b2, loss0, loss2):
     return z
 
 
-def fit_map(df):
-    from scipy.optimize import curve_fit as curve_fit
-    #from .robustfit import curve_fit
+def fit_map(is_robust, df):
+    if is_robust:
+        from .robustfit import curve_fit
+    else:
+        from scipy.optimize import curve_fit as curve_fit
 
     assert not np.any(np.isnan(df['pmf'])), \
             "Cannot fit with NaNs in `pmf` data! \n%s" % np.any(np.isnan(df['pmf']), axis=1)
