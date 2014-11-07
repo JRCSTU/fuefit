@@ -119,7 +119,7 @@ Sub ExecuteWindows(IsFrozen As Boolean, Command As String, PYTHON_WIN As String,
     PythonTxt = "import sys; sys.path.append(r'" & PYTHONPATH & "'); " & Command
     Call WriteFile(PYTHON_FILE, PythonTxt)
 
-    ' Create a Python script thats adds the Workbook-path into the `sys.path` and then run it
+    ' Create a Python script thats adds the Workb-path into the `sys.path` and then run it
     ' with the workbook-fullname and "from_xl" as 1st and 2nd arguments.
     ' Then redirect stderr to the LOG_FILE and wait for the call to return.
     PythonExec = "cmd.exe /C " & DriveCommand & _
@@ -295,5 +295,4 @@ Private Sub CleanUp()
     Application.StatusBar = False
     Application.ScreenUpdating = True
 End Sub
-
 

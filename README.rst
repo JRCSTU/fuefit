@@ -99,14 +99,14 @@ you can try the following commands:
 :Install:
     .. code-block:: console
 
-        $ pip install fuefit --pre  
-        $ fuefit --winmenus                             ## Windows only
+        $ pip install fuefit --pre
+        $ fuefit --winmenus                         ## Adds StartMenu-items, Windows only.
     
 :Cmd-line:
     .. code-block:: console
 
         $ fuefit --version
-        0.0.4-alpha.3
+        0.0.4-beta.1
         
         $ fuefit --help
         ...
@@ -219,7 +219,7 @@ After installation, it is important that you check which version is visible in y
 .. code-block:: console
 
     $ fuefit --version
-    0.0.4-alpha.3
+    0.0.4-beta.1
         
 
 
@@ -397,7 +397,6 @@ For information on the model-data, check the schema:
 
 
 You can always check the Test-cases and the :mod:`fuefit.cmdline` for sample code.
-You explore documentation in Html by serving it with a web-server:
 
 
 

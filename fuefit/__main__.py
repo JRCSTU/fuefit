@@ -97,7 +97,7 @@ import sys
 from textwrap import dedent
 
 from fuefit import model, processor, utils
-from fuefit._version import __version__ as prog_ver# @UnusedImport
+from fuefit import __version__ as prog_ver
 from fuefit.model import (JsonPointerException, json_dump, json_dumps, validate_model)
 from pandas.core.generic import NDFrame
 
