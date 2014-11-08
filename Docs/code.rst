@@ -14,7 +14,7 @@ Content below is automatically produced from `docstrings` in the sources, and ne
 .. currentmodule:: fuefit.excel
 .. autosummary::
 
-    fuefit_excel_runner
+    FuefitExcelRunner
 
 
 .. currentmodule:: fuefit.test
@@ -44,9 +44,9 @@ Module: :mod:`fuefit.pdcalc`
 .. automodule:: fuefit.pdcalc
     :members:
 
-Module: :mod:`fuefit.excel.fuefit_excel_runner`
------------------------------------------------
-.. automodule:: fuefit.excel.fuefit_excel_runner
+Module: :mod:`fuefit.excel.FuefitExcelRunner`
+---------------------------------------------
+.. automodule:: fuefit.excel.FuefitExcelRunner
     :members:
 
 Module: :mod:`fuefit.test.cmdline_test`

@@ -252,7 +252,7 @@ def copy_excel_template_files(dest_dir=None):
     except:
         pass ## Might already exist
     
-    files_to_copy = ['fuefit_excel_runner.xlsm', 'fuefit_excel_runner.py']
+    files_to_copy = ['FuefitExcelRunner.xlsm', 'FuefitExcelRunner.py']
     files_to_copy = [pkg.resource_filename('fuefit.excel', f) for f in files_to_copy] #@UndefinedVariable
     files_copied = []
     for src_fname in files_to_copy:

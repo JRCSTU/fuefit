@@ -16,7 +16,7 @@ import xlwings as xw
 import pandas as pd
 import numpy as np
 from numpy import testing as npt
-from fuefit.excel.fuefit_excel_runner import resolve_excel_ref
+from fuefit.excel.FuefitExcelRunner import resolve_excel_ref
 from pandas.core.generic import NDFrame
 
 
@@ -112,10 +112,10 @@ class TestExcel(unittest.TestCase):
 
 
         def test_excel_runner_call_from_python(self):
-            from fuefit.excel import fuefit_excel_runner 
-            wb = xw.Workbook(from_my_path('..', 'excel', 'fuefit_excel_runner'))
+            from fuefit.excel import FuefitExcelRunner 
+            wb = xw.Workbook(from_my_path('..', 'excel', 'FuefitExcelRunner'))
             try:
-                fuefit_excel_runner.main()
+                FuefitExcelRunner.main()
             finally:
                 close_workbook(wb)
 

@@ -106,7 +106,7 @@ you can try the following commands:
     .. code-block:: console
 
         $ fuefit --version
-        0.0.4-beta.1
+        0.0.4-alpha.4
         
         $ fuefit --help
         ...
@@ -219,7 +219,7 @@ After installation, it is important that you check which version is visible in y
 .. code-block:: console
 
     $ fuefit --version
-    0.0.4-beta.1
+    0.0.4-alpha.4
         
 
 
@@ -290,12 +290,12 @@ and the excel will open them in one-shot.
 
 All the above commands creates two files:
 
-:file:`fuefit_excel_runner{#}.xlsm`
+:file:`FuefitExcelRunner{#}.xlsm`
     The python-enabled excel-file where input and output data are written, as seen in the screenshot below:
     
     .. image:: docs/xlwings_screenshot.png
         :scale: 50%
-        :alt: Screenshot of the `fuefit_excel_runner.xlsm` file.
+        :alt: Screenshot of the `FuefitExcelRunner.xlsm` file.
     
     After opening it the first tie, enable the macros on the workbook, select the python-code at the left and click 
     the :menuselection:`Run Selection as Pyhon` button; one sheet per vehicle should be created.
@@ -307,7 +307,7 @@ All the above commands creates two files:
     To add more input-columns, you need to set as column *Headers* the *json-pointers* path of the desired 
     model item (see `Python usage`_ below,).
 
-:file:`fuefit_excel_runner{#}.py`   
+:file:`FuefitExcelRunner{#}.py`   
     Python functions used by the above xls-file for running a batch of experiments.  
     
     The particular functions included reads multiple vehicles from the input table with various  
@@ -320,7 +320,7 @@ All the above commands creates two files:
 
     .. code-block:: console
     
-         $ python fuefit_excel_runner.py
+         $ python FuefitExcelRunner.py
     
     The script will open the excel-file, run the experiments and add the new sheets, but in case any errors occur, 
     this time you can debug them, if you had executed the script through `LiClipse <http://www.liclipse.com/>`__, 
@@ -331,7 +331,7 @@ Some general notes regarding the python-code from excel-cells:
 
 * An elaborate syntax to reference excel *cells*, *rows*, *columns* or *tables* from python code, and 
   to read them as :class:`pandas.DataFrame` is utilized by the Excel .
-  Read its syntax at :func:`~fuefit.excel.fuefit_excel_runner.resolve_excel_ref`.
+  Read its syntax at :func:`~fuefit.excel.FuefitExcelRunner.resolve_excel_ref`.
 * On each invocation, the predefined VBA module `pandalon` executes a dynamically generated python-script file
   in the same folder where the excel-file resides, which, among others, imports the "sister" python-script file.
   You can read & modify the sister python-script to import libraries such as 'numpy' and 'pandas', 
@@ -372,7 +372,7 @@ First run :command:`python` or :command:`ipython` and try to import the project 
     >>> import fuefit
 
     >>> fuefit.__version__              ## Check version once more.
-    '0.0.4-beta.1'
+    '0.0.4-alpha.4'
 
     >>> fuefit.__file__                   ## To check where it was installed.         # doctest: +SKIP
     /usr/local/lib/site-package/fuefit-...
