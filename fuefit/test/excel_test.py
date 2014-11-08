@@ -42,6 +42,12 @@ def _make_sample_workbook(sheetname, addr, value):
 
     return wb
 
+def close_workbook(wb):
+    try:
+        wb.close()
+    except Exception:
+        log.warning('Minor failure while closing Workbook!', exc_info=True)
+
 
 @skipIf(not 'darwin' in sys.platform and not 'win32' in sys.platform, "Cannot test xlwings in Linux")
 class TestExcel(unittest.TestCase):
@@ -56,10 +62,7 @@ class TestExcel(unittest.TestCase):
             xw.Sheet(1).name = sheetname
             xw.Range(addr).value = table
         finally:
-            try:
-                wb.close()
-            except Exception:
-                log.warning('Minor failure while closing Workbook!', exc_info=True)
+            close_workbook(wb)
 
 
     def test_excel_refs(self):
@@ -102,13 +105,19 @@ class TestExcel(unittest.TestCase):
                     log.exception('%i: INP(%s), OUT(%s), EXP(%s), FAIL: %s' % (i, inp, out, exp, ex))
                     errors.append(ex)
         finally:
-            try:
-                wb.close()
-            except Exception:
-                log.warning('Minor failure while closing Workbook!', exc_info=True)
+            close_workbook(wb)
 
         if errors:
             raise Exception('There are %i out of %i errors!'% (len(errors), len(cases)))
+
+
+        def test_excel_runner_call_from_python(self):
+            from fuefit.excel import fuefit_excel_runner 
+            wb = xw.Workbook(from_my_path('..', 'excel', 'fuefit_excel_runner'))
+            try:
+                fuefit_excel_runner.main()
+            finally:
+                close_workbook(wb)
 
 
 if __name__ == "__main__":
