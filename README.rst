@@ -127,14 +127,14 @@ you can try the following commands:
         import pandas as pd
         from fuefit import model, processor
         
-        input_model = mdl = model.base_model()
+        input_model = mdl = datamodel.base_model()
         input_model.update({...})                                   ## See "Python Usage" below.
         input_model['engine_points'] = pd.read_csv('measured.csv')  ## Can also read Excel, matlab, ...
-        mdl = model.validate_model(mdl, additional_props) 
+        mdl = datamodel.validate_model(mdl, additional_properties=False) 
         
         output_model = processor.run(input_model)
         
-        print(model.resolve_jsonpointer(output_model, '/engine/fc_map_coeffs'))
+        print(datamodel.resolve_jsonpointer(output_model, '/engine/fc_map_coeffs'))
         print(output_model['fitted_eng_points'])
 
 .. Tip::
@@ -331,7 +331,7 @@ Some general notes regarding the python-code from excel-cells:
 
 * An elaborate syntax to reference excel *cells*, *rows*, *columns* or *tables* from python code, and 
   to read them as :class:`pandas.DataFrame` is utilized by the Excel .
-  Read its syntax at :func:`fuefit.excel.fuefit_excel_runner.resolve_excel_ref`.
+  Read its syntax at :func:`~fuefit.excel.fuefit_excel_runner.resolve_excel_ref`.
 * On each invocation, the predefined VBA module `pandalon` executes a dynamically generated python-script file
   in the same folder where the excel-file resides, which, among others, imports the "sister" python-script file.
   You can read & modify the sister python-script to import libraries such as 'numpy' and 'pandas', 
@@ -359,44 +359,78 @@ Example command::
         -O ~t.csv model_path= -m /params/plot_maps@=True
 
 
+
 Python usage
 ------------
-Example code:
+Example python :abbr:`REPL (Read-Eval-Print Loop)` example-commands  are given below 
+that setup and run an *experiment*.
+  
+First run :command:`python` or :command:`ipython` and try to import the project to check its version:
+
+.. doctest::
+
+    >>> import fuefit
+
+    >>> fuefit.__version__              ## Check version once more.
+    '0.0.4-beta.1'
+
+    >>> fuefit.__file__                   ## To check where it was installed.         # doctest: +SKIP
+    /usr/local/lib/site-package/fuefit-...
+
+
+.. Tip:
+    The use :command:`ipython` is preffered over :command:`python` since it offers various user-friendly 
+    facilities, such as pressing :kbd:`Tab` for completions, or allowing you to suffix commands with `?` or `??` 
+    to get help and read their source-code.
+    
+    Additionally you can <b>copy any python commands starting with ``>>>`` and ``...``</b> and copy paste them directly
+    into the ipython interpreter; it will remove these prefixes.  
+    But in :command:`python` you have to remove it youself.
+
+
+If everything works, take the **base-model** and extend it your input-data (strings and numbers): 
 
 .. code-block:: pycon
 
-    >> from fuefit import model, processor
+    >>> from fuefit import datamodel, processor
 
-    >> input_model = model.base_model()
-    >> input_model.update({
-        "engine": {
-            "fuel": "diesel",
-            "p_max": 95,
-            "n_idle": 850,
-            "n_rated": 6500,
-            "stroke": 94.2,
-            "capacity": 2000,
-            "bore": null,
-            "cylinders": null,
-        }
-    })
+    >>> input_model = datamodel.base_model()
+    >>> input_model.update({
+    ...     "engine": {
+    ...         "fuel":     "diesel",
+    ...         "p_max":    95,
+    ...         "n_idle":   850,
+    ...         "n_rated":  6500,
+    ...         "stroke":   94.2,
+    ...         "capacity": 2000,
+    ...         "bore":     None,       ##You do not have to include these,
+    ...         "cylinders": None,      ##  they are just for displaying some more engine properties.
+    ...     }
+    ... })
 
-    >> model.validate_model(input_model)
+For information on the accepted model-data, check both its :term:`JSON-schema` at :func:`~fuefit.datamodel.model_schema`,
+and the :func:`~fuefit.datamodel.base_model`:
 
-    >> output_model = processor.run(input_model)
-
-    >> print(output_model['engine'])
-    >> print(output_model['fitted_eng_maps'])
-
-
-For information on the model-data, check the schema:
+Next you have to *validate* it against its *JSON-schema*:
 
 .. code-block:: pycon
 
-    >> print(fuefit.model.model_schema())
+    >>> datamodel.validate_model(input_model, additional_properties=False)
 
 
-You can always check the Test-cases and the :mod:`fuefit.cmdline` for sample code.
+If validation is successful, you may then feed this model-tree to the :mod:`fuefit.processor`,
+and get back the results:
+
+.. code-block:: pycon
+
+    >>> output_model = processor.run(input_model)                   # doctest: +SKIP
+
+    >>> print(output_model['fitted_eng_maps'])                      # doctest: +SKIP
+    >>> print(output_model['fitted_eng_points'].shape)              # doctest: +SKIP
+
+
+.. Hint::
+    You can always check the sample code at the Test-cases and in the cmdline tool :mod:`fuefit.__main__`.
 
 
 

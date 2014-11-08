@@ -96,9 +96,9 @@ import shutil
 import sys
 from textwrap import dedent
 
-from fuefit import model, processor, utils
+from fuefit import datamodel, processor, utils
 from fuefit import __version__ as prog_ver
-from fuefit.model import (JsonPointerException, json_dump, json_dumps, validate_model)
+from fuefit.datamodel import (JsonPointerException, json_dump, json_dumps)
 from pandas.core.generic import NDFrame
 
 import jsonschema as jsons
@@ -220,7 +220,7 @@ def main(argv=None):
         additional_props = not opts.strict
         mdl = assemble_model(infiles, opts.m)
         log.debug("Input Model(strict: %s): %s", opts.strict, utils.Lazy(lambda: json_dumps(mdl, 'to_string')))
-        mdl = validate_model(mdl, additional_props)
+        datamodel.validate_model(mdl, additional_props)
 
         mdl = processor.run(mdl, opts)
 
@@ -567,7 +567,7 @@ def load_model_part(mdl, filespec):
     dfin = load_file_as_df(filespec)
     log.trace("  +-input-file(%s):\n%s", filespec.fname, dfin.head())
     if filespec.path:
-        model.set_jsonpointer(mdl, filespec.path, dfin)
+        datamodel.set_jsonpointer(mdl, filespec.path, dfin)
     else:
         mdl = dfin
     return mdl
@@ -575,7 +575,7 @@ def load_model_part(mdl, filespec):
 
 def assemble_model(infiles, model_overrides):
 
-    mdl = model.base_model()
+    mdl = datamodel.base_model()
 
     for filespec in infiles:
         try:
@@ -589,7 +589,7 @@ def assemble_model(infiles, model_overrides):
             try:
                 if (not json_path.startswith('/')):
                     json_path = _default_model_overridde_path + json_path
-                model.set_jsonpointer(mdl, json_path, value)
+                datamodel.set_jsonpointer(mdl, json_path, value)
             except Exception as ex:
                 raise Exception("Failed setting model-value(%s) due to: %s" %(json_path, value, ex)) from ex
 
@@ -618,7 +618,7 @@ def store_model_parts(mdl, outfiles):
     for filespec in outfiles:
         try:
             try:
-                part = model.resolve_jsonpointer(mdl, filespec.path)
+                part = datamodel.resolve_jsonpointer(mdl, filespec.path)
             except JsonPointerException:
                 log.warning('Nothing found at model(%s) to write to file(%s).', filespec.path, filespec.fname)
             else:

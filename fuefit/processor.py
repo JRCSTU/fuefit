@@ -6,17 +6,17 @@
 # You may not use this work except in compliance with the Licence.
 # You may obtain a copy of the Licence at: http://ec.europa.eu/idabc/eupl
 """
-The core calculations required for transforming the Input-model to the Output one.
+The core calculations required for transforming the Input-datamodel to the Output one.
 
 Uses *pandalon*'s automatic dependency extraction from calculation functions.
 """
 import logging
 
-from fuefit.model import resolve_jsonpointer
 import numpy as np
 import pandas as pd
 
-from . import pdcalc, model
+from . import pdcalc
+from fuefit import datamodel
 from collections import OrderedDict
 
 
@@ -25,13 +25,13 @@ log = logging.getLogger(__name__)
 
 def run(mdl, opts=None):
     """
-    :param mdl: the model to process, all params and data
+    :param mdl: the datamodel to process, all params and data
     :param map opts: flags controlling non-functional aspects of the process (ie error-handling and logging, gui, etc)
     """
 
-    model.ensure_modelpath_Series(mdl, '/engine')
-    model.ensure_modelpath_Series(mdl, '/params')
-    model.ensure_modelpath_DataFrame(mdl, '/measured_eng_points')
+    datamodel.ensure_modelpath_Series(mdl, '/engine')
+    datamodel.ensure_modelpath_Series(mdl, '/params')
+    datamodel.ensure_modelpath_DataFrame(mdl, '/measured_eng_points')
 
     params              = mdl['params']
     engine              = mdl['engine']
@@ -44,13 +44,13 @@ def run(mdl, opts=None):
 
     ## FIT
     #
-    fitted_coeffs = fit_map(resolve_jsonpointer(mdl, '/params/robust_fit'), measured_eng_points)
+    fitted_coeffs = fit_map(datamodel.resolve_jsonpointer(mdl, '/params/robust_fit'), measured_eng_points)
     engine['fc_map_coeffs'] = fitted_coeffs
 
     fitted_eng_points   = reconstruct_eng_points_fitted(engine, fitted_coeffs, measured_eng_points)
     std_to_norm_map(engine, fitted_eng_points)
 
-    if resolve_jsonpointer(mdl, '/params/plot_maps'):
+    if datamodel.resolve_jsonpointer(mdl, '/params/plot_maps'):
         mesh_eng_points     = generate_mesh_eng_points_fitted(measured_eng_points, fitted_coeffs, measured_eng_points)
         columns = ['pmf', 'cm', 'pme']
         plot_map(measured_eng_points, mesh_eng_points, columns)
@@ -69,7 +69,7 @@ def run(mdl, opts=None):
     mdl['measured_eng_points'] = measured_eng_points
     mdl['fitted_eng_points'] = pd.DataFrame(fitted_eng_points)
 
-    #model.validate_model(mdl, additional_properties=False) TODO: Make OUT-MODEL pass validation. 
+    #datamodel.validate_model(mdl, additional_properties=False) TODO: Make OUT-MODEL pass validation. 
     
     return mdl
 
@@ -197,7 +197,7 @@ def plot_map(dfin, fitted_eng_points, columns):
     plt.show()
 
 
-def proc_vehicle(dfin, model):
+def proc_vehicle(dfin, datamodel):
 
     ## Filter values
     #

@@ -12,51 +12,51 @@ import unittest
 
 import jsonschema
 
-from .. import model
+from fuefit import datamodel
 
 
 class Test(unittest.TestCase):
 
     @unittest.expectedFailure #Due to extra types: DataFrame, Series
     def testSchema(self):
-        validator = model.model_validator()
-        validator.check_schema(model.model_schema())
+        validator = datamodel.model_validator()
+        validator.check_schema(datamodel.model_schema())
 
     def testShema_emptyInstanceFail(self):
-        validator = model.model_validator()
+        validator = datamodel.model_validator()
         instance = {}
 
         self.assertRaises(jsonschema.ValidationError, validator.validate, instance)
 
     def testModelBase_fail(self):
-        mdl = model.base_model()
+        mdl = datamodel.base_model()
 
-        self.assertRaises(jsonschema.ValidationError, model.model_validator().validate, mdl)
+        self.assertRaises(jsonschema.ValidationError, datamodel.model_validator().validate, mdl)
 
-        model.set_jsonpointer(mdl, '/engine/fuel', 'BAD_FUEL')
-        self.assertRaisesRegex(jsonschema.ValidationError, "Failed validating 'oneOf' in schema.*properties.*engine", model.model_validator().validate, mdl)
+        datamodel.set_jsonpointer(mdl, '/engine/fuel', 'BAD_FUEL')
+        self.assertRaisesRegex(jsonschema.ValidationError, "Failed validating 'oneOf' in schema.*properties.*engine", datamodel.model_validator().validate, mdl)
 
 
     def testModel_FAIL_extraFuel(self):
-        mdl = model.base_model()
-        model.set_jsonpointer(mdl, '/engine/fuel', 'diesel')
+        mdl = datamodel.base_model()
+        datamodel.set_jsonpointer(mdl, '/engine/fuel', 'diesel')
         mdl['params']['fuel']['EXTRA_FUEL'] = 'somethign'
 
-        self.assertRaisesRegex(jsonschema.ValidationError, "Additional properties .*EXTRA_FUEL", model.model_validator().validate, mdl)
+        self.assertRaisesRegex(jsonschema.ValidationError, "Additional properties .*EXTRA_FUEL", datamodel.model_validator().validate, mdl)
 
     def testModel_FAIL_missLhv(self):
-        mdl = model.base_model()
-        model.set_jsonpointer(mdl, '/engine/fuel', 'diesel')
+        mdl = datamodel.base_model()
+        datamodel.set_jsonpointer(mdl, '/engine/fuel', 'diesel')
         mdl['params']['fuel']['petrol'] = {}
 
-        self.assertRaisesRegex(jsonschema.ValidationError, "'lhv' is a required", model.model_validator().validate, mdl)
+        self.assertRaisesRegex(jsonschema.ValidationError, "'lhv' is a required", datamodel.model_validator().validate, mdl)
 
 
     def testModel_GOOD(self):
-        mdl = model.base_model()
-        model.set_jsonpointer(mdl, '/engine/fuel', 'diesel')
+        mdl = datamodel.base_model()
+        datamodel.set_jsonpointer(mdl, '/engine/fuel', 'diesel')
 
-        validator = model.model_validator()
+        validator = datamodel.model_validator()
         validator.validate(mdl)
 
     def testModel_units_GOOD(self):
@@ -73,13 +73,13 @@ class Test(unittest.TestCase):
             [['/engine/bore', ' +14 '], 0.14 * ureg.meter],
         ]
 
-        validator = model.model_validator()
+        validator = datamodel.model_validator()
 
         for (args, res) in cases:
-            mdl = model.base_model()
-            model.set_jsonpointer(mdl, '/engine/fuel', 'diesel')
+            mdl = datamodel.base_model()
+            datamodel.set_jsonpointer(mdl, '/engine/fuel', 'diesel')
 
-            model.set_jsonpointer(mdl, *args)
+            datamodel.set_jsonpointer(mdl, *args)
             validator.validate(mdl)
 
 

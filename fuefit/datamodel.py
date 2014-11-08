@@ -155,13 +155,27 @@ def model_schema(additional_properties = False):
                             "type": ["boolean", "number"],
                             "default": False,
                         },
+                        'coeffs_0': {
+                            "title": "Starting fitting coefficients",
+                            "description": dedent("""
+                                The starting values `p0` of the fitting-function.
+                            """),
+                            "oneOf": [
+                                {"type": ["null", "number"]},
+                                {"type": "array"},
+                            ],
+                            "default": None,
+                        },
                         'limit_coeffs': {
                             "title": "Enforce limits into the coefficients",
                             "description": dedent("""
                                 Enforce limits into the fit-coefficients
                             """),
-                            "type": ["boolean", "number"],
-                            "default": False,
+                            "oneOf": [
+                                {"type": ["null", "number"]},
+                                {"type": "array"},
+                            ],
+                            "default": None,
                         },
                 }
             },
@@ -255,55 +269,6 @@ def model_schema(additional_properties = False):
                     },
                 },
             },
-           "full_load_curve": {
-               "title": "full load power curve",
-               "type": "array",
-               "items": [
-                    {
-                        "title": "normalized engine revolutions",
-                        "description": dedent("""
-                            The normalized engine revolutions, within [0.0, 0.15]:
-                                n_norm = (n - n_idle) / (n_rated  - n_idle) """),
-                        "type": "array", "additionalItems": False,
-                        "maxItems": 360,
-                        "minItems": 7,
-                        "items": {
-                            "type": "number",
-                            "minimum": 0.0,
-                            "exclusiveMinimum": False,
-                            "maximum": 1.5,
-                            "exclusiveMaximum": False,
-                        },
-                    },
-                    {
-                        "title": "normalized full-load power curve",
-                        "description": dedent("""
-                            The normalised values of the full-power load against the p_rated,
-                            within [0, 1]:
-                                p_norm = p / p_rated
-                        """),
-                        "type": "array", "additionalItems": False,
-                        "maxItems": 360,
-                        "minItems": 7,
-                        "items": {
-                           "type": "number",
-                           "minimum": 0.0,
-                           "exclusiveMinimum": False,
-                           "maximum": 1.0,
-                           "exclusiveMaximum": False,
-                        }
-                    },
-                ],
-                "description": dedent("""
-                    A 2-dimensional array holding the full load power curve in 2 rows
-                    Example:
-                        [
-                            [ 0, 10, 20, 30, 40, 50, 60, 70. 80, 90 100, 110, 120 ],
-                            [ 6.11, 21.97, 37.43, 51.05, 62.61, 72.49, 81.13, 88.7, 94.92, 98.99, 100., 96.28, 87.66 ]
-                        ]
-
-                """),
-            },
         }
     }
 
@@ -323,23 +288,12 @@ def validate_model(mdl, additional_properties=False):
     validator = model_validator(additional_properties=False)
     try:
         validator.validate(mdl)
-
-        return mdl
     except jsons.ValidationError as ex:
         ## Attempt to workround BUG: https://github.com/Julian/jsonschema/issues/164
         #
         if isinstance(ex.instance, NDFrame):
             ex.instance = str(ex.instance)
         raise
-
-
-
-def validate_full_load_curve(flc, f_n_max):
-    if (min(flc[0]) > 0):
-        raise ValueError("The full_load_curve must begin at least from 0%%, not from %f%%!" % min(flc[0]))
-    max_x_limit = f_n_max
-    if (max(flc[0]) < max_x_limit):
-        raise ValueError("The full_load_curve must finish at least on f_n_max(%f%%), not on %f%%!" % (max_x_limit, max(flc[0])))
 
 
 
@@ -370,7 +324,7 @@ def base_model():
             },
             'plot_maps':        False,
             'robust_fit':       False,
-            'limit_coeffs':     False,
+            'limit_coeffs':     None,
         }
     }
 
@@ -553,7 +507,7 @@ def set_jsonpointer(doc, jsonpointer, value, object_factory=dict):
     
         doc, pdoc, ppart = ndoc, doc, part 
     else:
-        doc = pdoc # If loop exhuasted, cancel last assignment.
+        doc = pdoc # If loop exhausted, cancel last assignment.
 
     ## Build branch with value-leaf.
     #

@@ -25,11 +25,11 @@ import unittest
 from fuefit.__main__ import (
     build_args_parser, validate_file_opts, parse_key_value_pair,
     parse_many_file_args, assemble_model,
-    validate_model, FileSpec, main, store_model_parts
+    FileSpec, main, store_model_parts
 )
 from fuefit.__main__ import parse_column_specifier
 
-from ..model import json_dumps, base_model
+from ..datamodel import json_dumps, base_model, validate_model
 from .redirect import redirected # @UnresolvedImport
 
 
