@@ -1,7 +1,7 @@
 ################################################
 *fuefit* fits engine-maps on physical parameters
 ################################################
-|dev-status| |docs-status| |pypi-status| |downloads-count| |github-issues|
+|dev-status| |build-status| |docs-status| |pypi-status| |downloads-count| |github-issues|
 
 :Release:       |version|
 :Home:          https://github.com/ankostis/fuefit
@@ -470,6 +470,11 @@ Footnotes
 .. |pypi| replace:: *PyPi* repo
 .. _pypi: https://pypi.python.org/pypi/fuefit
 
+.. |build-status| image:: https://travis-ci.org/ankostis/fuefit.svg
+    :alt: Integration-build status
+    :scale: 100%
+    :target: https://travis-ci.org/ankostis/fuefit/builds
+
 .. |docs-status| image:: https://readthedocs.org/projects/fuefit/badge/
     :alt: Documentation status
     :scale: 100%
@@ -505,3 +510,16 @@ Footnotes
     
     PMF
         Available mean effective pressure (the maximum mean effective pressure which could be produced if n = 1)
+        
+    JSON-schema
+        The `JSON schema <http://json-schema.org/>`_ is an `IETF draft <http://tools.ietf.org/html/draft-zyp-json-schema-03>`_
+        that provides a *contract* for what JSON-data is required for a given application and how to interact
+        with it.  JSON Schema is intended to define validation, documentation, hyperlink navigation, and
+        interaction control of JSON data.
+        You can learn more about it from this `excellent guide <http://spacetelescope.github.io/understanding-json-schema/>`_,
+        and experiment with this `on-line validator <http://www.jsonschema.net/>`_.
+
+    JSON-pointer
+        JSON Pointer(:rfc:`6901`) defines a string syntax for identifying a specific value within
+        a JavaScript Object Notation (JSON) document. It aims to serve the same purpose as *XPath* from the XML world,
+        but it is much simpler.

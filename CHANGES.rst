@@ -8,12 +8,14 @@ Releases
 ========
 v0.0.4, xx-Noe-2014 -- 2nd public release
 -----------------------------------------
-* TODO: ci: Use Travisci Continuous integration to check project health.
 * core: FIX calclulations.
 * core: Possible to specify whether to Robust-fit or not.
 * excel: Enhance excel-runner code to support any python-code. 
 * excel: FIX parsing of ExcelRefs and their syntax documentation.  
+* test: Improve tests and Doctest code in README. 
+* TODO: test, ci: Use Travisci Continuous integration to check project health.
 * docs: Add "API-reference" section.
+* NOTE: Various renames of modules, files and model properties.
 
 
 v0.0.3, 03-Noe-2014 -- 1st public (beta) release

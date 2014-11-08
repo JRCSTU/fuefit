@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 
 from . import pdcalc
-from fuefit import datamodel
+from . import datamodel
 from collections import OrderedDict
 
 

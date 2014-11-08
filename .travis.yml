@@ -1,0 +1,45 @@
+## TravisCI config
+#
+language: python
+python:
+  - "3.3"
+  - "3.4"
+before_install:
+    - sudo apt-get install python3-setuptools
+    - sudo apt-get install libblas-dev
+    - sudo apt-get install liblapack-dev
+    - sudo apt-get install gfortran
+
+install:
+    - pip install -r dev_requirements.txt
+    - pip install .
+
+# command to run tests
+script:
+    - python setup.py doctest_docs
+    - python setup.py doctest_code
+    - python setup.py test_code
+
+#    - python setup.py test_code_cover
+
+    - python setup.py build_sphinx                  ## Build html-docs.
+    - python setup.py sdist bdist_wheel             ## Create archives for PyPI repo.
+
+    ## Ensure README valid ReST for PyPI.
+    ##  In case it fails, improve the filtering-code in ``setup.py``.
+    - python setup.py --long-description | rst2html.py  --halt=warning > /dev/null
+
+#after_success:
+#    coveralls
+
+branches:
+    only:
+        - master
+
+deploy:
+    provider: pypi
+    user: ankostis
+    password:
+        secure: AFaWbL5FIQHTAKxmFnOId1rApOsHxjpWGP3RVXTKjw65SJnRDoExne6Zd+M5ATRryBh2ud2ea3JK96mOl/CAZpr7fTpMHMnRruhyyQvJNKmOrXKBASmDF0yXoxuEaDNGO8BJ9sa0+S7sdoRiR/AzuDzRPHPzFR5J5DQiGCMHqmU=
+    on:
+        tags: true

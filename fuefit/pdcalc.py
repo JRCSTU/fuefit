@@ -6,8 +6,7 @@
 # You may not use this work except in compliance with the Licence.
 # You may obtain a copy of the Licence at: http://ec.europa.eu/idabc/eupl
 '''A best-effort attempt to build computation dependency-graphs from method with dict-like objects (such as pandas),
-inspired by XForms:
-    http://lib.tkk.fi/Diss/2007/isbn9789512285662/article3.pdf
+inspired by XForms: http://lib.tkk.fi/Diss/2007/isbn9789512285662/article3.pdf
 
 .. seealso::
     Dependencies
@@ -475,7 +474,7 @@ def default_arg_paths_extractor(arg_name, arg, paths):
     The inner-ones paths are not added, ie ``df.some.key``, but not ``df`` or ``df.some``.
 
     .. Note:: for pandas-series their index (their infos-axis) gets appended only the 1st time
-    (not if invoked in recursion, from DataFrame columns).
+        (not if invoked in recursion, from DataFrame columns).
 
     :param list paths: where to add the extracted paths into
     '''
@@ -529,8 +528,8 @@ class Dependencies:
     The relation-tuples are "rough" in the sense that they may contain duplicates etc
     requiring cleanup by _consolidate_relations().
 
-    Usage:
-    ------
+    **Usage:**
+    
 
     Use the `harvest_{XXX}()` methods or the `add_func_rel()` method
     to gather dependencies from functions and function-facts
@@ -543,19 +542,29 @@ class Dependencies:
         Factory method for building `Dependencies` by harvesting multiple functions and func_factories, at once
 
         :param funcs_map: a mapping or a sequence of pairs ``(what --> bool_or_null)`` with values:
-            True  -- when `what` is a funcs_factory, a function returning a sequence of functions processing the data
-            False -- when `what` is a standalone_function, or
-            None  -- when `what` is an explicit relation 3-tuple (item, deps, func) to be fed
+                
+                True
+                    when `what` is a funcs_factory, a function returning a sequence of functions processing the data
+                False
+                    when `what` is a standalone_function, or
+                None
+                    when `what` is an explicit relation 3-tuple (item, deps, func) to be fed
                     directly to :func:`Dependencies.add_func_rel()`, where:
-                        item -- a ''dotted.varname'' string,
-                        deps -- a string or a sequence of ''dotted.varname'' strings, and
-                        func -- a standalone func or a funcs_factory as a 2-tuple (func, index)
+                    
+                    item 
+                        a ''dotted.varname'' string,
+                    deps
+                        a string or a sequence of ''dotted.varname'' strings, and
+                    func
+                        a standalone func or a funcs_factory as a 2-tuple (func, index)
+                        
                     Both items and deps are dot-separated sequence of varnames, such as 'foo.bar'
+            
         :param deps: if none, a new `Dependencies` instance is created to harvest relations
         :return: a new (even inherited) or an updated `Dependencies` instance
 
         .. Important:: All functions must accept exactly the same args, or else the results
-        will be undetermined and it will most-likely scream on execute_funcs_map.
+                will be undetermined and it will most-likely scream on execute_funcs_map.
         '''
 
         if deps is None:
