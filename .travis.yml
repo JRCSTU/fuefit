@@ -4,17 +4,30 @@ language: python
 python:
   - "3.3"
   - "3.4"
+  
 before_install:
-    - sudo apt-get install python3-setuptools
-    - sudo apt-get install libblas-dev
-    - sudo apt-get install liblapack-dev
-    - sudo apt-get install gfortran
+    ## From: http://conda.pydata.org/docs/travis.htm
+    ## Another one: https://gist.github.com/dan-blanchard/7045057
+    #- sudo apt-get update
+    - wget http://repo.continuum.io/miniconda/Miniconda3-3.4.2-Linux-x86_64.sh -O miniconda.sh
+    - bash miniconda.sh -b -p $HOME/miniconda
+    - export PATH="$HOME/miniconda/bin:$PATH"
+    - hash -r
+    - conda config --set always_yes yes --set changeps1 no
+    - conda update -q conda
+    # Useful for debugging any issues with conda
+    - conda info -a
+  
+    - deps='pip numpy scipy pandas matplotlib nose sphinx'
+    - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION $deps
+    - source activate test-environment
+    - pip install nose -I  # To skip system-nose??? http://stackoverflow.com/questions/864956/problems-using-nose-in-a-virtualenv?lq=1
+      hash -r 
+      which nosetests
 
 install:
-    - pip install -r dev_requirements.txt
-    - pip install .
+  - python setup.py install
 
-# command to run tests
 script:
     - python setup.py doctest_docs
     - python setup.py doctest_code
