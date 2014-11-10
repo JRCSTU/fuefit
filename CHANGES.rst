@@ -6,10 +6,15 @@ Changes
 
 Releases
 ========
-v0.0.4, xx-Noe-2014 -- 2nd public release
------------------------------------------
+v0.0.5, xx-Noe-2014 -- 2nd public (beta) release
+------------------------------------------------
+
+
+v0.0.4, 10-Noe-2014 -- 2nd public (beta) release
+------------------------------------------------
 * core: FIX calclulations.
 * core: Possible to specify whether to Robust-fit or not.
+* core: Pin `b0` coefficient to 0.
 * excel: Enhance excel-runner code to support any python-code. 
 * excel: FIX parsing of ExcelRefs and their syntax documentation.  
 * test: Improve tests and Doctest code in README. 

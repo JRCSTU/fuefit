@@ -114,7 +114,7 @@ you can try the following commands:
     .. code-block:: console
 
         $ fuefit --version
-        0.0.4-alpha.4
+        0.0.4-beta.2
         
         $ fuefit --help
         ...
@@ -128,7 +128,11 @@ you can try the following commands:
             -O - model_path=/engine/fc_map_coeffs \
             -m /params/plot_maps@=True
 
-:Excel:         ``$ fuefit --excelrun                             ## Windows & OS X only``
+:Excel:
+    .. code-block:: console
+
+        $ fuefit --excelrun                             ## Windows & OS X only
+    
 :Python-code: 
     .. code-block:: python
     
@@ -241,7 +245,7 @@ After installation, it is important that you check which version is visible in y
 .. code-block:: console
 
     $ fuefit --version
-    0.0.4-alpha.4
+    0.0.4-beta.1
         
 
 
@@ -392,7 +396,7 @@ First run :command:`python` or :command:`ipython` and try to import the project 
     >>> import fuefit
 
     >>> fuefit.__version__              ## Check version once more.
-    '0.0.4-alpha.4'
+    '0.0.4-beta.1'
 
     >>> fuefit.__file__                   ## To check where it was installed.         # doctest: +SKIP
     /usr/local/lib/site-package/fuefit-...
@@ -466,7 +470,7 @@ Development team
 * Author:
     * Kostis Anagnostopoulos
 * Contributing Authors:
-    * Giorgos Fontaras for the physics, policy and admin support.
+    * Giorgos Fontaras for the testing, physics, policy and admin support.
 
 
 
