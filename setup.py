@@ -198,5 +198,8 @@ setup(
         'build_sphinx' :{
             'build_dir': 'Docs/_build',
         },
+        'bdist_wheel' :{
+            'universal': True,
+        },
     },
 )
