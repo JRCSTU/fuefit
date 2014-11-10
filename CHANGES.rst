@@ -13,8 +13,9 @@ v0.0.4, xx-Noe-2014 -- 2nd public release
 * excel: Enhance excel-runner code to support any python-code. 
 * excel: FIX parsing of ExcelRefs and their syntax documentation.  
 * test: Improve tests and Doctest code in README. 
-* TODO: test, ci: Use Travisci Continuous integration to check project health.
+* test, ci: Use Travisci Continuous integration to check project health.
 * docs: Add "API-reference" section.
+* docs: Add some "Anaconda" help.
 * NOTE: Various renames of modules, files and model properties.
 
 

@@ -92,6 +92,14 @@ from each of the following categories (column-headers are case-insensitive):
 
 Quick-start
 -----------
+On *Windows*/*OS X*, it is recommended to use one of the scientific Python distributions:
+
+* `WinPython <http://winpython.github.io/>`_ (*Windows* only),
+* `Anaconda <http://docs.continuum.io/anaconda/>`_ or `miniconda <http://conda.pydata.org/miniconda.html>`_
+* `Canopy <https://www.enthought.com/products/canopy/>`_,
+
+as they already include *numpy/scipy*, *pandas* and *win32* native-libraries. 
+
 Assuming you have a working python-environment, open a *command-shell*, 
 (in *Windows* use :program:`cmd.exe` BUT ensure :program:`python.exe` is in its :envvar:`PATH`), 
 you can try the following commands: 
@@ -151,27 +159,6 @@ For more elaborate instructions, read the next sections.
 
     But do not install/rely on cygwin's outdated python environment.
 
-.. Tip:: 
-    * To install *python* with *numpy/scipy* libraries, you can try 
-      the `Anaconda <http://docs.continuum.io/anaconda/pkg-docs.html>`_ cross-platform distribution 
-      (*Windows*, *Linux* and *OS X*), or its lighter-weight alternative, 
-      `miniconda <http://conda.pydata.org/miniconda.html>`_.
-
-      On this environment you will need to install this project's dependencies manually 
-      using a combination of :program:`conda` and :program:`pip` commands.
-      See :file:`conda_requirements.txt`, and peek at the example script commands in :file:`.travis.yaml`. 
-    
-    * Under *Windows* you can try the self-wrapped `WinPython <http://winpython.sourceforge.net/>`_ distribution,
-      a higly active project, that can even compile native libraries using an installations of *Visual Studio*, 
-      if available (required for instance when upgrading ``numpy/scipy``, ``pandas`` or ``matplotlib`` with :command:`pip`).
-      The most recent version (python-3.4) is hosted at github: http://winpython.github.io/.
-            
-      Just remember to **Register your WinPython installation** and 
-      **add your installation into** :envvar:`PATH` (see :doc:`faq`).
-      To register it, go to :menuselection:`Start menu --> All Programs --> WinPython --> WinPython ControlPanel`, and then
-      :menuselection:`Options --> Register Distribution` .
-      
-
 
 
 .. _before-install:
@@ -181,12 +168,33 @@ Install
 Fuefit-|version| runs on Python-3.3+, and it is distributed on `Wheels <https://pypi.python.org/pypi/wheel>`_.
 
 .. Note::
-    Among other dependencies, this project depends on the *numpy/scipy* and *pandas* libraries, 
-    that are based on *C* and *Fortran* libraries, so native-compilers are required to build them from sources.  
+    This project depends on the *numpy/scipy*, *pandas* and *win32* python-packages
+    that themselfs require the use of *C* and *Fortran* compilers to build from sources. 
+    To avoid this hussle, you can choose instead a self-wrapped python distribution like
+    *Anaconda/minoconda*, *Winpython*, or *Canopy*.
 
     .. Tip::
-        Check for alternative installation instructions on the various python environments and platforms
-        at `the pandas site <http://pandas.pydata.org/pandas-docs/stable/install.html>`_.
+        * You can try to install the `Anaconda <http://docs.continuum.io/anaconda/>`_ 
+          cross-platform distribution (*Windows*, *Linux* and *OS X*), or its lighter-weight alternative, 
+          `miniconda <http://conda.pydata.org/miniconda.html>`_.
+    
+          On this environment you will need to install this project's dependencies manually 
+          using a combination of :program:`conda` and :program:`pip` commands.
+          See :file:`conda_requirements.txt`, and peek at the example script commands in :file:`.travis.yaml`. 
+        
+        * Under *Windows* you can try the self-wrapped `WinPython <http://winpython.github.io/>`_ distribution,
+          a higly active project, that can even compile native libraries using an installations of *Visual Studio*, 
+          if available (required for instance when upgrading ``numpy/scipy``, ``pandas`` or ``matplotlib`` with :command:`pip`).
+                
+          Just remember to **Register your WinPython installation** after installation and 
+          **add your installation into** :envvar:`PATH` (see :doc:`faq`):
+          
+            * To register it, go to :menuselection:`Start menu --> All Programs --> WinPython --> WinPython ControlPanel`, and then
+              :menuselection:`Options --> Register Distribution` .
+            * For the path, add or modify the registry string-key :samp:`[HKEY_CURRENT_USER\Environment] "PATH"`.
+      
+        * Check for alternative installation instructions on the various python environments and platforms
+          at `the pandas site <http://pandas.pydata.org/pandas-docs/stable/install.html>`_.
 
 
 Before installing it, make sure that there are no older versions left over.  
@@ -243,11 +251,9 @@ Installing from sources
 If you download the sources you have more options for installation.
 There are various methods to get hold of them:
 
-* Download a `release-snapshot from github <https://github.com/ankostis/fuefit/releases>`_
-* Download the *source* distribution from |pypi|_.
-* Clone the *git-repository* at *github*.
-
-  Assuming you have a working installation of `git <http://git-scm.com/>`_
+* Download and extract a `release-snapshot from github <https://github.com/ankostis/fuefit/releases>`_.
+* Download and extract a ``sdist`` *source* distribution from |pypi|_.
+* Clone the *git-repository* at *github*.  Assuming you have a working installation of `git <http://git-scm.com/>`_
   you can fetch and install the latest version of the project with the following series of commands:
   
   .. code-block:: console

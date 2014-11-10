@@ -51,5 +51,7 @@ deploy:
     user: ankostis
     password:
         secure: AFaWbL5FIQHTAKxmFnOId1rApOsHxjpWGP3RVXTKjw65SJnRDoExne6Zd+M5ATRryBh2ud2ea3JK96mOl/CAZpr7fTpMHMnRruhyyQvJNKmOrXKBASmDF0yXoxuEaDNGO8BJ9sa0+S7sdoRiR/AzuDzRPHPzFR5J5DQiGCMHqmU=
+    distributions: "sdist bdist_wheel"
     on:
         tags: true
+        all_branches: true
