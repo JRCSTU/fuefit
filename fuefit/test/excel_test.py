@@ -12,11 +12,9 @@ from unittest.case import skipIf
 import unittest
 import logging
 import os, sys
-import xlwings as xw
 import pandas as pd
 import numpy as np
 from numpy import testing as npt
-from fuefit.excel.FuefitExcelRunner import resolve_excel_ref
 from pandas.core.generic import NDFrame
 
 
@@ -36,6 +34,7 @@ def from_my_path(*parts):
     return os.path.join(os.path.dirname(__file__), *parts)
 
 def _make_sample_workbook(sheetname, addr, value):
+    import xlwings as xw
     wb = xw.Workbook()
     xw.Sheet(1).name = sheetname
     xw.Range(addr).value = value
@@ -49,11 +48,12 @@ def close_workbook(wb):
         log.warning('Minor failure while closing Workbook!', exc_info=True)
 
 
-@skipIf(not 'darwin' in sys.platform and not 'win32' in sys.platform, "Cannot test xlwings in Linux")
+@skipIf(not ('darwin' in sys.platform or 'win32' in sys.platform), "Cannot test xlwings in Linux")
 class TestExcel(unittest.TestCase):
 
 
     def test_xlwings_smoketest(self):
+        import xlwings as xw
         sheetname   ='shitt'
         addr        ='f6'
         table       = pd.DataFrame([[1,2],[True, 'off']], columns=list('ab'))
@@ -66,6 +66,7 @@ class TestExcel(unittest.TestCase):
 
 
     def test_excel_refs(self):
+        from fuefit.excel.FuefitExcelRunner import resolve_excel_ref
         sheetname   ='Input'
         addr        ='d2'
         table       = pd.DataFrame({'a':[1,2,3], 'b':['s','t','u'], 'c':[True,False,True]})
@@ -111,13 +112,14 @@ class TestExcel(unittest.TestCase):
             raise Exception('There are %i out of %i errors!'% (len(errors), len(cases)))
 
 
-        def test_excel_runner_call_from_python(self):
-            from fuefit.excel import FuefitExcelRunner 
-            wb = xw.Workbook(from_my_path('..', 'excel', 'FuefitExcelRunner'))
-            try:
-                FuefitExcelRunner.main()
-            finally:
-                close_workbook(wb)
+    def test_excel_runner_call_from_python(self):
+        import xlwings as xw
+        from fuefit.excel import FuefitExcelRunner 
+        wb = xw.Workbook(from_my_path('..', 'excel', 'FuefitExcelRunner'))
+        try:
+            FuefitExcelRunner.main()
+        finally:
+            close_workbook(wb)
 
 
 if __name__ == "__main__":

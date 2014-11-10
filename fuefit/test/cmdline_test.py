@@ -44,7 +44,7 @@ log = logging.getLogger(__name__)
 def from_my_path(*parts):
     return os.path.join(os.path.dirname(__file__), *parts)
 
-def copy_test_data_files_to_cwd():
+def copy_data_files_to_cwd():
     copy_paths = ['*.xlsx', '*.csv']
     for path in copy_paths:
         for f in glob.glob(from_my_path(path)):
@@ -65,7 +65,7 @@ class TestFuncs(unittest.TestCase):
             if (not os.path.exists(tfn)):
                 tf = open(tfn, "w")
                 tf.close()
-        copy_test_data_files_to_cwd()
+        copy_data_files_to_cwd()
             
         _exit_code = None
         _exit_msg = None
@@ -407,7 +407,7 @@ class TestMain(unittest.TestCase):
 
     def setUp(self):
         self.held, sys.stdout = sys.stdout, io.StringIO()
-        copy_test_data_files_to_cwd()
+        copy_data_files_to_cwd()
     
     def test_run_main_stdout1(self):
         main('''-I FuelFit.xlsx  sheetname+=0 header@=None names:=["n","p","fc"]

@@ -9,31 +9,33 @@ before_install:
     ## From: http://conda.pydata.org/docs/travis.htm
     ## Another one: https://gist.github.com/dan-blanchard/7045057
     #- sudo apt-get update
-    - wget http://repo.continuum.io/miniconda/Miniconda3-3.4.2-Linux-x86_64.sh -O miniconda.sh
+    - wget http://repo.continuum.io/miniconda/Miniconda3-3.7.0-Linux-x86_64.sh -O miniconda.sh
     - bash miniconda.sh -b -p $HOME/miniconda
     - export PATH="$HOME/miniconda/bin:$PATH"
     - hash -r
     - conda config --set always_yes yes --set changeps1 no
     - conda update -q conda
-    # Useful for debugging any issues with conda
-    - conda info -a
+    - conda info -a	## Useful for debugging any conda issues
   
-    - deps='pip numpy scipy pandas matplotlib nose sphinx'
+    - deps="`grep -v \# conda_requirements.txt`"
     - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION $deps
     - source activate test-environment
-    - pip install nose -I  # To skip system-nose??? http://stackoverflow.com/questions/864956/problems-using-nose-in-a-virtualenv?lq=1
-      hash -r 
-      which nosetests
 
 install:
   - python setup.py install
 
 script:
-    - python setup.py doctest_docs
-    - python setup.py doctest_code
-    - python setup.py test_code
-
-#    - python setup.py test_code_cover
+    #- python setup.py doctest_docs
+    - nosetests --with-doctest --doctest-options=+NORMALIZE_WHITESPACE,+ELLIPSIS,+REPORT_UDIFF \
+                        --tests=README.rst \
+                        --doctest-extension=.rst
+    #- python setup.py doctest_code
+    - nosetests --with-doctest --doctest-options=+NORMALIZE_WHITESPACE,+ELLIPSIS,+REPORT_NDIFF \
+                        --tests=fuefit.processor,fuefit.datamodel,fuefit.pdcalc
+    #- python setup.py test_code
+    - nosetests
+ 
+#   #- python setup.py test_code_cover
 
     - python setup.py build_sphinx                  ## Build html-docs.
     - python setup.py sdist bdist_wheel             ## Create archives for PyPI repo.

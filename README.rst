@@ -137,35 +137,40 @@ you can try the following commands:
         print(datamodel.resolve_jsonpointer(output_model, '/engine/fc_map_coeffs'))
         print(output_model['fitted_eng_points'])
 
+For more elaborate instructions, read the next sections.
+
 .. Tip::
     The commands beginning with ``$``, above, imply a *Unix* like operating system with a *POSIX* shell
-    (*Linux*, *OS X*). Although the commands are simple and easy to translate , it would be worthwile to install
-    `Cygwin <https://www.cygwin.com/>`_ to get the same environment on *Windows*.
+    (*Linux*, *OS X*). Although the commands are simple and easy to translate in its *Windows* counterparts, 
+    it would be worthwile to install `Cygwin <https://www.cygwin.com/>`_ to get the same environment on *Windows*.
     If you choose to do that, include also the following packages in the *Cygwin*'s installation wizard::
 
         * git, git-completion
         * make, zip, unzip, bzip2
         * openssh, curl, wget
 
-.. Tip:: 
-    To install *python*, you can try the free (as in beer) distribution
-    `Anaconda <http://docs.continuum.io/anaconda/pkg-docs.html>`_ for *Windows* and *OS X*, or
-    the totally free `WinPython <http://winpython.sourceforge.net/>`_ distribution, but only for *Windows*:
+    But do not install/rely on cygwin's outdated python environment.
 
-    * For *Anaconda* you may need to install project's dependencies manually (see :file:`setup.py`)
-      using :command:`conda`.
-    * The most recent version of *WinPython* (python-3.4) although it has just 
-      `changed maintainer  <http://sourceforge.net/projects/stonebig.u/files/>`_,
-      it remains a higly active project, and it can even compile native libraries using an installations of 
-      *Visual Studio*, if available
-      (required for instance when upgrading ``numpy/scipy``, ``pandas`` or ``matplotlib`` with :command:`pip`).
-      
-      You must also **Register your WinPython installation** and 
+.. Tip:: 
+    * To install *python* with *numpy/scipy* libraries, you can try 
+      the `Anaconda <http://docs.continuum.io/anaconda/pkg-docs.html>`_ cross-platform distribution 
+      (*Windows*, *Linux* and *OS X*), or its lighter-weight alternative, 
+      `miniconda <http://conda.pydata.org/miniconda.html>`_.
+
+      On this environment you will need to install this project's dependencies manually 
+      using a combination of :program:`conda` and :program:`pip` commands.
+      See :file:`conda_requirements.txt`, and peek at the example script commands in :file:`.travis.yaml`. 
+    
+    * Under *Windows* you can try the self-wrapped `WinPython <http://winpython.sourceforge.net/>`_ distribution,
+      a higly active project, that can even compile native libraries using an installations of *Visual Studio*, 
+      if available (required for instance when upgrading ``numpy/scipy``, ``pandas`` or ``matplotlib`` with :command:`pip`).
+      The most recent version (python-3.4) is hosted at github: http://winpython.github.io/.
+            
+      Just remember to **Register your WinPython installation** and 
       **add your installation into** :envvar:`PATH` (see :doc:`faq`).
       To register it, go to :menuselection:`Start menu --> All Programs --> WinPython --> WinPython ControlPanel`, and then
       :menuselection:`Options --> Register Distribution` .
       
-For more elaborate instructions, read the next sections.
 
 
 
@@ -173,7 +178,16 @@ For more elaborate instructions, read the next sections.
 
 Install
 =======
-Current |version| runs on Python-3.3+ and it is distributed on `Wheels <https://pypi.python.org/pypi/wheel>`_.
+Fuefit-|version| runs on Python-3.3+, and it is distributed on `Wheels <https://pypi.python.org/pypi/wheel>`_.
+
+.. Note::
+    Among other dependencies, this project depends on the *numpy/scipy* and *pandas* libraries, 
+    that are based on *C* and *Fortran* libraries, so native-compilers are required to build them from sources.  
+
+    .. Tip::
+        Check for alternative installation instructions on the various python environments and platforms
+        at `the pandas site <http://pandas.pydata.org/pandas-docs/stable/install.html>`_.
+
 
 Before installing it, make sure that there are no older versions left over.  
 So run this command until you cannot find any project installed:

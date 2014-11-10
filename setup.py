@@ -177,10 +177,12 @@ setup(
     ],
     setup_requires = [
         'setuptools',# >= 3.4.4',
-        'setuptools-git >= 0.3',
-        'sphinx >=1.2', # >=1.3
+        'setuptools-git >= 0.3', ## Gather package-data from all files in git.
+        'nose>=1.0',
+        'sphinx', # >=1.3',
         'sphinx_rtd_theme',
         'matplotlib',
+        'wheel',
     ],
     tests_require = [
         'nose',
