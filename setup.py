@@ -170,6 +170,7 @@ setup(
         'pandas',
         'xlrd',
         'scipy',
+        'lmfit',
         'jsonschema',
         'networkx',
         'pint',

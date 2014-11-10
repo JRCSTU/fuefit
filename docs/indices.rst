@@ -1,7 +1,3 @@
-=======
-Indices
-=======
-
 .. include:: ../README.rst
     :start-after: _before-indices:
 

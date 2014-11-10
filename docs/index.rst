@@ -14,4 +14,4 @@
     indices
 
 .. include:: ../README.rst
-    :start-after: _before-indices:
+    :start-after: _before-replacements:

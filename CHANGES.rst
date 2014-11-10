@@ -6,8 +6,8 @@ Changes
 
 Releases
 ========
-v0.0.5, xx-Noe-2014 -- 2nd public (beta) release
-------------------------------------------------
+v0.0.5, xx-Noe-2014 -- 2nd public release
+-----------------------------------------
 
 
 v0.0.4, 10-Noe-2014 -- 2nd public (beta) release

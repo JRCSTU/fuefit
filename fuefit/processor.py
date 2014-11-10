@@ -14,6 +14,7 @@ import logging
 
 import numpy as np
 import pandas as pd
+import lmfit 
 
 from . import pdcalc
 from . import datamodel
@@ -30,7 +31,7 @@ def run(mdl, opts=None):
     """
 
     datamodel.ensure_modelpath_Series(mdl, '/engine')
-    datamodel.ensure_modelpath_Series(mdl, '/params')
+    #datamodel.ensure_modelpath_Series(mdl, '/params')
     datamodel.ensure_modelpath_DataFrame(mdl, '/measured_eng_points')
 
     params              = mdl['params']
@@ -44,7 +45,13 @@ def run(mdl, opts=None):
 
     ## FIT
     #
-    fitted_coeffs = fit_map(datamodel.resolve_jsonpointer(mdl, '/params/robust_fit'), measured_eng_points)
+    coeffs = datamodel.resolve_jsonpointer(mdl, '/params/fitting/coeffs')
+    coeffs = [lmfit.parameter.Parameter(name, **kws) for (name, kws) in coeffs.items()]
+    fitted_coeffs = fit_engine_map(measured_eng_points, 
+                datamodel.resolve_jsonpointer(mdl, '/params/fitting/is_robust'),
+                coeffs,
+                datamodel.resolve_jsonpointer(mdl, '/params/fitting/fit_options'),
+            )
     engine['fc_map_coeffs'] = fitted_coeffs
 
     fitted_eng_points   = reconstruct_eng_points_fitted(engine, fitted_coeffs, measured_eng_points)
@@ -115,36 +122,48 @@ def std_to_norm_map(engine, eng_points):
 
 
 
-def fitfunc(X, a, b, c, a2, b2, loss0, loss2):
+def engine_map_modelfunc(coeff_values, X):
+    """
+    The function that models the engine-map.
+    """
+    
+    a = coeff_values['a']
+    b = coeff_values['b']
+    c = coeff_values['c']
+    a2 = coeff_values['a2']
+    b2 = coeff_values['b2']
+    loss0 = coeff_values['loss0']
+    loss2 = coeff_values['loss2']
+
     pmf = X['pmf']
     cm = X['cm']
-    z = (a + b*cm + c*cm**2)*pmf + (a2 + 0*b2*cm)*pmf**2 + loss0 + loss2*cm**2
-    return z
+    
+    pme = (a + b*cm + c*cm**2)*pmf + (a2 + b2*cm)*pmf**2 + loss0 + loss2*cm**2
+    
+    return pme
 
 
-def fit_map(is_robust, df):
-    if is_robust:
-        from .robustfit import curve_fit
-    else:
-        from scipy.optimize import curve_fit as curve_fit
-
+def fit_engine_map(df, is_robust, coeffs, fit_options):
+    assert len({'cm', 'pme', 'pmf'} - set(df.columns)) == 0, \
+            "Missing fit-columns: %s" % {'cm', 'pme', 'pmf'} - set(df.columns)
     assert not np.any(np.isnan(df['pmf'])), \
             "Cannot fit with NaNs in `pmf` data! \n%s" % np.any(np.isnan(df['pmf']), axis=1)
     assert not np.any(np.isnan(df['cm'])), \
             "Cannot fit with NaNs in `cm` data! \n%s" % np.any(np.isnan(df['cm']), axis=1)
 
-    param_names = ('a', 'b', 'c', 'a2', 'b2', 'loss0', 'loss2')
-    p0=[0.45,0.0154,-0.00093,-0.0027,0,-2.17,-0.0037]
+    residualfunc_args   = (engine_map_modelfunc, df, df['pme'])
+    residualfunc_kws    = dict(is_robust=is_robust)
+    minimizer = lmfit.minimize(_robust_residualfunc, coeffs, 
+                args=residualfunc_args, 
+                kws=residualfunc_kws,
+                **fit_options)
+    res_df = pd.Series(minimizer.params.valuesdict())
 
-    Y = df.pme.values
-
-    (res, _) = curve_fit(fitfunc, df, Y, p0=p0)#, robust=False)
-    res_df = pd.Series(res, index=param_names)
     return res_df
 
 
 def reconstruct_eng_points_fitted(engine, fitted_coeffs, eng_points):
-    pme = fitfunc(eng_points, *fitted_coeffs)
+    pme = engine_map_modelfunc(fitted_coeffs, eng_points)
 
     fitted_eng_points = pd.DataFrame.from_items(zip(['pmf', 'cm', 'pme'], (eng_points.pmf, eng_points.cm, pme)))
 
@@ -163,7 +182,7 @@ def generate_mesh_eng_points_fitted(engine, fitted_coeffs, eng_points):
     X1, X2 = np.mgrid[dmin[0]:dmax[0]:dstp[0], dmin[1]:dmax[1]:dstp[1]]
 
     X = {'pmf': X1, 'cm': X2}
-    Y = fitfunc(X, *fitted_coeffs)
+    Y = engine_map_modelfunc(fitted_coeffs, X)
 
 
     mesh_eng_points = OrderedDict(zip(['pmf', 'cm', 'pme'], (X1, X2, Y)))
@@ -206,3 +225,65 @@ def proc_vehicle(dfin, datamodel):
     log.warning('Filtered %s out of %s rows for BAD  pme.', nrows-len(dfin), nrows)
 
     return dfin
+
+
+
+def _robust_residualfunc(coeffs, modelfunc, X, YData, is_robust=False, robust_prcntile=None):
+    """
+    A non-linear iteratively-reweighted least-squares (IRLS) residual function (objective-function) 
+    that robustly fits ``YData = modelfunc(X)``.
+
+    This method applies weights on each iteration so as to downscale any outliers and high-leverage data-points
+    based on the 'bisquare' standardized adjusted residuals:[#]_
+    :math:`\frac{r}{K \times \hat{\sigma} \times \sqrt{1 - h}}`
+    where:
+
+    :math:`r` : vector
+        the residuals :math:`\hat{y} - y`
+    :math:`K` : scalar
+        the *robust percentile* tuning constant used on each iteration to filter-out
+        adjusted-standarized-weights above 1, expressed as the Bisquare M-estimator efficiency 
+        under Gaussian model. 
+    :math:`\hat{\sigma}` : scalar
+        the robust estimate of the *standard deviation* of the residuals
+        based on MAD[#]_ like this: :math:`\hat{\sigma}=1.4826\times\operatorname{MAD}`
+    :math:`h` : vector
+        the *hat vector*, the diagonal of the *hat matrix*,[#]_
+        which is used to reduce the weight of high-leverage data points
+        that are having a large effect on the least-squares fit.
+
+
+    :param modelfunc:             The modeling function that accepts the dict of coeffs
+    :param nparray X:             
+    :param nparray YData:         measured-data points
+    :param boolean is_robust:     Whether to deleverage outlier YData.
+    :param float robust_prcntile: The `K` percentile of the MAD, 
+                             [default: 4.68, filters-out approximately 5% of the residuals as outliers]
+
+    .. Seealso::
+        curve_fit, leastsq
+
+
+    .. [#] http://www.mathworks.com/help/stats/robustfit.html
+    .. [#] https://en.wikipedia.org/wiki/Median_absolute_deviation
+    .. [#] https://en.wikipedia.org/wiki/Hat_matrix
+    """
+    YFitted = engine_map_modelfunc(coeffs.valuesdict(), X)
+    Residual    = YFitted - YData
+
+    ## Robust:
+    ## Deleverage and standardize absolute-residuals based on a robust-MAD.
+    ##
+    if is_robust:
+        R_abs       = Residual.abs()
+        if not robust_prcntile:
+            robust_prcntile = 4.685     ##  Bisquare M-estimator with 95% efficiency under the Gaussian model.
+        R_deleved   = R_abs / (robust_prcntile * 1.4826 * np.median(R_abs))  ## * sqrt(1 - hat_vector))
+        ## Calc the robust bisquared-residuals excluding outliers.
+        R_weights   = (R_deleved < 1) * (1 - R_deleved**2)**2
+
+        Residual = R_weights * Residual
+        
+    return Residual
+
+

@@ -5,6 +5,9 @@
 # Licensed under the EUPL (the 'Licence');
 # You may not use this work except in compliance with the Licence.
 # You may obtain a copy of the Licence at: http://ec.europa.eu/idabc/eupl
+import io
+from textwrap import dedent
+from collections import OrderedDict
 '''
 Function for building and jsonschema-validating input and output model.
 '''
@@ -12,6 +15,7 @@ Function for building and jsonschema-validating input and output model.
 from collections.abc import Mapping, Sequence 
 import json
 
+import numpy as np
 from pandas.core.generic import NDFrame
 
 import jsonschema as jsons
@@ -122,7 +126,7 @@ def model_schema(additional_properties = False):
             "params": {
                 "title": "Experiment parameters and constants",
                 "type": "object", "additionalProperties": additional_properties,
-                "required": ['fuel'],
+                "required": ['fuel', 'fitting'],
                 "properties": {
                         'fuel': {
                             "title": "fuel-types",
@@ -144,7 +148,7 @@ def model_schema(additional_properties = False):
                             "type": ["boolean", "number"],
                             "default": False,
                         },
-                        'robust_fit': {
+                        'is_robust': {
                             "title": "Robust fitting?",
                             "description": dedent("""
                                 When `robust`, outliers are excluded from the fitted-data,
@@ -152,31 +156,20 @@ def model_schema(additional_properties = False):
                                 
                                 See :func:`fuefit.robustfit.curve_fit()` for more.
                             """),
-                            "type": ["boolean", "number"],
+                            "type": ["boolean", "null"],
                             "default": False,
                         },
-                        'coeffs_0': {
-                            "title": "Starting fitting coefficients",
-                            "description": dedent("""
-                                The starting values `p0` of the fitting-function.
-                            """),
-                            "oneOf": [
-                                {"type": ["null", "number"]},
-                                {"type": "array"},
-                            ],
-                            "default": None,
-                        },
-                        'limit_coeffs': {
-                            "title": "Enforce limits into the coefficients",
-                            "description": dedent("""
-                                Enforce limits into the fit-coefficients
-                            """),
-                            "oneOf": [
-                                {"type": ["null", "number"]},
-                                {"type": "array"},
-                            ],
-                            "default": None,
-                        },
+                        'fitting': {
+                            "type": "object",
+                            "properties": {
+                                'coeffs': {
+                                    "title": "Fitting Coefficient params",
+                                },
+                                'fit_options': {
+                                    "title": "Least-square fitting options",
+                                },
+                            },
+                        }
                 }
             },
         },
@@ -322,9 +315,20 @@ def base_model():
                 'diesel':   {'lhv':42700},
                 'petrol':   {'lhv':43000},
             },
+            'fitting': {
+                'is_robust':        False,
+                'fit_options': {},
+                'coeffs': OrderedDict([
+                    ('a',     dict(value=0.45, min=0.30, max=0.60)),
+                    ('b',     dict(value=0.0154)),
+                    ('c',     dict(value=-0.00093)),
+                    ('a2',    dict(value=-0.0027)),
+                    ('b2',    dict(value=0, vary=False)),
+                    ('loss0', dict(value=-2.17, min=-3.5, max=-1.5)),
+                    ('loss2', dict(value=-0.0037)),
+                ]), 
+            },
             'plot_maps':        False,
-            'robust_fit':       False,
-            'limit_coeffs':     None,
         }
     }
 

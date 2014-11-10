@@ -39,21 +39,21 @@ An "execution" or a "run" of a calculation along with the most important pieces 
 are depicted in the following diagram::
 
 
-                 .-----------------------------.                         .-------------------------------.
-                /        Input-Model          /                         /         Output-Model          /
-               /-----------------------------/                         /-------------------------------/
-              / +--engine                   /                         / +--engine                     /
-             /  |  +--...                  /                         /  |  +--fc_map_coeffs          /
-            /   +--params                 /     ____________        /   +--measured_eng_points      /
-           /    |  +--...                /     |            |      /    |    n   p  fc  pme  ...   /
-          /     +--measured_eng_points  /  ==> | Calculator | ==> /     |  ... ... ...  ...  ...  /
-         /          n    p    fc       /       |____________|    /      +--fitted_eng_points     /
-        /          --  ----  ---      /                         /       |    n    p   fc        /
-       /            0   0.0    0     /                         /        |  ...  ...  ...       /
-      /           600  42.5   25    /                         /         +--mesh_eng_points    /
-     /           ...    ...  ...   /                         /               n    p   fc     /
-    /                             /                         /              ...  ...  ...    /
-   '-----------------------------'                         '-------------------------------'
+                 .----------------------------.                    .-----------------------------.
+                /        Input-Model         /                    /        Output-Model         /
+               /----------------------------/                    /-----------------------------/
+              / +--engine                  /                    / +--engine                   /
+             /  |  +--...                 /                    /  |  +--fc_map_coeffs        /
+            /   +--params                /  ____________      /   +--measured_eng_points    /
+           /    |  +--...               /  |            |    /    |    n   p  fc  pme  ... /
+          /     +--measured_eng_points /==>| Calculator |==>/     |  ... ... ...  ...     /
+         /          n    p    fc      /    |____________|  /      +--fitted_eng_points   /
+        /          --  ----  ---     /                    /       |    n    p   fc      /
+       /            0   0.0    0    /                    /        |  ...  ...  ...     /
+      /           600  42.5   25   /                    /         +--mesh_eng_points  /
+     /           ...    ...  ...  /                    /               n    p   fc   /
+    /                            /                    /              ...  ...  ...  /
+   '----------------------------'                    '-----------------------------'
 
 
 The *Input & Output Model* are trees of strings and numbers, assembled with:
@@ -89,6 +89,13 @@ from each of the following categories (column-headers are case-insensitive):
     PMF      (bar)
 
 
+.. [#] Bastiaan Zuurendonk, Maarten Steinbuch(2005):
+        "Advanced Fuel Consumption and Emission Modeling using Willans line scaling techniques for engines",
+        *Technische Universiteit Eindhoven*, 2005, 
+        Department Mechanical Engineering, Dynamics and Control Technology Group,
+        http://alexandria.tue.nl/repository/books/612441.pdf
+
+
 
 Quick-start
 -----------
@@ -114,7 +121,7 @@ you can try the following commands:
     .. code-block:: console
 
         $ fuefit --version
-        0.0.4-beta.2
+        0.0.5-alpha.1
         
         $ fuefit --help
         ...
@@ -245,7 +252,7 @@ After installation, it is important that you check which version is visible in y
 .. code-block:: console
 
     $ fuefit --version
-    0.0.4-beta.1
+    0.0.5-alpha.1
         
 
 
@@ -396,7 +403,7 @@ First run :command:`python` or :command:`ipython` and try to import the project 
     >>> import fuefit
 
     >>> fuefit.__version__              ## Check version once more.
-    '0.0.4-beta.1'
+    '0.0.5-alpha.1'
 
     >>> fuefit.__file__                   ## To check where it was installed.         # doctest: +SKIP
     /usr/local/lib/site-package/fuefit-...
@@ -457,12 +464,21 @@ and get back the results:
     You can always check the sample code at the Test-cases and in the cmdline tool :mod:`fuefit.__main__`.
 
 
+Fitting Parameterization
+^^^^^^^^^^^^^^^^^^^^^^^^
+The `'lmfit' fitting library <http://lmfit.github.io/lmfit-py/>`_ can be parameterized by 
+setting/modifying various input-model properties under ``/params/fitting/``.
+
+In particular under ``/params/fitting/coeffs/`` you can set a dictionary of *coefficient-name* -->
+`coefficient-attributes <http://lmfit.github.io/lmfit-py/parameters.html#Parameters>`_ such as ``min/max/value``,
+as defined by the *lmfit* library (check the default props under :func:`fuefit.datamodel.base_model()` and the
+example columns in the *ExcelRunner*).
+ 
 
 .. _before-contribute:
 
 Contribute
 ==========
-sad [TBD]
 
 Development team
 ----------------
@@ -477,16 +493,37 @@ Development team
 
 .. _before-indices:
 
-Footnotes
-=========
+Indices
+=======
 
 .. _before-footer:
 
-.. [#] Bastiaan Zuurendonk, Maarten Steinbuch(2005):
-        "Advanced Fuel Consumption and Emission Modeling using Willans line scaling techniques for engines",
-        *Technische Universiteit Eindhoven*, 2005, 
-        Department Mechanical Engineering, Dynamics and Control Technology Group,
-        http://alexandria.tue.nl/repository/books/612441.pdf
+.. glossary::
+
+    CM
+        Mean piston speed (measure for the engines operating speed)
+    
+    PME
+        Mean effective pressure (the engines ability to produce mechanical work)
+    
+    PMF
+        Available mean effective pressure (the maximum mean effective pressure which could be produced if n = 1)
+        
+    JSON-schema
+        The `JSON schema <http://json-schema.org/>`_ is an `IETF draft <http://tools.ietf.org/html/draft-zyp-json-schema-03>`_
+        that provides a *contract* for what JSON-data is required for a given application and how to interact
+        with it.  JSON Schema is intended to define validation, documentation, hyperlink navigation, and
+        interaction control of JSON data.
+        You can learn more about it from this `excellent guide <http://spacetelescope.github.io/understanding-json-schema/>`_,
+        and experiment with this `on-line validator <http://www.jsonschema.net/>`_.
+
+    JSON-pointer
+        JSON Pointer(:rfc:`6901`) defines a string syntax for identifying a specific value within
+        a JavaScript Object Notation (JSON) document. It aims to serve the same purpose as *XPath* from the XML world,
+        but it is much simpler.
+
+
+.. _before-replacements:
 
 .. |virtualenv| replace::  *virtualenv* (isolated Python environment)
 .. _virtualenv: http://docs.python-guide.org/en/latest/dev/virtualenvs/
@@ -524,26 +561,3 @@ Footnotes
     :target: https://github.com/ankostis/fuefit/issues
     :alt: Issues count
 
-.. glossary::
-
-    CM
-        Mean piston speed (measure for the engines operating speed)
-    
-    PME
-        Mean effective pressure (the engines ability to produce mechanical work)
-    
-    PMF
-        Available mean effective pressure (the maximum mean effective pressure which could be produced if n = 1)
-        
-    JSON-schema
-        The `JSON schema <http://json-schema.org/>`_ is an `IETF draft <http://tools.ietf.org/html/draft-zyp-json-schema-03>`_
-        that provides a *contract* for what JSON-data is required for a given application and how to interact
-        with it.  JSON Schema is intended to define validation, documentation, hyperlink navigation, and
-        interaction control of JSON data.
-        You can learn more about it from this `excellent guide <http://spacetelescope.github.io/understanding-json-schema/>`_,
-        and experiment with this `on-line validator <http://www.jsonschema.net/>`_.
-
-    JSON-pointer
-        JSON Pointer(:rfc:`6901`) defines a string syntax for identifying a specific value within
-        a JavaScript Object Notation (JSON) document. It aims to serve the same purpose as *XPath* from the XML world,
-        but it is much simpler.

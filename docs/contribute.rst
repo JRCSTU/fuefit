@@ -3,4 +3,4 @@
     :end-before: _before-indices:
 
 .. include:: ../README.rst
-    :start-after: _before-footer:
+    :start-after: _before-replacements:
