@@ -191,7 +191,7 @@ Fuefit-|version| runs on Python-3.3+, and it is distributed on `Wheels <https://
     
           On this environment you will need to install this project's dependencies manually 
           using a combination of :program:`conda` and :program:`pip` commands.
-          See :file:`conda_requirements.txt`, and peek at the example script commands in :file:`.travis.yaml`. 
+          See :file:`conda_requirements.txt`, and peek at the example script commands in :file:`.travis.yaml`.
         
         * Under *Windows* you can try the self-wrapped `WinPython <http://winpython.github.io/>`_ distribution,
           a higly active project, that can even compile native libraries using an installations of *Visual Studio*, 
@@ -247,13 +247,12 @@ by typing the :command:`pip` in the console:
     print the whole command line when an external program (like a C compiler) fails.
 
 
-After installation, it is important that you check which version is visible in your :envvar:`PATH`:
+After a successful installation, it is important that you check which version is visible in your :envvar:`PATH`:
 
 .. code-block:: console
 
     $ fuefit --version
     0.0.5-alpha.2
-        
 
 
 
@@ -293,6 +292,20 @@ in `development mode <http://pythonhosted.org/setuptools/setuptools.html#develop
 
 
 .. Note:: This last command installs any missing dependencies inside the project-folder.
+
+
+Anaconda install
+----------------
+To install it on *Anaconda* or *miniconda* environment (ie *OS X* ), download the sources, 
+open a *bash-shell* inside them and type the following commands: 
+
+.. code-block:: console
+
+    $ coda install `cat conda_requirements.txt`
+    $ pip install lmfit             ## Workaround lmfit-py#149 
+    $ python setup.py install
+    $ fuefit --version
+    0.0.5-alpha.2
 
 
 
@@ -484,10 +497,15 @@ The `'lmfit' fitting library <http://lmfit.github.io/lmfit-py/>`_ can be paramet
 setting/modifying various input-model properties under ``/params/fitting/``.
 
 In particular under ``/params/fitting/coeffs/`` you can set a dictionary of *coefficient-name* -->
-`coefficient-attributes <http://lmfit.github.io/lmfit-py/parameters.html#Parameters>`_ such as ``min/max/value``,
+:class:`lmfit.parameters.Parameter` such as ``min/max/value``,
 as defined by the *lmfit* library (check the default props under :func:`fuefit.datamodel.base_model()` and the
 example columns in the *ExcelRunner*).
- 
+
+.. Seealso::
+    http://lmfit.github.io/lmfit-py/parameters.html#Parameters
+
+
+
 
 .. _before-contribute:
 

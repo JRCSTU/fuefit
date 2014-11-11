@@ -58,11 +58,11 @@ if on_rtd:
     MOCK_MODULES = ['matplotlib', 'matplotlib.sphinxext', 'matplotlib.sphinxext.plot_directive', 'xlwings']
     sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
-## Trick from https://github.com/rjw57/dtcwt/blob/0.9.0/docs/conf.py
+## Trick from https://github.com/rtfd/readthedocs.org/issues/283
 # On read the docs we need to use a different CDN URL for MathJax which loads
 # over HTTPS.
 if on_rtd:
-    mathjax_path = 'https://c328740.ssl.cf1.rackcdn.com/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML'
+    mathjax_path = 'https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML'
 
 ## Make autodoc always includes constructors.
 #    From http://stackoverflow.com/a/5599712/548792
@@ -362,8 +362,10 @@ texinfo_documents = [
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
     'python': ('http://docs.python.org/3.4', None),
+    'numpy': ('http://docs.scipy.org/doc/numpy/', None),
+    'scipy': ('http://docs.scipy.org/doc/scipy/reference/', None),
+    'pandas': ('http://pandas.pydata.org/pandas-docs/dev', None),
+    'lmfit': ('http://lmfit.github.io/lmfit-py/', None),
     'jsonschema': ('http://python-jsonschema.readthedocs.org/en/latest/', None),
-    'pandas': ('http://pandas.pydata.org/pandas-docs/dev', None),
-    'pandas': ('http://pandas.pydata.org/pandas-docs/dev', None),
 }
 

@@ -235,19 +235,26 @@ def _robust_residualfunc(coeffs, modelfunc, X, YData, is_robust=False, robust_pr
 
     This method applies weights on each iteration so as to downscale any outliers and high-leverage data-points
     based on the 'bisquare' standardized adjusted residuals:[#]_
-    :math:`\frac{r}{K \times \hat{\sigma} \times \sqrt{1 - h}}`
+    
+    .. math::
+    
+            \frac{r}{K \times \hat{\sigma} \times \sqrt{1 - h}}
+    
     where:
 
-    :math:`r` : vector
+    :math:`r` (vector)
         the residuals :math:`\hat{y} - y`
-    :math:`K` : scalar
+        
+    :math:`K` (scalar)
         the *robust percentile* tuning constant used on each iteration to filter-out
-        adjusted-standarized-weights above 1, expressed as the Bisquare M-estimator efficiency 
+        adjusted-standardized-weights above 1, expressed as the Bisquare M-estimator efficiency 
         under Gaussian model. 
-    :math:`\hat{\sigma}` : scalar
+        
+    :math:`\hat{\sigma}` (scalar)
         the robust estimate of the *standard deviation* of the residuals
         based on MAD[#]_ like this: :math:`\hat{\sigma}=1.4826\times\operatorname{MAD}`
-    :math:`h` : vector
+        
+    :math:`h` : (vector)
         the *hat vector*, the diagonal of the *hat matrix*,[#]_
         which is used to reduce the weight of high-leverage data points
         that are having a large effect on the least-squares fit.

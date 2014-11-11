@@ -6,8 +6,9 @@ Changes
 
 Releases
 ========
-v0.0.5, xx-Noe-2014 -- 2nd public release
+v0.0.5, xx-Noe-2014 -- 3nd public release
 -----------------------------------------
+* core: Use `lmfit` library for enforcing limits on fitted coefficients, etc.
 
 
 v0.0.4, 10-Noe-2014 -- 2nd public (beta) release
@@ -18,7 +19,7 @@ v0.0.4, 10-Noe-2014 -- 2nd public (beta) release
 * excel: Enhance excel-runner code to support any python-code. 
 * excel: FIX parsing of ExcelRefs and their syntax documentation.  
 * test: Improve tests and Doctest code in README. 
-* test, ci: Use Travisci Continuous integration to check project health.
+* test, ci: Use TravisCI/Anaconda Continuous-integration to check project health.
 * docs: Add "API-reference" section.
 * docs: Add some "Anaconda" help.
 * NOTE: Various renames of modules, files and model properties.
