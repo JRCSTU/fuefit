@@ -21,7 +21,8 @@ before_install:
     - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION $deps
     - source activate test-environment
 
-    -  pip install -U -I nose ## Curiously installed nose is rotten, and python-nosetests fails!
+    - pip install nose -IU   ## Curiously installed nose is rotten, and python-nosetests fails!
+    - pip install lmfit      ## Otherwise `setup.py install` will fail with sandbox-violation!
 
 install:
   - python setup.py install
@@ -55,3 +56,4 @@ deploy:
     on:
         tags: true
         all_branches: true
+
