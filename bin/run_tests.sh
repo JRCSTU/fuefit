@@ -1,4 +1,4 @@
-    #!/bin/bash
+#!/bin/bash
 #-*- coding: utf-8 -*-
 #
 # Copyright 2013-2014 European Commission (JRC);
