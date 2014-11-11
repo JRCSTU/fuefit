@@ -24,7 +24,13 @@ The *Fuefit* calculator performs the following:
 
 1) Accepts **fuel-consumption engine data points** as input
    (RPM, Power and Fuel-Consumption or equivalent quantities such as CM, PME/Torque and PMF/FC). 
-2) Uses those points to **fit the coefficients** :math:`a, b, c, a2, b2, loss0, loss2` in the following formula:[#]_
+2) Uses those points to **fit the following coefficients**:
+
+  .. math::
+  
+        a, b, c, a2, b2, loss0, loss2
+        
+  using the following formula:[#]_
 
   .. (a + b*cm + c*cm**2)*pmf + (a2 + b2*cm)*pmf**2 + loss0 + loss2*cm**2
   .. math::
@@ -32,28 +38,29 @@ The *Fuefit* calculator performs the following:
         \mathbf{pme} = (a + b\times{\mathbf{cm}} + c\times{\mathbf{cm^2}})\times{\mathbf{pmf}} + 
                 (a2 + b2\times{\mathbf{cm}})\times{\mathbf{pmf^2}} + loss0 + loss2\times{\mathbf{cm^2}}
 
-3) **Spits-out the input engine-points** according to the fitting.
+3) **Spits-out the input engine-points** according to the fitting, and optionally plots a mesh (grid) 
+   with the engine-map.
 
      
 An "execution" or a "run" of a calculation along with the most important pieces of data 
 are depicted in the following diagram::
 
 
-                 .----------------------------.                    .-----------------------------.
-                /        Input-Model         /                    /        Output-Model         /
-               /----------------------------/                    /-----------------------------/
-              / +--engine                  /                    / +--engine                   /
-             /  |  +--...                 /                    /  |  +--fc_map_coeffs        /
-            /   +--params                /  ____________      /   +--measured_eng_points    /
-           /    |  +--...               /  |            |    /    |    n   p  fc  pme  ... /
-          /     +--measured_eng_points /==>| Calculator |==>/     |  ... ... ...  ...     /
-         /          n    p    fc      /    |____________|  /      +--fitted_eng_points   /
-        /          --  ----  ---     /                    /       |    n    p   fc      /
-       /            0   0.0    0    /                    /        |  ...  ...  ...     /
-      /           600  42.5   25   /                    /         +--mesh_eng_points  /
-     /           ...    ...  ...  /                    /               n    p   fc   /
-    /                            /                    /              ...  ...  ...  /
-   '----------------------------'                    '-----------------------------'
+                  .----------------------------.                    .-----------------------------.
+                 /        Input-Model         /                    /        Output-Model         /
+                /----------------------------/                    /-----------------------------/
+               / +--engine                  /                    / +--engine                   /
+              /  |  +--...                 /                    /  |  +--fc_map_coeffs        /
+             /   +--params                /  ____________      /   +--measured_eng_points    /
+            /    |  +--...               /  |            |    /    |    n   p  fc  pme  ... /
+           /     +--measured_eng_points /==>| Calculator |==>/     |  ... ... ...  ...     /
+          /          n    p    fc      /    |____________|  /      +--fitted_eng_points   /
+         /          --  ----  ---     /                    /       |    n    p   fc      /
+        /            0   0.0    0    /                    /        |  ...  ...  ...     /
+       /           600  42.5   25   /                    /         +--mesh_eng_points  /
+      /           ...    ...  ...  /                    /               n    p   fc   /
+     /                            /                    /              ...  ...  ...  /
+    '----------------------------'                    '-----------------------------'
 
 
 The *Input & Output Model* are trees of strings and numbers, assembled with:
@@ -121,40 +128,51 @@ you can try the following commands:
     .. code-block:: console
 
         $ fuefit --version
-        0.0.5-alpha.2
+        0.0.5-beta.1
         
         $ fuefit --help
         ...
         
         ## Change-directory into the `fuefit/test/` folder in the  *sources*.
         $ fuefit -I FuelFit_real.csv header+=0 \
-            --irenames n_norm _ fc_norm \
-            -I engine.csv file_frmt=SERIES model_path=/engine header@=None \
-            --irenames \
+            -I ./FuelFit.xlsx sheetname+=0 header@=None names:='["p","n","fc"]' \
+            -I ./engine.csv file_frmt=SERIES model_path=/engine header@=None \
             -m /engine/fuel=petrol \
-            -O - model_path=/engine/fc_map_coeffs \
-            -m /params/plot_maps@=True
+            -m /params/plot_maps@=True \
+            -O full_results_model.json \
+            -O fit_coeffs.csv model_path=/engine/fc_map_coeffs   index?=false \
+            -O t1.csv model_path=/measured_eng_points   index?=false \
+            -O t2.csv model_path=/mesh_eng_points       index?=false \
 
 :Excel:
     .. code-block:: console
 
-        $ fuefit --excelrun                             ## Windows & OS X only
+        $ fuefit --excelrun                                             ## Windows & OS X only
     
 :Python-code: 
-    .. code-block:: python
+    .. doctest::
     
-        import pandas as pd
-        from fuefit import model, processor
+        >>> import pandas as pd
+        >>> from fuefit import datamodel, processor, test
         
-        input_model = mdl = datamodel.base_model()
-        input_model.update({...})                                   ## See "Python Usage" below.
-        input_model['engine_points'] = pd.read_csv('measured.csv')  ## Can also read Excel, matlab, ...
-        mdl = datamodel.validate_model(mdl, additional_properties=False) 
+        >>> inp_model = datamodel.base_model()
+        >>> inp_model.update({...})                                     ## See "Python Usage" below.        # doctest: +SKIP
+        >>> inp_model['engine_points'] = pd.read_csv('measured.csv')    ## Pandas can read Excel, matlab, ... # doctest: +SKIP
+        >>> datamodel.set_jsonpointer(inp_model, '/params/plot_maps', True)
         
-        output_model = processor.run(input_model)
+        >>> datamodel.validade_model(inp_model, additional_properties=False)            # doctest: +SKIP 
         
-        print(datamodel.resolve_jsonpointer(output_model, '/engine/fc_map_coeffs'))
-        print(output_model['fitted_eng_points'])
+        >>> out_model = processor.run(inp_model)                                        # doctest: +SKIP
+        
+        >>> print(datamodel.resolve_jsonpointer(out_model, '/engine/fc_map_coeffs'))    # doctest: +SKIP
+        a             0.450000
+        b         12582.049764
+        c        -96546.722543
+        a2            0.547341
+        b2            0.000000
+        loss0     -3294.230480
+        loss2   -986836.523690
+        dtype: float64
 
 For more elaborate instructions, read the next sections.
 
@@ -252,7 +270,7 @@ After a successful installation, it is important that you check which version is
 .. code-block:: console
 
     $ fuefit --version
-    0.0.5-alpha.2
+    0.0.5-beta.1
 
 
 
@@ -305,7 +323,7 @@ open a *bash-shell* inside them and type the following commands:
     $ pip install lmfit             ## Workaround lmfit-py#149 
     $ python setup.py install
     $ fuefit --version
-    0.0.5-alpha.2
+    0.0.5-beta.1
 
 
 
@@ -392,9 +410,11 @@ Some general notes regarding the python-code from excel-cells:
 
 Cmd-line usage
 --------------
-Example command::
+Example command:
 
-    fuefit -v\
+.. code-block:: console
+
+      fuefit -v\
         -I fuefit/test/FuelFit.xlsx sheetname+=0 header@=None names:='["p","rpm","fc"]' \
         -I fuefit/test/engine.csv file_frmt=SERIES model_path=/engine header@=None \
         -m /engine/fuel=petrol \
@@ -406,7 +426,7 @@ Example command::
 
 Python usage
 ------------
-The most powerfull way to interact with the project is through a python :abbr:`REPL (Read-Eval-Print Loop)`.
+The most powerful way to interact with the project is through a python :abbr:`REPL (Read-Eval-Print Loop)`.
 So fire-up a :command:`python` or :command:`ipython` shell and first try to import the project just to check its version:
 
 .. doctest::
@@ -414,7 +434,7 @@ So fire-up a :command:`python` or :command:`ipython` shell and first try to impo
     >>> import fuefit
 
     >>> fuefit.__version__                ## Check version once more.
-    '0.0.5-alpha.2'
+    '0.0.5-beta.1'
 
     >>> fuefit.__file__                   ## To check where it was installed.         # doctest: +SKIP
     /usr/local/lib/site-package/fuefit-...
@@ -437,8 +457,8 @@ If the version was as expected, take the **base-model** and extend it with your 
 
     >>> from fuefit import datamodel, processor
 
-    >>> input_model = datamodel.base_model()
-    >>> input_model.update({
+    >>> inp_model = datamodel.base_model()
+    >>> inp_model.update({
     ...     "engine": {
     ...         "fuel":     "diesel",
     ...         "p_max":    95,
@@ -453,7 +473,7 @@ If the version was as expected, take the **base-model** and extend it with your 
 
     >>> import pandas as pd
     >>> df = pd.read_excel('fuefit/test/FuelFit.xlsx', 0, header=None, names=["n","p","fc"])
-    >>> input_model['measured_eng_points'] = df
+    >>> inp_model['measured_eng_points'] = df
 
 
 For information on the accepted model-data, check both its :term:`JSON-schema` at :func:`~fuefit.datamodel.model_schema`,
@@ -463,7 +483,7 @@ Next you have to *validate* it against its *JSON-schema*:
 
 .. code-block:: pycon
 
-    >>> datamodel.validate_model(input_model, additional_properties=False)
+    >>> datamodel.validate_model(inp_model, additional_properties=False)
 
 
 If validation is successful, you may then feed this model-tree to the :mod:`fuefit.processor`,
@@ -471,7 +491,7 @@ to get back the results:
 
 .. code-block:: pycon
 
-    >>> out_model = processor.run(input_model)
+    >>> out_model = processor.run(inp_model)
 
     >>> print(datamodel.resolve_jsonpointer(out_model, '/engine/fc_map_coeffs'))
     a             0.450000
