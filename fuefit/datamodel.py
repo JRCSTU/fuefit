@@ -324,7 +324,7 @@ def base_model():
                     ('c',     dict(value=-0.00093)),
                     ('a2',    dict(value=-0.0027)),
                     ('b2',    dict(value=0, vary=False)),
-                    ('loss0', dict(value=-2.17, min=-3.5, max=-1.5)),
+                    ('loss0', dict(value=-2.17)), #, min=-3.5, max=-1.5)),
                     ('loss2', dict(value=-0.0037)),
                 ]), 
             },

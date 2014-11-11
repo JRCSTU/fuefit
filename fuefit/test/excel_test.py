@@ -66,7 +66,7 @@ class TestExcel(unittest.TestCase):
 
 
     def test_excel_refs(self):
-        from fuefit.excel.FuefitExcelRunner import resolve_excel_ref
+        from ..excel.FuefitExcelRunner import resolve_excel_ref
         sheetname   ='Input'
         addr        ='d2'
         table       = pd.DataFrame({'a':[1,2,3], 'b':['s','t','u'], 'c':[True,False,True]})
@@ -114,7 +114,7 @@ class TestExcel(unittest.TestCase):
 
     def test_excel_runner_call_from_python(self):
         import xlwings as xw
-        from fuefit.excel import FuefitExcelRunner 
+        from ..excel import FuefitExcelRunner 
         wb = xw.Workbook(from_my_path('..', 'excel', 'FuefitExcelRunner'))
         try:
             FuefitExcelRunner.main()

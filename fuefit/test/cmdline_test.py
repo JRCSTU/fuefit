@@ -22,12 +22,12 @@ import sys
 import tempfile
 import unittest
 
-from fuefit.__main__ import (
+from ..__main__ import (
     build_args_parser, validate_file_opts, parse_key_value_pair,
     parse_many_file_args, assemble_model,
     FileSpec, main, store_model_parts
 )
-from fuefit.__main__ import parse_column_specifier
+from ..__main__ import parse_column_specifier
 
 from ..datamodel import json_dumps, base_model, validate_model
 from .redirect import redirected # @UnresolvedImport

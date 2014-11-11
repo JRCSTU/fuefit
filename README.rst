@@ -121,7 +121,7 @@ you can try the following commands:
     .. code-block:: console
 
         $ fuefit --version
-        0.0.5-alpha.1
+        0.0.5-alpha.2
         
         $ fuefit --help
         ...
@@ -252,7 +252,7 @@ After installation, it is important that you check which version is visible in y
 .. code-block:: console
 
     $ fuefit --version
-    0.0.5-alpha.1
+    0.0.5-alpha.2
         
 
 
@@ -393,33 +393,32 @@ Example command::
 
 Python usage
 ------------
-Example python :abbr:`REPL (Read-Eval-Print Loop)` example-commands  are given below 
-that setup and run an *experiment*.
-  
-First run :command:`python` or :command:`ipython` and try to import the project to check its version:
+The most powerfull way to interact with the project is through a python :abbr:`REPL (Read-Eval-Print Loop)`.
+So fire-up a :command:`python` or :command:`ipython` shell and first try to import the project just to check its version:
 
 .. doctest::
 
     >>> import fuefit
 
-    >>> fuefit.__version__              ## Check version once more.
-    '0.0.5-alpha.1'
+    >>> fuefit.__version__                ## Check version once more.
+    '0.0.5-alpha.2'
 
     >>> fuefit.__file__                   ## To check where it was installed.         # doctest: +SKIP
     /usr/local/lib/site-package/fuefit-...
 
 
 .. Tip:
-    The use :command:`ipython` is preffered over :command:`python` since it offers various user-friendly 
-    facilities, such as pressing :kbd:`Tab` for completions, or allowing you to suffix commands with `?` or `??` 
-    to get help and read their source-code.
+    The use of :program:`ipython` interpreter is preffered over plain :program:`python` since the former 
+    provides various user-friendly facilities, such as pressing :kbd:`Tab` for receiving completions on commands, or 
+    adding `?` or `??` at the end of commands to view their help *docstrings* and read their source-code.
     
-    Additionally you can <b>copy any python commands starting with ``>>>`` and ``...``</b> and copy paste them directly
-    into the ipython interpreter; it will remove these prefixes.  
-    But in :command:`python` you have to remove it youself.
+    Additionally you can <b>copy any python listing from this tutorial starting with ``>>>`` and ``...``</b> 
+    and paste it directly into the :program:`ipython` interpreter; the prefixes will be removed automatically.  
+    But in :command:`python` you have to remove them yourself.
 
 
-If everything works, take the **base-model** and extend it your input-data (strings and numbers): 
+If the version was as expected, take the **base-model** and extend it with your engine-data 
+(strings and numbers): 
 
 .. code-block:: pycon
 
@@ -439,6 +438,11 @@ If everything works, take the **base-model** and extend it your input-data (stri
     ...     }
     ... })
 
+    >>> import pandas as pd
+    >>> df = pd.read_excel('fuefit/test/FuelFit.xlsx', 0, header=None, names=["n","p","fc"])
+    >>> input_model['measured_eng_points'] = df
+
+
 For information on the accepted model-data, check both its :term:`JSON-schema` at :func:`~fuefit.datamodel.model_schema`,
 and the :func:`~fuefit.datamodel.base_model`:
 
@@ -450,14 +454,24 @@ Next you have to *validate* it against its *JSON-schema*:
 
 
 If validation is successful, you may then feed this model-tree to the :mod:`fuefit.processor`,
-and get back the results:
+to get back the results:
 
 .. code-block:: pycon
 
-    >>> output_model = processor.run(input_model)                   # doctest: +SKIP
+    >>> out_model = processor.run(input_model)
 
-    >>> print(output_model['fitted_eng_maps'])                      # doctest: +SKIP
-    >>> print(output_model['fitted_eng_points'].shape)              # doctest: +SKIP
+    >>> print(datamodel.resolve_jsonpointer(out_model, '/engine/fc_map_coeffs'))
+    a             0.450000
+    b         12582.049764
+    c        -96546.722543
+    a2            0.547341
+    b2            0.000000
+    loss0     -3294.230480
+    loss2   -986836.523690
+    dtype: float64
+
+    >>> print(out_model['fitted_eng_points'].shape)
+    (262, 11)
 
 
 .. Hint::

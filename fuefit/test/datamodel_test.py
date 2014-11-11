@@ -12,7 +12,7 @@ import unittest
 
 import jsonschema
 
-from fuefit import datamodel
+from .. import datamodel
 
 
 class Test(unittest.TestCase):

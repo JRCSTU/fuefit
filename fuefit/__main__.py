@@ -96,9 +96,9 @@ import shutil
 import sys
 from textwrap import dedent
 
-from fuefit import datamodel, processor, utils
-from fuefit import __version__ as prog_ver
-from fuefit.datamodel import (JsonPointerException, json_dump, json_dumps)
+from . import datamodel, processor, utils
+from . import __version__ as prog_ver
+from .datamodel import (JsonPointerException, json_dump, json_dumps)
 from pandas.core.generic import NDFrame
 
 import jsonschema as jsons
