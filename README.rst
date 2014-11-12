@@ -106,13 +106,15 @@ from each of the following categories (column-headers are case-insensitive):
 
 Quick-start
 -----------
-On *Windows*/*OS X*, it is recommended to use one of the scientific Python distributions:
+The program runs on Python-3.3+ with *numpy/scipy*, *pandas* and *win32* native-libraries installed.
+  
+On *Windows*/*OS X*, it is recommended to use one of the following "scientific" python-distributions, 
+as they already include the native libraries and can install without administrative priviledges: 
 
 * `WinPython <http://winpython.github.io/>`_ (*Windows* only),
-* `Anaconda <http://docs.continuum.io/anaconda/>`_ or `miniconda <http://conda.pydata.org/miniconda.html>`_
+* `Anaconda <http://docs.continuum.io/anaconda/>`_,
 * `Canopy <https://www.enthought.com/products/canopy/>`_,
 
-as they already include *numpy/scipy*, *pandas* and *win32* native-libraries. 
 
 Assuming you have a working python-environment, open a *command-shell*, 
 (in *Windows* use :program:`cmd.exe` BUT ensure :program:`python.exe` is in its :envvar:`PATH`), 
@@ -124,7 +126,7 @@ you can try the following commands:
         $ pip install fuefit
         $ fuefit --winmenus                         ## Adds StartMenu-items, Windows only.
   
-    See: :ref:`Install`
+    See: :doc:`install`
     
 :Cmd-line:
     .. code-block:: console
