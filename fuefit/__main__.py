@@ -391,6 +391,7 @@ _default_out_file_append    = False
 _default_model_overridde_path = '/engine/'
 
 
+## TODO: <Accept.any/string_forkey-value\ pairs?=any.
 _value_parsers = {
     '+': int,
     '*': float,

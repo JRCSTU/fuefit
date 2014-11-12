@@ -6,9 +6,11 @@ Changes
 
 Releases
 ========
-v0.0.5, xx-Noe-2014 -- 3nd public release
------------------------------------------
+v0.0.5, 12-Noe-2014 -- 3nd public (Rosetta) release
+---------------------------------------------------
 * core: Use `lmfit` library for enforcing limits on fitted coefficients, etc.
+* data: Updated Excel file with more engines.
+* docs: Fix math-formulas and improve instructions.
 
 
 v0.0.4, 10-Noe-2014 -- 2nd public (beta) release

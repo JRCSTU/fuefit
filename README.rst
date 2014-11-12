@@ -121,14 +121,16 @@ you can try the following commands:
 :Install:
     .. code-block:: console
 
-        $ pip install fuefit --pre
+        $ pip install fuefit
         $ fuefit --winmenus                         ## Adds StartMenu-items, Windows only.
+  
+    See: :ref:`Install`
     
 :Cmd-line:
     .. code-block:: console
 
         $ fuefit --version
-        0.0.5-beta.1
+        0.0.5
         
         $ fuefit --help
         ...
@@ -144,11 +146,15 @@ you can try the following commands:
             -O t1.csv model_path=/measured_eng_points   index?=false \
             -O t2.csv model_path=/mesh_eng_points       index?=false \
 
+    See: :ref:`cmd-line-usage`
+    
 :Excel:
     .. code-block:: console
 
         $ fuefit --excelrun                                             ## Windows & OS X only
     
+    See: :ref:`excel-usage`
+
 :Python-code: 
     .. doctest::
     
@@ -165,16 +171,16 @@ you can try the following commands:
         >>> out_model = processor.run(inp_model)                                        # doctest: +SKIP
         
         >>> print(datamodel.resolve_jsonpointer(out_model, '/engine/fc_map_coeffs'))    # doctest: +SKIP
-        a             0.450000
-        b         12582.049764
-        c        -96546.722543
-        a2            0.547341
-        b2            0.000000
-        loss0     -3294.230480
-        loss2   -986836.523690
-        dtype: float64
+        a            164.110667
+        b           7051.867419
+        c          63015.519469
+        a2             0.121139
+        b2          -493.301306
+        loss0      -1637.894603
+        loss2   -1047463.140758
+        dtype: float64    
 
-For more elaborate instructions, read the next sections.
+    See: :ref:`python-usage`
 
 .. Tip::
     The commands beginning with ``$``, above, imply a *Unix* like operating system with a *POSIX* shell
@@ -209,7 +215,7 @@ Fuefit-|version| runs on Python-3.3+, and it is distributed on `Wheels <https://
     
           On this environment you will need to install this project's dependencies manually 
           using a combination of :program:`conda` and :program:`pip` commands.
-          See :file:`conda_requirements.txt`, and peek at the example script commands in :file:`.travis.yaml`.
+          See :file:`miniconda_requirements.txt`, and peek at the example script commands in :file:`.travis.yaml`.
         
         * Under *Windows* you can try the self-wrapped `WinPython <http://winpython.github.io/>`_ distribution,
           a higly active project, that can even compile native libraries using an installations of *Visual Studio*, 
@@ -270,7 +276,7 @@ After a successful installation, it is important that you check which version is
 .. code-block:: console
 
     $ fuefit --version
-    0.0.5-beta.1
+    0.0.5
 
 
 
@@ -314,16 +320,20 @@ in `development mode <http://pythonhosted.org/setuptools/setuptools.html#develop
 
 Anaconda install
 ----------------
-To install it on *Anaconda* or *miniconda* environment (ie *OS X* ), download the sources, 
-open a *bash-shell* inside them and type the following commands: 
+The installation to *Anaconda* (ie *OS X*) works without any differences from the ``pip`` procedure 
+described so far.
+ 
+To install it on *miniconda* environment, you need to install first the project's *native* dependencies 
+(numpy/scipy), so you need to download the sources (see above). 
+Then open a *bash-shell* inside them and type the following commands: 
 
 .. code-block:: console
 
-    $ coda install `cat conda_requirements.txt`
+    $ coda install `cat miniconda_requirements.txt`
     $ pip install lmfit             ## Workaround lmfit-py#149 
     $ python setup.py install
     $ fuefit --version
-    0.0.5-beta.1
+    0.0.5
 
 
 
@@ -331,6 +341,8 @@ open a *bash-shell* inside them and type the following commands:
 
 Usage
 =====
+.. _excel-usage:
+
 Excel usage
 -----------
 .. Attention:: Excel-integration requires Python 3 and *Windows* or *OS X*!
@@ -407,6 +419,7 @@ Some general notes regarding the python-code from excel-cells:
 * Read http://docs.xlwings.org/quickstart.html
 
 
+.. _cmd-line-usage:
 
 Cmd-line usage
 --------------
@@ -423,6 +436,7 @@ Example command:
         -O ~t.csv model_path= -m /params/plot_maps@=True
 
 
+.. _python-usage:
 
 Python usage
 ------------
@@ -434,7 +448,7 @@ So fire-up a :command:`python` or :command:`ipython` shell and first try to impo
     >>> import fuefit
 
     >>> fuefit.__version__                ## Check version once more.
-    '0.0.5-beta.1'
+    '0.0.5'
 
     >>> fuefit.__file__                   ## To check where it was installed.         # doctest: +SKIP
     /usr/local/lib/site-package/fuefit-...
@@ -494,13 +508,13 @@ to get back the results:
     >>> out_model = processor.run(inp_model)
 
     >>> print(datamodel.resolve_jsonpointer(out_model, '/engine/fc_map_coeffs'))
-    a             0.450000
-    b         12582.049764
-    c        -96546.722543
-    a2            0.547341
-    b2            0.000000
-    loss0     -3294.230480
-    loss2   -986836.523690
+    a            164.110667
+    b           7051.867419
+    c          63015.519469
+    a2             0.121139
+    b2          -493.301306
+    loss0      -1637.894603
+    loss2   -1047463.140758
     dtype: float64
 
     >>> print(out_model['fitted_eng_points'].shape)
