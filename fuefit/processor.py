@@ -19,6 +19,7 @@ import lmfit
 from . import pdcalc
 from . import datamodel
 from collections import OrderedDict
+from operator import setitem
 
 
 log = logging.getLogger(__name__)
@@ -91,16 +92,16 @@ def eng_points_2_std_map(params, engine, eng_points):
     from math import pi
     
     funcs = [
-        lambda: engine.__setitem__('fuel_lhv',           params['fuel'][engine.fuel]['lhv']),
-        lambda: eng_points.__setitem__('n',      eng_points.n_norm * (engine.n_rated - engine.n_idle) + engine.n_idle),
-        lambda: eng_points.__setitem__('p',      eng_points.p_norm * engine.p_max),
-        lambda: eng_points.__setitem__('fc',     eng_points.fc_norm * engine.p_max),
-        lambda: eng_points.__setitem__('rps',    eng_points.n / 60),
-        #lambda: eng_points.__setitem__('rps',     eng_points.cm * 1000 / (2 * engine.stroke)),
-        lambda: eng_points.__setitem__('torque', (eng_points.p * 1000) / (eng_points.rps * 2 * pi)),
-        lambda: eng_points.__setitem__('pme',    (eng_points.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-6)),
-        lambda: eng_points.__setitem__('pmf',    ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-6)) * (eng_points.fc / (3600 * eng_points.rps * 2 * pi)) * 10e-5),
-        lambda: eng_points.__setitem__('cm',     eng_points.rps * 2 * engine.stroke / 1000),
+        lambda: setitem(engine,     'fuel_lhv',           params['fuel'][engine.fuel]['lhv']),
+        lambda: setitem(eng_points, 'n',      eng_points.n_norm * (engine.n_rated - engine.n_idle) + engine.n_idle),
+        lambda: setitem(eng_points, 'p',      eng_points.p_norm * engine.p_max),
+        lambda: setitem(eng_points, 'fc',     eng_points.fc_norm * engine.p_max),
+        lambda: setitem(eng_points, 'rps',    eng_points.n / 60),
+        #lambda: setitem(eng_points, 'rps',     eng_points.cm * 1000 / (2 * engine.stroke)),
+        lambda: setitem(eng_points, 'torque', (eng_points.p * 1000) / (eng_points.rps * 2 * pi)),
+        lambda: setitem(eng_points, 'pme',    (eng_points.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-6)),
+        lambda: setitem(eng_points, 'pmf',    ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-6)) * (eng_points.fc / (3600 * eng_points.rps * 2 * pi)) * 10e-5),
+        lambda: setitem(eng_points, 'cm',     eng_points.rps * 2 * engine.stroke / 1000),
     ]
 
     return funcs
