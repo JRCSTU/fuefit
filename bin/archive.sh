@@ -18,7 +18,7 @@ git archive -9 --prefix="$gitpack/" --output="dist/${gitpack}.zip"  ${treish}
 
 echo "Creating arhive: dist/${docpack}.zip"
 ( 
-    cd Docs/_build &&
+    cd docs/_build &&
     ln -sf html "${docpack}" && 
     zip -9 -r  "../../dist/${docpack}.zip"  "${docpack}" 
 ) 

@@ -71,4 +71,6 @@ __pycache__/
 fuefit-*.tgz
 fuefit-*.zip
 
-/.eggs/
+*.eggs/
+/.project
+/.pydevproject

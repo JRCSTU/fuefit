@@ -758,14 +758,11 @@ def build_args_parser(program_name, version, desc, epilog):
         """), 
         nargs='?', const=os.getcwd(), metavar='DESTPATH')
     xlusive_group.add_argument('--excelrun', help=dedent("""
-            copies ExcelRunner template files into DESTPATH 
-            (or <current-working-directory> if DESTPATH missing), 
-            and opens the new Excel-file.
+            copies ExcelRunner template files into USERDIR and 
+            open the new Excel-file, to run a batch of experiments.
         """), 
         nargs='?', const=os.getcwd(), metavar='DESTPATH')
     xlusive_group.add_argument('--winmenus', help="Adds shortcuts into Windows StartMenu.", action='store_true')
-    #xlusive_group.add_argument('--docs', help="Builds project's html-documentation and opens browser on it.", action='store_true')
-    
 
     grp_various = parser.add_argument_group('Various', 'Options controlling various other aspects.')
     grp_various.add_argument('-d', "--debug", action="store_true", help=dedent("""

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Eclipse project file:
+
+    Remove the `sample` prefix (but leave the dot(`.`) and "import project" 
+    from File menu. 
+-->
+<projectDescription>
+	<name>fuefit</name>
+	<comment></comment>
+	<projects>
+	</projects>
+	<buildSpec>
+		<buildCommand>
+			<name>org.python.pydev.PyDevBuilder</name>
+			<arguments>
+			</arguments>
+		</buildCommand>
+	</buildSpec>
+	<natures>
+		<nature>org.python.pydev.pythonNature</nature>
+	</natures>
+</projectDescription>

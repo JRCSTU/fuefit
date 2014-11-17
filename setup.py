@@ -6,11 +6,13 @@
 # You may not use this work except in compliance with the Licence.
 # You may obtain a copy of the Licence at: http://ec.europa.eu/idabc/eupl
 ''''
-fuefit: Fit fuel-consumption engine-maps on a physical formula with 6 parameters.
+Setuptools script for *fuefit* that calculates fitted fuel-maps from measured engine data-points based on coefficients with physical meaning.
 
 
 Install:
 ========
+
+Runs on Python-3, tested on: see :file:`.travis.yaml`
 
 To install it, assuming you have download the sources,
 do the usual::
@@ -21,8 +23,6 @@ Or get it directly from the PIP repository::
 
     pip install fuefit
 
-
-Tested with Python 3.4.
 '''
 
 from distutils.version import StrictVersion
@@ -157,14 +157,14 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     packages=['fuefit', 'fuefit.test', 'fuefit.excel'],
+    include_package_data = True,
     package_data={
         'fuefit.test': ['*.bat', '*.sh'],
-        'fuefit.excel': ['*.ico'],
+        'fuefit.excel': ['*.xlsm', '*.ico'],
     },
 #    extras_require = {
-#        'Docs':  ['sphinx >= 1.2'],
+#        'docs':  ['sphinx >= 1.2'],
 #    },
-    include_package_data = True,
     install_requires=[
         'enum34',
         'pandas',
@@ -172,6 +172,7 @@ setup(
         'scipy',
         'lmfit',
         'jsonschema',
+        'matplotlib',
         'networkx',
         'pint',
         'xlwings >= 0.2.3',
@@ -194,10 +195,10 @@ setup(
             'fuefit          = fuefit.__main__:main',
         ],
     },
-    zip_safe=False,
+    zip_safe=True,
     options={
         'build_sphinx' :{
-            'build_dir': 'Docs/_build',
+            'build_dir': 'docs/_build',
         },
         'bdist_wheel' :{
             'universal': True,
