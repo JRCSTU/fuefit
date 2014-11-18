@@ -381,7 +381,7 @@ All the above commands creates two files:
     using the `mypy` namespace. 
     
     To add more input-columns, you need to set as column *Headers* the *json-pointers* path of the desired 
-    model item (see `Python usage`_ below,).
+    model item (see :ref:`python-usage` below,).
 
 :file:`FuefitExcelRunner{#}.py`   
     Python functions used by the above xls-file for running a batch of experiments.  
@@ -547,6 +547,35 @@ example columns in the *ExcelRunner*).
 
 Contribute
 ==========
+
+This project is hosted in **github**. 
+To provide feedback about bugs and errors or questions and requests for enhancements,
+use `github's Issue-tracker <https://github.com/ankostis/fuefit/issues>`_.
+
+
+
+Sources & Dependencies
+----------------------
+To get involved with development, you need a POSIX environment to fully build it
+(*Linux*, *OSX*, or *Cygwin* on *Windows*). 
+
+.. Admonition:: Liclipse IDE
+    :class: note
+
+    Within the sources there are two sample files for the comprehensive
+    `LiClipse IDE <https://brainwy.github.io/liclipse/>`_:
+    
+    * :file:`eclipse.project` 
+    * :file:`eclipse.pydevproject` 
+    
+    Remove the `eclipse` prefix, (but leave the dot(`.`)) and import it as "existing project" from 
+    Eclipse's `File` menu.
+    
+    Another issue is caused due to the fact that LiClipse contains its own implementation of *Git*, *EGit*,
+    which badly interacts with unix *symbolic-links*, such as the :file:`docs/docs`, and it detects
+    working-directory changes even after a fresh checkout.  To workaround this, Right-click on the above file
+    :menuselection:`Properties --> Team --> Advanced --> Assume Unchanged` 
+
 
 Development team
 ----------------

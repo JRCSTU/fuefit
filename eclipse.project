@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Eclipse project file:
 
-    Remove the `sample` prefix (but leave the dot(`.`) and "import project" 
-    from File menu. 
+    Remove the `eclipse` prefix (but leave the dot(`.`)) and import it 
+    as "existing project" from Eclipse's `File` menu. 
 -->
 <projectDescription>
 	<name>fuefit</name>
