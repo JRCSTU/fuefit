@@ -37,7 +37,7 @@ from setuptools import setup
 py_verinfo = sys.version_info
 py_sver = StrictVersion("%s.%s.%s" % py_verinfo[:3])
 if py_verinfo[0] != 3 or py_sver < StrictVersion("3.3"):
-    exit("Sorry, only Python >= 3.3 is supported!")
+    exit("Sorry, only Python 3.3+ is supported!")
 if sys.argv[-1] == 'setup.py':
     exit("To install, run `python setup.py install`")
     

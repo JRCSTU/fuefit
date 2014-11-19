@@ -148,25 +148,31 @@ def model_schema(additional_properties = False):
                             "type": ["boolean", "number"],
                             "default": False,
                         },
-                        'is_robust': {
-                            "title": "Robust fitting?",
-                            "description": dedent("""
-                                When `robust`, outliers are excluded from the fitted-data,
-                                by using a non-linear iteratively-reweighted least-squares (IRLS) fitting-method.
-                                
-                                See :func:`fuefit.robustfit.curve_fit()` for more.
-                            """),
-                            "type": ["boolean", "null"],
-                            "default": False,
-                        },
                         'fitting': {
-                            "type": "object",
+                            "type": "object", "additionalProperties": additional_properties,
                             "properties": {
                                 'coeffs': {
-                                    "title": "Fitting Coefficient params",
+                                    "title": "Fitting Coefficient parameters",
+                                    "description": "See http://lmfit.github.io/lmfit-py/parameters.html#Parameter",
+                                    'type': 'object', "additionalProperties": additional_properties,
+                                    'properties':{
+                                        'a':{"$ref": "#/definitions/fitting_param"},
+                                        'b':{"$ref": "#/definitions/fitting_param"},
+                                        'c':{"$ref": "#/definitions/fitting_param"},
+                                        'a2':{"$ref": "#/definitions/fitting_param"},
+                                        'b2':{"$ref": "#/definitions/fitting_param"},
+                                        'loss0':{"$ref": "#/definitions/fitting_param"},
+                                        'loss2':{"$ref": "#/definitions/fitting_param"},
+                                    },
                                 },
-                                'fit_options': {
-                                    "title": "Least-square fitting options",
+                                'is_robust': {
+                                    "title": "Robust fitting?",
+                                    "description": dedent("""
+                                        When `robust`, outliers are excluded from the fitted-data,
+                                        by using a non-linear iteratively-reweighted least-squares (IRLS) fitting-method.
+                                    """),
+                                    "type": ["boolean", "null"],
+                                    "default": False,
                                 },
                             },
                         }
@@ -234,33 +240,15 @@ def model_schema(additional_properties = False):
                     'lhv': {'title': "Fuel's Specific Heat-Value (kjoule/kgr)", "$ref": "#/definitions/positiveInteger"}
                 }
             },
-            "mergeableArray": {
-                "type": "object", "": False,
-                "required": ["$merge", "$list"],
-                "properties": {
-                    "$merge": {
-                        "enum": ["merge", "replace", "append_head", "append_tail", "overwrite_head", "overwrite_tail"],
-                        "description": dedent("""
-                            merge       := appends any non-existent elements
-                            replace     := (default) all items replaced
-                        """),
-                    },
-                    "$list": {
-                        "type": "array",
-                    }
-                },
-            },
-            "mergeableObject": {
+            "fitting_param": {
                 "type": "object",
                 "properties": {
-                    "$merge": {
-                        "type": "boolean",
-                        "description": dedent("""
-                            true    := (default) merge properties
-                            false   := replace properties
-                        """),
-                    },
-                },
+                    'value': {'type': ['null', 'number']},
+                    'vary': {'type': ['null', 'boolean']},
+                    'min': {'type': ['null', 'number']},
+                    'max': {'type': ['null', 'number']},
+                    'expr': {},
+                }
             },
         }
     }
@@ -316,8 +304,7 @@ def base_model():
                 'petrol':   {'lhv':43000},
             },
             'fitting': {
-                'is_robust':        False,
-                'fit_options': {},
+                'is_robust':    False,
                 'coeffs': OrderedDict([
                     ('a',     dict(value=0.45)),
                     ('b',     dict(value=0.0154)),

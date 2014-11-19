@@ -6,11 +6,19 @@ Changes
 
 Releases
 ========
-v0.0.5, 12-Noe-2014 -- 3nd public (Rosetta) release
+v0.0.6, X-X-X -- Maintenance release
+------------------------------------
+* build: Untrack exclipse-project files.
+* docs: Improve installation instructions.
+* model: Move /params/is_robust --> ./fitting/is_robust
+
+
+v0.0.5, 12-Noe-2014 -- 3rd public (Rosetta) release
 ---------------------------------------------------
 * core: Use `lmfit` library for enforcing limits on fitted coefficients, etc.
 * data: Updated Excel file with more engines.
 * docs: Fix math-formulas and improve instructions.
+* WARN: ExcelRunner fails on *OS X*.
 
 
 v0.0.4, 10-Noe-2014 -- 2nd public (beta) release

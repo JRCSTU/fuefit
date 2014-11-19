@@ -153,6 +153,9 @@ def main(argv=None):
     program_name = os.path.basename(sys.argv[0])
     if program_name.endswith('.py'):
         program_name = PROG 
+
+    if sys.version < "3.3":
+        exit("Sorry, only Python 3.3+ is supported!")
         
     if argv is None:
         argv = sys.argv[1:]

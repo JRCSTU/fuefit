@@ -48,11 +48,9 @@ def run(mdl, opts=None):
     #
     coeffs = datamodel.resolve_jsonpointer(mdl, '/params/fitting/coeffs')
     coeffs = [lmfit.parameter.Parameter(name, **kws) for (name, kws) in coeffs.items()]
-    fitted_coeffs = fit_engine_map(measured_eng_points, 
-                datamodel.resolve_jsonpointer(mdl, '/params/fitting/is_robust'),
-                coeffs,
-                datamodel.resolve_jsonpointer(mdl, '/params/fitting/fit_options'),
-            )
+    is_robust = datamodel.resolve_jsonpointer(mdl, '/params/fitting/is_robust', False)
+    fitted_coeffs = fit_engine_map(measured_eng_points, is_robust, coeffs)
+    
     engine['fc_map_coeffs'] = fitted_coeffs
 
     fitted_eng_points   = reconstruct_eng_points_fitted(engine, fitted_coeffs, measured_eng_points)
@@ -144,7 +142,7 @@ def engine_map_modelfunc(coeff_values, X):
     return pme
 
 
-def fit_engine_map(df, is_robust, coeffs, fit_options):
+def fit_engine_map(df, is_robust, coeffs):
     assert len({'cm', 'pme', 'pmf'} - set(df.columns)) == 0, \
             "Missing fit-columns: %s" % {'cm', 'pme', 'pmf'} - set(df.columns)
     assert not np.any(np.isnan(df['pmf'])), \
@@ -156,8 +154,7 @@ def fit_engine_map(df, is_robust, coeffs, fit_options):
     residualfunc_kws    = dict(is_robust=is_robust)
     minimizer = lmfit.minimize(_robust_residualfunc, coeffs, 
                 args=residualfunc_args, 
-                kws=residualfunc_kws,
-                **fit_options)
+                kws=residualfunc_kws)
     res_df = pd.Series(minimizer.params.valuesdict())
 
     return res_df
