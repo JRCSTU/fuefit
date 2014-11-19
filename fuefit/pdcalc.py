@@ -274,12 +274,18 @@ def _filter_common_prefixes(deps):
     return ndeps
 
 
+def _keep_calculation_routes(graph, sources, dests):
+    ## Trim irrelevant nodes.
+    #
+    graph.nbunch_iter(dests + _all_predecessors(graph, dests))
+    
 def _research_calculation_routes(graph, sources, dests):
     '''Find nodes reaching 'dests' but not 'sources'.
 
-        sources: a list of nodes (existent or not) to search for all paths originating from them
-        dests:   a list of nodes to search for all paths leading to them them
-        return: a 2-tuple with the graph and its nodes topologically-ordered
+    :param graph: dependency-graph, to be cloned (not modified)
+    :param sources: a list of nodes (existent or not) to search for all paths originating from them
+    :param dests:   a list of nodes to search for all paths leading to them them
+    :return: a 4-tuple (see source)
     '''
 
     ## Remove dests already present in sources.
@@ -308,6 +314,8 @@ def _research_calculation_routes(graph, sources, dests):
     data_graph.remove_nodes_from(isolates)
     
     try:
+        io_pairs = [(o, i) for o in calc_out_nodes for i in calc_inp_nodes]
+        routes = set(it.chain(nx.all_simple_paths(deps_graph, pair) for pair in io_pairs))
         calc_nodes = set(list(calc_out_nodes) + _all_predecessors(data_graph, calc_out_nodes))
     except (KeyError, NetworkXError) as ex:
         unknown = [node for node in calc_out_nodes if node not in graph]
@@ -317,6 +325,8 @@ def _research_calculation_routes(graph, sources, dests):
 
 def _all_predecessors(graph, nodes):
     return [k for node in nodes for k in nx.bfs_predecessors(graph, node).keys()]
+def _all_successors(graph, nodes):
+    return [k for node in nodes for k in nx.bfs_successors(graph, node).keys()]
 
 
 def _find_calculation_order(graph, calc_nodes):

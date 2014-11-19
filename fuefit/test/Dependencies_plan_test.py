@@ -5,6 +5,7 @@
 # Licensed under the EUPL (the 'Licence');
 # You may not use this work except in compliance with the Licence.
 # You may obtain a copy of the Licence at: http://ec.europa.eu/idabc/eupl
+from fuefit.pdcalc import _keep_calculation_routes
 '''
 Check pdcalc's function-dependencies exploration, reporting and classes .
 '''
@@ -12,7 +13,7 @@ from collections import OrderedDict
 import logging
 import unittest
 
-from networkx.classes.digraph import DiGraph
+import networkx as nx
 
 import pandas as pd
 
@@ -33,7 +34,8 @@ def SR(d):
 
 
 def make_test_graph():
-    '''     (4)  6
+    '''
+            (4)  6
              ^   ^
              | X |
             (3)  5
@@ -44,7 +46,7 @@ def make_test_graph():
                |
               (1)
     '''
-    web = DiGraph()
+    web = nx.DiGraph()
     web.add_edges_from([(1,2), (2,3), (3,4), (2,5), (3,6), (5,6), (5,4)])
     return web
 
@@ -202,7 +204,8 @@ class Test(unittest.TestCase):
         self.assertTrue(all_in & cn_nodes == all_in, cn_nodes)
 
     def test_find_connecting_nodes_good_sourceDep(self):
-        '''     (4)  6
+        '''
+                (4)  6
                  ^   ^
                  | X |
                 (3)  5
@@ -213,7 +216,7 @@ class Test(unittest.TestCase):
                    |
                   (1)
         '''
-        web = DiGraph()
+        web = nx.DiGraph()
         web.add_edges_from([(1,2), (2,3), (3,4), (2,5), (3,6), (5,6), (5,4)])
 
         inp = (1, 3, 4)
@@ -223,6 +226,56 @@ class Test(unittest.TestCase):
         all_in = {2,5,6}
         self.assertTrue(cn_nodes - all_out == cn_nodes, cn_nodes)
         self.assertTrue(all_in & cn_nodes == all_in, cn_nodes)
+
+
+    def test_find_func_group_with_cyclic_routes(self):
+        '''
+                      (4)             4
+                       ^              ^
+                       |              |
+                (2)<-->3        2<-->(3)
+                 ^     ^        ^     ^
+                  \   /          \   / 
+                   [1]            [1]  
+        '''
+        web = nx.DiGraph()
+        web.add_edges_from([(1,2), (1,3), (2,3), (3,2), (3,4)])
+
+        inp1 = (2,4)
+        inp2 = (3,)
+        out = (1,)
+        (_, _, cn_nodes, _) = _research_calculation_routes(web, inp1, out)
+        all_out = {1,4,3}
+        all_in = {2,5,6}
+        self.assertTrue(cn_nodes - all_out == cn_nodes, cn_nodes)
+        self.assertTrue(all_in & cn_nodes == all_in, cn_nodes)
+
+
+    def test_drop_func_groups_with_unmet_branches(self):
+        '''
+                 2   3   4
+                 ^  ^ ^  ^ 
+                  \a| |b/
+                   \| |/
+                    * *
+                     1   
+        '''
+        web = nx.MultiDiGraph()
+        func_a = {'func':'a'}
+        func_b = {'func':'b'}
+        web.add_edges_from([
+                (1,2, func_a), (1,3, func_a),
+                (1,3, func_b), (1,4, func_b),
+        ])
+
+        cases = [# INP   OUT#
+                 ((2,3), 3),
+                 ((3,4), 3),
+                 ((2,4), 0),
+         ]
+        for inps, nouts in cases:
+            web = _keep_calculation_routes(web, inps, [1])
+            self.assertEqual(len(web), nouts)
 
 
     def testSmoke_ExecutionPlan_fail(self):

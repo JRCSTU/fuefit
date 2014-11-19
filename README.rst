@@ -4,9 +4,10 @@
 |dev-status| |build-status| |docs-status| |pypi-status| |downloads-count| |github-issues|
 
 :Release:       |version|
-:Home:          https://github.com/ankostis/fuefit
 :Documentation: https://fuefit.readthedocs.org/
-:PyPI:          https://pypi.python.org/pypi/fuefit
+:Source:        https://github.com/ankostis/fuefit
+:PyPI repo:     https://pypi.python.org/pypi/fuefit
+:Keywords:      automotive, car, cars, consumption, engine, engine-map, fitting, fuel, vehicle, vehicles
 :Copyright:     2014 European Commission (`JRC-IET <http://iet.jrc.ec.europa.eu/>`_)
 :License:       `EUPL 1.1+ <https://joinup.ec.europa.eu/software/page/eupl>`_
 
@@ -22,9 +23,9 @@ Overview
 --------
 The *Fuefit* calculator performs the following:
 
-1) Accepts **fuel-consumption engine data points** as input
+1. Accepts **fuel-consumption engine data points** as input
    (RPM, Power and Fuel-Consumption or equivalent quantities such as CM, PME/Torque and PMF/FC). 
-2) Uses those points to **fit the following coefficients**:
+2. Uses those points to **fit the following coefficients**:
 
    .. math::
    
@@ -38,7 +39,7 @@ The *Fuefit* calculator performs the following:
          \mathbf{pme} = (a + b\times{\mathbf{cm}} + c\times{\mathbf{cm^2}})\times{\mathbf{pmf}} + 
                  (a2 + b2\times{\mathbf{cm}})\times{\mathbf{pmf^2}} + loss0 + loss2\times{\mathbf{cm^2}}
    
-3) **Spits-out the input engine-points** according to the fitting, and optionally plots a mesh (grid) 
+3. **Spits-out the input engine-points** according to the fitting, and optionally plots a mesh (grid) 
    with the engine-map.
 
      
@@ -121,7 +122,7 @@ Assuming you have a working python-environment, open a *command-shell*,
 you can try the following commands: 
 
 :Install:
-    .. code-block:: console
+    .. code-block:: bash
 
         $ pip install fuefit
         $ fuefit --winmenus                         ## Adds StartMenu-items, Windows only.
@@ -129,7 +130,7 @@ you can try the following commands:
     See: :doc:`install`
     
 :Cmd-line:
-    .. code-block:: console
+    .. code-block:: bash
 
         $ fuefit --version
         0.0.6-alpha.1
@@ -151,7 +152,7 @@ you can try the following commands:
     See: :ref:`cmd-line-usage`
     
 :Excel:
-    .. code-block:: console
+    .. code-block:: bash
 
         $ fuefit --excelrun                                             ## Windows & OS X only
     
@@ -237,7 +238,7 @@ Fuefit-|version| runs on Python-3.3+, and it is distributed on `Wheels <https://
 Before installing it, make sure that there are no older versions left over.  
 So run this command until you cannot find any project installed:
 
-.. code-block:: console
+.. code-block:: bash
 
     $ pip uninstall fuefit                                      ## Use `pip3` if both python-2 & 3 are in PATH.
     
@@ -245,7 +246,7 @@ So run this command until you cannot find any project installed:
 You can install the project directly from the |pypi|_ the "standard" way, 
 by typing the :command:`pip` in the console:
 
-.. code-block:: console
+.. code-block:: bash
 
     $ pip install fuefit
 
@@ -260,7 +261,7 @@ by typing the :command:`pip` in the console:
 
 * To install an older version issue the console command:
   
-  .. code-block:: console
+  .. code-block:: bash
   
       $ pip install fuefit=1.1.1                    ## Use `--pre` if version-string has a build-suffix.
 
@@ -275,7 +276,7 @@ by typing the :command:`pip` in the console:
 
 After a successful installation, it is important that you check which version is visible in your :envvar:`PATH`:
 
-.. code-block:: console
+.. code-block:: bash
 
     $ fuefit --version
     0.0.6-alpha.1
@@ -292,7 +293,7 @@ There are various methods to get hold of them:
 * Clone the *git-repository* at *github*.  Assuming you have a working installation of `git <http://git-scm.com/>`_
   you can fetch and install the latest version of the project with the following series of commands:
   
-  .. code-block:: console
+  .. code-block:: bash
   
       $ git clone "https://github.com/ankostis/fuefit.git" fuefit.git
       $ cd fuefit.git
@@ -303,7 +304,7 @@ When working with sources, you need to have installed all libraries that the pro
 Particularly for the latest *WinPython* environments (*Windows* / *OS X*) you can install 
 the necessary dependencies with: 
 
-.. code-block:: console
+.. code-block:: bash
 
     $ pip install -r WinPython_requirements.txt -U .
 
@@ -312,7 +313,7 @@ The previous command installs a "snapshot" of the project as it is found in the 
 If you wish to link the project's sources with your python environment, install the project 
 in `development mode <http://pythonhosted.org/setuptools/setuptools.html#development-mode>`_:
 
-.. code-block:: console
+.. code-block:: bash
 
     $ python setup.py develop
 
@@ -329,7 +330,7 @@ To install it on *miniconda* environment, you need to install first the project'
 (numpy/scipy), so you need to download the sources (see above). 
 Then open a *bash-shell* inside them and type the following commands: 
 
-.. code-block:: console
+.. code-block:: bash
 
     $ coda install `cat miniconda_requirements.txt`
     $ pip install lmfit             ## Workaround lmfit-py#149 
@@ -354,7 +355,7 @@ to use Excel files for providing input and output to the processor.
 
 To create the necessary template-files in your current-directory you should enter:
 
-.. code-block:: console
+.. code-block:: bash
 
      $ fuefit --excel
      
@@ -394,7 +395,7 @@ All the above commands creates two files:
 
 .. Note:: You may reverse the procedure described above and run the python-script instead:
 
-    .. code-block:: console
+    .. code-block:: bash
     
          $ python FuefitExcelRunner.py
     
@@ -427,7 +428,7 @@ Cmd-line usage
 --------------
 Example command:
 
-.. code-block:: console
+.. code-block:: bash
 
       fuefit -v\
         -I fuefit/test/FuelFit.xlsx sheetname+=0 header@=None names:='["p","rpm","fc"]' \
