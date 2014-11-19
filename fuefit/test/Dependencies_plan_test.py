@@ -152,7 +152,7 @@ class Test(unittest.TestCase):
         graph = deps._build_deps_graph()
 #         print("RELS:\n", lstr(deps.rels))
 #         print('ORDERED:\n', lstr(plan.graph.ordered(True)))
-        self.assertEqual(len(graph), 25) #29 when adding.segments
+        self.assertEqual(len(graph), 27) #25 before func-groups, #29 when adding.segments
 
         return graph
 

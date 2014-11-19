@@ -26,18 +26,18 @@ The *Fuefit* calculator performs the following:
    (RPM, Power and Fuel-Consumption or equivalent quantities such as CM, PME/Torque and PMF/FC). 
 2) Uses those points to **fit the following coefficients**:
 
-  .. math::
-  
-        a, b, c, a2, b2, loss0, loss2
-        
-  using the following formula:[#]_
-
-  .. (a + b*cm + c*cm**2)*pmf + (a2 + b2*cm)*pmf**2 + loss0 + loss2*cm**2
-  .. math::
+   .. math::
    
-        \mathbf{pme} = (a + b\times{\mathbf{cm}} + c\times{\mathbf{cm^2}})\times{\mathbf{pmf}} + 
-                (a2 + b2\times{\mathbf{cm}})\times{\mathbf{pmf^2}} + loss0 + loss2\times{\mathbf{cm^2}}
-
+         a, b, c, a2, b2, loss0, loss2
+         
+   using the following formula:[#]_
+   
+   .. (a + b*cm + c*cm**2)*pmf + (a2 + b2*cm)*pmf**2 + loss0 + loss2*cm**2
+   .. math::
+    
+         \mathbf{pme} = (a + b\times{\mathbf{cm}} + c\times{\mathbf{cm^2}})\times{\mathbf{pmf}} + 
+                 (a2 + b2\times{\mathbf{cm}})\times{\mathbf{pmf^2}} + loss0 + loss2\times{\mathbf{cm^2}}
+   
 3) **Spits-out the input engine-points** according to the fitting, and optionally plots a mesh (grid) 
    with the engine-map.
 

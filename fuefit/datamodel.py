@@ -5,22 +5,21 @@
 # Licensed under the EUPL (the 'Licence');
 # You may not use this work except in compliance with the Licence.
 # You may obtain a copy of the Licence at: http://ec.europa.eu/idabc/eupl
-import io
-from textwrap import dedent
-from collections import OrderedDict
 '''
 Function for building and jsonschema-validating input and output model.
 '''
 
+import io
+import operator as ops
+from textwrap import dedent
+from collections import OrderedDict
 from collections.abc import Mapping, Sequence 
 import json
 
-import numpy as np
+import jsonschema as jsons
+import pandas as pd
 from pandas.core.generic import NDFrame
 
-import jsonschema as jsons
-import operator as ops
-import pandas as pd
 
 
 def model_schema(additional_properties = False):

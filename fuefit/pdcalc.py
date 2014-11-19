@@ -212,15 +212,17 @@ def _validate_func_relations(func_rels):
 
 
 def _build_func_dependencies_graph(func_rels, graph = None):
+    '''
+    :param func_rels: {(item, dep): funcs_set, ...}
+    '''
+    
     if graph is None:
         graph = nx.DiGraph()
 
     func_rels = _consolidate_relations(func_rels)
 
-    for (path, (deps, funcs)) in func_rels.items():
-        if (deps):
-            deps = _filter_common_prefixes(deps)
-            graph.add_edges_from([(path, dep, {'funcs': funcs}) for dep in deps])
+    for ((path, dep), funcs) in func_rels.items():
+        graph.add_edge(path, dep, {'funcs': funcs})
 
     cycles = list(nx.simple_cycles(graph))
     if cycles:
@@ -230,17 +232,19 @@ def _build_func_dependencies_graph(func_rels, graph = None):
 
 
 def _consolidate_relations(relations):
-    '''(item1, deps, func), (item1, ...) --> {item1, (set(deps), set(funcs))}'''
+    '''[(item, deps, func), ...] --> {(item, dep): funcs_set, ...}'''
 
     rels = defaultdict()
-    rels.default_factory = lambda: (set(), set()) # (deps, funcs)
+    rels.default_factory = set #funcs-set
 
     ## Join all item's  deps & funcs, and strip root-name.
     #
     for (item, deps, func) in relations:
-        (pdes, pfuncs) = rels[item[_root_len:]]
-        pdes.update([d[_root_len:] for d in deps])
-        pfuncs.add(func)
+        item = item[_root_len:]
+        for dep in deps:
+            if dep:
+                dep = dep[_root_len:]
+                rels[(item, dep)].add(func)
 
     return rels
 
@@ -278,7 +282,7 @@ def _research_calculation_routes(graph, sources, dests):
         return: a 2-tuple with the graph and its nodes topologically-ordered
     '''
 
-    ## Remove unrelated dests already present in sources.
+    ## Remove dests already present in sources.
     #
     calc_out_nodes = set(dests)
     calc_out_nodes -= set(sources)
@@ -297,10 +301,12 @@ def _research_calculation_routes(graph, sources, dests):
     data_graph = graph.copy()
     data_graph.remove_nodes_from(calc_inp_nodes)
     
-    ## FIXME: IS it NEEDED?
+    ## Report (and why remove?) isolated islands.
+    #
     isolates = nx.isolates(data_graph)
     log.debug('Isolates: %s', isolates)
     data_graph.remove_nodes_from(isolates)
+    
     try:
         calc_nodes = set(list(calc_out_nodes) + _all_predecessors(data_graph, calc_out_nodes))
     except (KeyError, NetworkXError) as ex:

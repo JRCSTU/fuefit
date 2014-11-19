@@ -223,7 +223,7 @@ class Test(unittest.TestCase):
         print('\n'.join([str(s) for s in deps]))
 
         g = _build_func_dependencies_graph(deps)
-        self.assertEqual(len(g), 20) #23 when adding.segments
+        self.assertEqual(len(g), 22) #20 before func-groups, 23 when adding.segments
 
 
     def build_web(self):
@@ -239,7 +239,7 @@ class Test(unittest.TestCase):
         web = self.build_web()
         print("RELS:\n", lstr(web))
         print('ORDERED:\n', lstr(nx.topological_sort(web)))
-        self.assertEqual(len(web), 25) #29 when adding.segments
+        self.assertEqual(len(web), 27) #25 before func-groups, 29 when adding.segments
 
         return web
 
