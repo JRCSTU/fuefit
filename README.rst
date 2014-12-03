@@ -46,7 +46,6 @@ More specifically this software works like that:
   
         a, b, c, a2, b2, loss0, loss2
 
-   .
 
 An "execution" or a "run" of a calculation along with the most important pieces of data 
 are depicted in the following diagram::
@@ -58,7 +57,7 @@ are depicted in the following diagram::
                / +--engine                  /                    / +--engine                   /
               /  |  +--...                 /                    /  |  +--fc_map_coeffs        /
              /   +--params                /  ____________      /   +--measured_eng_points    /
-            /    |  +--...               /  |            |    /    |    n   p  fc  pme  ... /
+            /    |  +--...               /  |            |    /    |    n   p  fc  bmep ... /
            /     +--measured_eng_points /==>| Calculator |==>/     |  ... ... ...  ...     /
           /          n    p    fc      /    |____________|  /      +--fitted_eng_points   /
          /          --  ----  ---     /                    /       |    n    p   fc      /

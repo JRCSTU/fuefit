@@ -13,23 +13,23 @@ The engine-points table at :samp:`/{XXX}_engine_points` must contain at least on
 from each category below:
 
 1. engine-speed:
-    N        (1/min)
-    N_norm   (1/min)    : normalized against N_idle + (N_rated - N_idle)
-    CM       (m/sec)    : Mean Piston speed
+    N        [1/min]
+    N_norm   [-]        : where N_norm = (N – N_idle) / (N_rated-N_idle)
+    CM       [m/sec]    : Mean Piston speed
 2. work-capability:
-    P        (kW)
-    P_norm   (kW)       : normalized against P_MAX
-    T        (Nm)
-    PME      (bar)
+    P        [kW]
+    P_norm   [-]        : where P_norm = P/P_MAX
+    T        [Nm]
+    BMEP     [bar]
 3. fuel-consumption:
-    FC       (g/h)
-    FC_norm  (g/h)      : normalized against P_MAX
-    PMF      (bar)
+    FC       [g/h]
+    FC_norm  [g/KWh]    : where FC_norm = FC[g/h] / P_MAX [kW]
+    PMF      [bar]
     
 EXAMPLES:
 ---------
 Assuming a CSV-file 'engine.csv' like this:
-        CM,PME,PMF
+        CM,BMEP,PMF
         12,0.14,180
         ...
 
@@ -39,13 +39,13 @@ Assuming a CSV-file 'engine.csv' like this:
     ## ...and if no header existed:
     $ %(prog)s -m fuel=petrol -I engine.csv header@=None
 
-    ## Assume PME column contained normalized-Power in Watts,
+    ## Assume BMEP column contained normalized-Power in Watts,
     #    instead of P in kW:
     $ %(prog)s -m fuel=petrol -I engine.csv  -irenames X X 'Pnorm (w)'
 
     ## Read the same table above but without header-row and
     #    store results into Excel file, 1st sheet:
-    $ %(prog)s -m fuel=petrol -I engine.csv --icolumns CM PME PMF -I engine_map.xlsx sheetname+=0
+    $ %(prog)s -m fuel=petrol -I engine.csv --icolumns CM BMEP PMF -I engine_map.xlsx sheetname+=0
 
     ## Supply as inline-json more model-values required for columns [N, P, FC]
     #    read from <stdin> as json 2D-array of values (no headers).

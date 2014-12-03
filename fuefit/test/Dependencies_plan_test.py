@@ -58,14 +58,14 @@ def funcs_fact1(params, engine, dfin, dfout):
     def f4(): dfin['fc']      = dfin.fc_norm * engine.p_max
     def f5(): dfin['rps']     = dfin.n / 60
     def f6(): dfin['torque']  = (dfin.p * 1000) / (dfin.rps * 2 * pi)
-    def f7(): dfin['pme']     = (dfin.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-6)
+    def f7(): dfin['bmep']     = (dfin.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-6)
     def f8(): dfin['pmf']     = ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-3)) * (dfin.fc / (3600 * dfin.rps * 2 * pi)) * 10e-5
     def f9(): dfin['cm']      = dfin.rps * 2 * engine.stroke / 1000
     return (f1, f2, f3, f4, f5, f6, f7, f8, f9)
 
 def funcs_fact2(params, engine, dfin, dfout):
     ## Out of returned funcs!!
-    def f10(): return dfin.cm + dfin.pmf + dfin.pme
+    def f10(): return dfin.cm + dfin.pmf + dfin.bmep
 
     def f11(): engine['eng_map_params'] = f10()
     def f12():
@@ -87,7 +87,7 @@ def funcs_fact3(params, engine, dfin, dfout):
 
 
 def func11(params, engine, dfin, dfout):
-    engine['eng_map_params'] = dfin.cm + dfin.pmf + dfin.pme
+    engine['eng_map_params'] = dfin.cm + dfin.pmf + dfin.bmep
 
 
 
@@ -269,7 +269,7 @@ class Test(unittest.TestCase):
 
         ## TODO, Check dotted.var.names.
         engine = SR(get_engine())
-        dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'n':[10,20], 'pme':[100,200], 'some_foo':[1,2]})
+        dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'n':[10,20], 'bmep':[100,200], 'some_foo':[1,2]})
         dfout = DF({})
         args = OrderedDict([
             ('params', SR(get_params())),
@@ -295,7 +295,7 @@ class Test(unittest.TestCase):
         deps.add_func_rel('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv'))
 
         engine = SR(get_engine())
-        dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'n':[10,20], 'pme':[100,200], 'some_foo':[1,2]})
+        dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'n':[10,20], 'bmep':[100,200], 'some_foo':[1,2]})
         dfout = DF({})
         args = OrderedDict([
             ('params', SR(get_params())),
@@ -324,7 +324,7 @@ class Test(unittest.TestCase):
         deps.add_func_rel('engine.fuel_lhv', ('params.fuel.diesel.lhv', 'params.fuel.petrol.lhv'))
 
         engine = SR(get_engine())
-        dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'n':[10,20], 'pme':[100,200], 'some_foo':[1,2]})
+        dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'n':[10,20], 'bmep':[100,200], 'some_foo':[1,2]})
         dfout = DF({})
         args = OrderedDict([
             ('params', SR(get_params())),
@@ -349,7 +349,7 @@ class Test(unittest.TestCase):
     def testSmoke_funcs_map_good(self):
         params = SR(get_params())
         engine = SR(get_engine())
-        dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'n':[10,20], 'pme':[100,200], 'some_foo':[1,2]})
+        dfin = DF({'fc':[1, 2], 'fc_norm':[22, 44], 'n':[10,20], 'bmep':[100,200], 'some_foo':[1,2]})
         dfout = DF({})
         out = ('dfout.n', 'dfout.fc_norm')
 

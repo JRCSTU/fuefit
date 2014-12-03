@@ -41,7 +41,7 @@ def run(mdl, opts=None):
 
     ## Identify quantities necessary for the FITTING, 
     #    and calculate them.
-    outcomes = ('eng_points.cm', 'eng_points.pme', 'eng_points.pmf', 'engine.fuel_lhv')
+    outcomes = ('eng_points.cm', 'eng_points.bmep', 'eng_points.pmf', 'engine.fuel_lhv')
     pdcalc.execute_funcs_factory(eng_points_2_std_map, outcomes, params, engine, measured_eng_points)
 
     ## FIT
@@ -58,7 +58,7 @@ def run(mdl, opts=None):
 
     if datamodel.resolve_jsonpointer(mdl, '/params/plot_maps'):
         mesh_eng_points     = generate_mesh_eng_points_fitted(measured_eng_points, fitted_coeffs, measured_eng_points)
-        columns = ['pmf', 'cm', 'pme']
+        columns = ['pmf', 'cm', 'bmep']
         plot_map(measured_eng_points, mesh_eng_points, columns)
         
         ## Flatten 2D-vectors to make a DataFrame
@@ -97,7 +97,7 @@ def eng_points_2_std_map(params, engine, eng_points):
         lambda: setitem(eng_points, 'rps',    eng_points.n / 60),
         #lambda: setitem(eng_points, 'rps',     eng_points.cm * 1000 / (2 * engine.stroke)),
         lambda: setitem(eng_points, 'torque', (eng_points.p * 1000) / (eng_points.rps * 2 * pi)),
-        lambda: setitem(eng_points, 'pme',    (eng_points.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-6)),
+        lambda: setitem(eng_points, 'bmep',   (eng_points.torque * 10e-5 * 4 * pi) / (engine.capacity * 10e-6)),
         lambda: setitem(eng_points, 'pmf',    ((4 * pi * engine.fuel_lhv) / (engine.capacity * 10e-6)) * (eng_points.fc / (3600 * eng_points.rps * 2 * pi)) * 10e-5),
         lambda: setitem(eng_points, 'cm',     eng_points.rps * 2 * engine.stroke / 1000),
     ]
@@ -111,7 +111,7 @@ def std_to_norm_map(engine, eng_points):
     eng_points['n']         = eng_points.rps * 60
     eng_points['n_norm']    = eng_points.n / (engine.n_rated - engine.n_idle) + engine.n_idle
     
-    eng_points['torque']    = eng_points.pme * (engine.capacity * 10e-3) / (4 * pi * 10e-5)
+    eng_points['torque']    = eng_points.bmep * (engine.capacity * 10e-3) / (4 * pi * 10e-5)
     eng_points['p']         = eng_points.torque * (eng_points.rps * 2 * pi) / 1000
 
     eng_points['fc']        = (eng_points.pmf * (engine.capacity * 10e-2) * (3600 * eng_points.rps * 2 * pi)) / (4 * pi * engine.fuel_lhv * 10e-5)
@@ -126,31 +126,31 @@ def engine_map_modelfunc(coeff_values, X):
     The function that models the engine-map.
     """
     
-    a = coeff_values['a']
-    b = coeff_values['b']
-    c = coeff_values['c']
-    a2 = coeff_values['a2']
-    b2 = coeff_values['b2']
-    loss0 = coeff_values['loss0']
-    loss2 = coeff_values['loss2']
+    a       = coeff_values['a']
+    b       = coeff_values['b']
+    c       = coeff_values['c']
+    a2      = coeff_values['a2']
+    b2      = coeff_values['b2']
+    loss0   = coeff_values['loss0']
+    loss2   = coeff_values['loss2']
 
-    pmf = X['pmf']
-    cm = X['cm']
+    pmf     = X['pmf']
+    cm      = X['cm']
     
-    pme = (a + b*cm + c*cm**2)*pmf + (a2 + b2*cm)*pmf**2 + loss0 + loss2*cm**2
+    bmep = (a + b*cm + c*cm**2)*pmf + (a2 + b2*cm)*pmf**2 + loss0 + loss2*cm**2
     
-    return pme
+    return bmep
 
 
 def fit_engine_map(df, is_robust, coeffs):
-    assert len({'cm', 'pme', 'pmf'} - set(df.columns)) == 0, \
-            "Missing fit-columns: %s" % {'cm', 'pme', 'pmf'} - set(df.columns)
+    assert len({'cm', 'bmep', 'pmf'} - set(df.columns)) == 0, \
+            "Missing fit-columns: %s" % {'cm', 'bmep', 'pmf'} - set(df.columns)
     assert not np.any(np.isnan(df['pmf'])), \
             "Cannot fit with NaNs in `pmf` data! \n%s" % np.any(np.isnan(df['pmf']), axis=1)
     assert not np.any(np.isnan(df['cm'])), \
             "Cannot fit with NaNs in `cm` data! \n%s" % np.any(np.isnan(df['cm']), axis=1)
 
-    residualfunc_args   = (engine_map_modelfunc, df, df['pme'])
+    residualfunc_args   = (engine_map_modelfunc, df, df['bmep'])
     residualfunc_kws    = dict(is_robust=is_robust)
     minimizer = lmfit.minimize(_robust_residualfunc, coeffs, 
                 args=residualfunc_args, 
@@ -161,9 +161,9 @@ def fit_engine_map(df, is_robust, coeffs):
 
 
 def reconstruct_eng_points_fitted(engine, fitted_coeffs, eng_points):
-    pme = engine_map_modelfunc(fitted_coeffs, eng_points)
+    bmep = engine_map_modelfunc(fitted_coeffs, eng_points)
 
-    fitted_eng_points = pd.DataFrame.from_items(zip(['pmf', 'cm', 'pme'], (eng_points.pmf, eng_points.cm, pme)))
+    fitted_eng_points = pd.DataFrame.from_items(zip(['pmf', 'cm', 'bmep'], (eng_points.pmf, eng_points.cm, bmep)))
 
     return fitted_eng_points
 
@@ -183,7 +183,7 @@ def generate_mesh_eng_points_fitted(engine, fitted_coeffs, eng_points):
     Y = engine_map_modelfunc(fitted_coeffs, X)
 
 
-    mesh_eng_points = OrderedDict(zip(['pmf', 'cm', 'pme'], (X1, X2, Y)))
+    mesh_eng_points = OrderedDict(zip(['pmf', 'cm', 'bmep'], (X1, X2, Y)))
 
     return mesh_eng_points
 
@@ -219,8 +219,8 @@ def proc_vehicle(dfin, datamodel):
     ## Filter values
     #
     nrows       = len(dfin)
-    dfin = dfin[(dfin.pme > -1.0) & (dfin.pme < 25.0)]
-    log.warning('Filtered %s out of %s rows for BAD  pme.', nrows-len(dfin), nrows)
+    dfin = dfin[(dfin.bmep > -1.0) & (dfin.bmep < 25.0)]
+    log.warning('Filtered %s out of %s rows for BAD  bmep.', nrows-len(dfin), nrows)
 
     return dfin
 
