@@ -9,7 +9,7 @@ Releases
 v0.0.6, X-X-X -- Maintenance release
 ------------------------------------
 * build: Untrack exclipse-project files.
-* docs: Improve installation instructions.
+* docs: Improve installation instructions and review of scientific content.
 * model: Move /params/is_robust --> ./fitting/is_robust
 
 

@@ -175,7 +175,7 @@ setup(
         'matplotlib',
         'networkx',
         'pint',
-        'xlwings >= 0.2.3',
+        'xlwings == 0.2.3',
     ],
     setup_requires = [
         'setuptools',# >= 3.4.4',

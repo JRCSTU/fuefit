@@ -20,34 +20,39 @@ Introduction
 
 Overview
 --------
-The *Fuefit* calculator performs the following:
+The *Fuefit* calculator  was developed to apply a statistical fit on measured engine fuel consumption data 
+(engine map). This allows the reduction of the information necessary to describe an engine fuel map 
+from several hundred points to seven statistically calculated parameters, with limited loss of information. 
 
-1) Accepts **fuel-consumption engine data points** as input
-   (RPM, Power and Fuel-Consumption or equivalent quantities such as CM, PME/Torque and PMF/FC). 
-2) Uses those points to **fit the following coefficients**:
+More specifically this software works like that:
 
-  .. math::
-  
-        a, b, c, a2, b2, loss0, loss2
-        
-  using the following formula:[#]_
+1) **Accepts engine data as input**, constituting of triplets of RPM, Power and Fuel-Consumption 
+   or equivalent quantities eg mean piston speed (CM), brake mean effective pressure (BMEP) or Torque, 
+   fuel mean effective pressure (PMF). 
 
-  .. (a + b*cm + c*cm**2)*pmf + (a2 + b2*cm)*pmf**2 + loss0 + loss2*cm**2
+2) **Fits the provided input** to the following formula [#]_ [#]_ [#]_:
+
+  .. BMEP = (a + b*CM + c*CM**2)*PMF + (a2 + b2*CM)*PMF**2 + loss0 + loss2*CM**2
   .. math::
    
-        \mathbf{pme} = (a + b\times{\mathbf{cm}} + c\times{\mathbf{cm^2}})\times{\mathbf{pmf}} + 
-                (a2 + b2\times{\mathbf{cm}})\times{\mathbf{pmf^2}} + loss0 + loss2\times{\mathbf{cm^2}}
+        \mathbf{BMEP} = (a + b\times{\mathbf{CM}} + c\times{\mathbf{CM^2}})\times{\mathbf{PMF}} + 
+                (a2 + b2\times{\mathbf{CM}})\times{\mathbf{PMF^2}} + loss0 + loss2\times{\mathbf{CM^2}}
 
-3) **Spits-out the input engine-points** according to the fitting, and optionally plots a mesh (grid) 
-   with the engine-map.
+3) **Recalculates and (optionally) plots engine-maps** based on the coefficients 
+   that describe the fit: 
 
-     
+   .. math::
+  
+        a, b, c, a2, b2, loss0, loss2
+
+   .
+
 An "execution" or a "run" of a calculation along with the most important pieces of data 
 are depicted in the following diagram::
 
 
                   .----------------------------.                    .-----------------------------.
-                 /        Input-Model         /                    /        Output-Model         /
+                 /        Input-Model         /                    /    Output(Fitted)-Model     /
                 /----------------------------/                    /-----------------------------/
                / +--engine                  /                    / +--engine                   /
               /  |  +--...                 /                    /  |  +--fc_map_coeffs        /
@@ -63,50 +68,58 @@ are depicted in the following diagram::
     '----------------------------'                    '-----------------------------'
 
 
-The *Input & Output Model* are trees of strings and numbers, assembled with:
-
-* sequences,
-* dictionaries,
-* :class:`pandas.DataFrame`,
-* :class:`pandas.Series`, and
-* URI-references to other model-trees (TODO).
-
-
 Apart from various engine-characteristics under ``/engine`` the table-columns such as `capacity` and `p_rated`, 
 the table under ``/measured_eng_points`` must contain *at least* one column 
 from each of the following categories (column-headers are case-insensitive):
 
 1. Engine-speed::
 
-    N        (1/min)
-    N_norm   (1/min)    : normalized against N_idle + (N_rated - N_idle)
-    CM       (m/sec)    : Mean Piston speed
+    N        [1/min]
+    N_norm   [-]        : where N_norm = (N – N_idle) / (N_rated-N_idle)
+    CM       [m/sec]
 
-2. Work-capability::
+2. Load-Power-capability::
 
-    P        (kW)
-    P_norm   (kW)       : normalized against P_MAX
-    T        (Nm)
-    PME      (bar)
+    P        [kW]
+    P_norm   [-]        : where P_norm = P/P_MAX
+    T        [Nm]
+    BMEP     [bar]
 
 3. Fuel-consumption::
 
-    FC       (g/h)
-    FC_norm  (g/h)      : normalized against P_MAX
-    PMF      (bar)
+    FC       [g/h]
+    FC_norm  [g/KWh]    : where FC_norm = FC[g/h] / P_MAX [kW]
+    PMF      [bar]
+
+
+The *Input & fitted data-model* described above are trees of strings and numbers, assembled with:
+
+* sequences,
+* dictionaries,
+* :class:`pandas.DataFrame`,
+* :class:`pandas.Series`.
 
 
 .. [#] Bastiaan Zuurendonk, Maarten Steinbuch(2005):
-        "Advanced Fuel Consumption and Emission Modeling using Willans line scaling techniques for engines",
-        *Technische Universiteit Eindhoven*, 2005, 
-        Department Mechanical Engineering, Dynamics and Control Technology Group,
-        http://alexandria.tue.nl/repository/books/612441.pdf
+    "Advanced Fuel Consumption and Emission Modeling using Willans line scaling techniques for engines",
+    *Technische Universiteit Eindhoven*, 2005, 
+    Department Mechanical Engineering, Dynamics and Control Technology Group,
+    http://alexandria.tue.nl/repository/books/612441.pdf
+.. [#] Yuan Zou, Dong-ge Li, and Xiao-song Hu (2012): 
+    "Optimal Sizing and Control Strategy Design for Heavy Hybrid Electric Truck", 
+    *Mathematical Problems in Engineering* Volume 2012, 
+    Article ID 404073, 15 pages doi:10.1155/2012/404073
+.. [#] Xi Wei (2004): 
+    "Modeling and control of a hybrid electric drivetrain for optimum fuel economy, performance and driveability", 
+    Dissertation Presented in Partial Fulfillment of the Requirements 
+    for the Degree Doctor of Philosophy in the Graduate School of The Ohio State University
 
 
 
 Quick-start
 -----------
-The program runs on Python-3.3+ with *numpy/scipy*, *pandas* and *win32* native-libraries installed.
+The program runs on **Python-3.3+** and requires *numpy/scipy*, *pandas* and *win32* libraries 
+along with their native backends to be installed.
   
 On *Windows*/*OS X*, it is recommended to use one of the following "scientific" python-distributions, 
 as they already include the native libraries and can install without administrative priviledges: 
@@ -116,9 +129,9 @@ as they already include the native libraries and can install without administrat
 * `Canopy <https://www.enthought.com/products/canopy/>`_,
 
 
-Assuming you have a working python-environment, open a *command-shell*, 
-(in *Windows* use :program:`cmd.exe` BUT ensure :program:`python.exe` is in its :envvar:`PATH`), 
-you can try the following commands: 
+Assuming you have a working python-environment, open a *command-shell* 
+(in *Windows* use :program:`cmd.exe` BUT ensure :program:`python.exe` is in its :envvar:`PATH`) 
+and try the following *console-commands*: 
 
 :Install:
     .. code-block:: console
@@ -202,7 +215,7 @@ you can try the following commands:
 
 Install
 =======
-Fuefit-|version| runs on Python-3.3+, and it is distributed on `Wheels <https://pypi.python.org/pypi/wheel>`_.
+Fuefit-|version| runs on **Python-3.3+**, and it is distributed on `Wheels <https://pypi.python.org/pypi/wheel>`_.
 
 .. Note::
     This project depends on the *numpy/scipy*, *pandas* and *win32* python-packages
@@ -211,14 +224,6 @@ Fuefit-|version| runs on Python-3.3+, and it is distributed on `Wheels <https://
     *Anaconda/minoconda*, *Winpython*, or *Canopy*.
 
     .. Tip::
-        * You can try to install the `Anaconda <http://docs.continuum.io/anaconda/>`_ 
-          cross-platform distribution (*Windows*, *Linux* and *OS X*), or its lighter-weight alternative, 
-          `miniconda <http://conda.pydata.org/miniconda.html>`_.
-    
-          On this environment you will need to install this project's dependencies manually 
-          using a combination of :program:`conda` and :program:`pip` commands.
-          See :file:`miniconda_requirements.txt`, and peek at the example script commands in :file:`.travis.yaml`.
-        
         * Under *Windows* you can try the self-wrapped `WinPython <http://winpython.github.io/>`_ distribution,
           a higly active project, that can even compile native libraries using an installations of *Visual Studio*, 
           if available (required for instance when upgrading ``numpy/scipy``, ``pandas`` or ``matplotlib`` with :command:`pip`).
@@ -230,12 +235,22 @@ Fuefit-|version| runs on Python-3.3+, and it is distributed on `Wheels <https://
               :menuselection:`Options --> Register Distribution` .
             * For the path, add or modify the registry string-key :samp:`[HKEY_CURRENT_USER\Environment] "PATH"`.
       
+        * An alternative scientific python-environment is the `Anaconda <http://docs.continuum.io/anaconda/>`_ 
+          cross-platform distribution (*Windows*, *Linux* and *OS X*), or its lighter-weight alternative, 
+          `miniconda <http://conda.pydata.org/miniconda.html>`_.
+    
+          On this environment you will need to install this project's dependencies manually 
+          using a combination of :program:`conda` and :program:`pip` commands.
+          See :file:`miniconda_requirements.txt`, and peek at the example script commands in :file:`.travis.yaml`.
+        
         * Check for alternative installation instructions on the various python environments and platforms
           at `the pandas site <http://pandas.pydata.org/pandas-docs/stable/install.html>`_.
 
+    See :doc:`install` for more details
 
 Before installing it, make sure that there are no older versions left over.  
-So run this command until you cannot find any project installed:
+So run this console-command (using :program:`cmd.exe` in windows) until you cannot find 
+any project installed:
 
 .. code-block:: console
 
@@ -253,12 +268,12 @@ by typing the :command:`pip` in the console:
 * If you want to install a *pre-release* version (the version-string is not plain numbers, but 
   ends with ``alpha``, ``beta.2`` or something else), use additionally :option:`--pre`.
 
-* If you want to upgrade an existing instalation along with all its dependencies, 
+* If you want to upgrade an existing installation along with all its dependencies, 
   add also :option:`--upgrade` (or :option:`-U` equivalently), but then the build might take some 
   considerable time to finish.  Also there is the possibility the upgraded libraries might break 
   existing programs(!) so use it with caution, or from within a |virtualenv|_. 
 
-* To install an older version issue the console command:
+* To install an older version issue the console-command:
   
   .. code-block:: console
   
@@ -273,7 +288,8 @@ by typing the :command:`pip` in the console:
     print the whole command line when an external program (like a C compiler) fails.
 
 
-After a successful installation, it is important that you check which version is visible in your :envvar:`PATH`:
+After a successful installation, it is important that you check which version is visible in your :envvar:`PATH`,
+so type this console-command:
 
 .. code-block:: console
 
@@ -282,8 +298,8 @@ After a successful installation, it is important that you check which version is
 
 
 
-Installing from sources
------------------------
+Installing from sources (for advanced users familiar with *git*)
+----------------------------------------------------------------
 If you download the sources you have more options for installation.
 There are various methods to get hold of them:
 
@@ -349,22 +365,23 @@ Excel usage
 -----------
 .. Attention:: Excel-integration requires Python 3 and *Windows* or *OS X*!
 
-In *Windows* and *OS X* you may utilize the excellent `xlwings <http://xlwings.org/quickstart/>`_ library 
-to use Excel files for providing input and output to the processor.
+In *Windows* and *OS X* you may utilize the `xlwings <http://xlwings.org/quickstart/>`_ library 
+to use Excel files for providing input and output to the program.
 
-To create the necessary template-files in your current-directory you should enter:
+To create the necessary template-files in your current-directory, type this console-command:
 
 .. code-block:: console
 
      $ fuefit --excel
      
 
-You could type instead :samp:`fuefit --excel {file_path}` to specify a different destination path.
+Type :samp:`fuefit --excel {file_path}` if you want to specify a different destination path.
 
 In *windows*/*OS X* you can type ``fuefit --excelrun`` and the files will be created in your home-directory 
-and the excel will open them in one-shot.
+and the Excel will immediately open them.
 
-All the above commands creates two files:
+
+What the above commands do is to create 2 files:
 
 :file:`FuefitExcelRunner{#}.xlsm`
     The python-enabled excel-file where input and output data are written, as seen in the screenshot below:
@@ -568,10 +585,10 @@ To get involved with development, you need a POSIX environment to fully build it
     * :file:`eclipse.project` 
     * :file:`eclipse.pydevproject` 
     
-    Remove the `eclipse` prefix, (but leave the dot(`.`)) and import it as "existing project" from 
+    Remove the `eclipse` prefix, (but leave the dot(``.``)) and import it as "existing project" from 
     Eclipse's `File` menu.
     
-    Another issue is caused due to the fact that LiClipse contains its own implementation of *Git*, *EGit*,
+    Another issue is due to the fact that LiClipse contains its own implementation of *Git*, *EGit*,
     which badly interacts with unix *symbolic-links*, such as the :file:`docs/docs`, and it detects
     working-directory changes even after a fresh checkout.  To workaround this, Right-click on the above file
     :menuselection:`Properties --> Team --> Advanced --> Assume Unchanged` 
@@ -579,13 +596,16 @@ To get involved with development, you need a POSIX environment to fully build it
 
 Development team
 ----------------
+* Kostis Anagnostopoulos (software design & implementation)
+* Georgios Fontaras (methodology inception, engineering support & validation)
 
-* Author:
-    * Kostis Anagnostopoulos
-* Contributing Authors:
-    * Giorgos Fontaras for the testing, physics, policy and admin support.
+Contributing Authors
+^^^^^^^^^^^^^^^^^^^^^
+* Stefanos Tsiakmakis
+* Biagio Ciuffo
+* Alessandro Marotta
 
-
+Authors would like to thank experts of the SGS group for providing useful feedback.
 
 
 .. _before-indices:
@@ -598,13 +618,16 @@ Indices
 .. glossary::
 
     CM
-        Mean piston speed (measure for the engines operating speed)
+        `Mean Piston Speed <https://en.wikipedia.org/wiki/Mean_piston_speed>`_, 
+        a measure for the engines operating speed [m/sec]
     
-    PME
-        Mean effective pressure (the engines ability to produce mechanical work)
+    BMEP
+        `Brake Mean Effective Pressure <https://en.wikipedia.org/wiki/Mean_effective_pressure>`_, 
+        a valuable measure of an engine's capacity to do work that is independent of engine displacement) [bar]
     
     PMF
-        Available mean effective pressure (the maximum mean effective pressure which could be produced if n = 1)
+        *Available Mean Effective Pressure*, the maximum mean effective pressure calculated based on 
+        the energy content of the fuel [bar]
         
     JSON-schema
         The `JSON schema <http://json-schema.org/>`_ is an `IETF draft <http://tools.ietf.org/html/draft-zyp-json-schema-03>`_
