@@ -1,10 +1,13 @@
 ## Dependencies for the *conda* package-manager.
 ## Use this command to install them::
 ##
-##    conda install `cat minconda_requirements.txt`
+##      conda install `cat requirements/minconda.txt`
 ##
-## Use the "standard" ``pip`` program to install the rest `requirements.txt` of the project.
+## To install the rest deps of the project use the "standard"::
 ##
+##      pip install -r requirements/execution.txt
+##
+
 pip
 setuptools
 #nose ## Use `pip install nose` or else `python setup.py nosetests` fails!

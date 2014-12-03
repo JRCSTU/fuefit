@@ -1,9 +1,0 @@
-enum34
-numpy
-pandas
-xlrd
-scipy
-jsonschema >= 2.4,
-networkx
-pint
-xlwings >= 0.2.3

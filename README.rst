@@ -241,7 +241,7 @@ Fuefit-|version| runs on **Python-3.3+**, and it is distributed on `Wheels <http
     
           On this environment you will need to install this project's dependencies manually 
           using a combination of :program:`conda` and :program:`pip` commands.
-          See :file:`miniconda_requirements.txt`, and peek at the example script commands in :file:`.travis.yaml`.
+          See :file:`requirements/miniconda.txt`, and peek at the example script commands in :file:`.travis.yaml`.
         
         * Check for alternative installation instructions on the various python environments and platforms
           at `the pandas site <http://pandas.pydata.org/pandas-docs/stable/install.html>`_.
@@ -321,7 +321,7 @@ the necessary dependencies with:
 
 .. code-block:: console
 
-    $ pip install -r WinPython_requirements.txt -U .
+    $ pip install -r requirements/execution.txt .
 
 
 The previous command installs a "snapshot" of the project as it is found in the sources.
@@ -347,7 +347,7 @@ Then open a *bash-shell* inside them and type the following commands:
 
 .. code-block:: console
 
-    $ coda install `cat miniconda_requirements.txt`
+    $ coda install `cat requirements/miniconda.txt`
     $ pip install lmfit             ## Workaround lmfit-py#149 
     $ python setup.py install
     $ fuefit --version
