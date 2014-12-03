@@ -4,9 +4,10 @@
 |dev-status| |build-status| |docs-status| |pypi-status| |downloads-count| |github-issues|
 
 :Release:       |version|
-:Home:          https://github.com/ankostis/fuefit
 :Documentation: https://fuefit.readthedocs.org/
-:PyPI:          https://pypi.python.org/pypi/fuefit
+:Source:        https://github.com/ankostis/fuefit
+:PyPI repo:     https://pypi.python.org/pypi/fuefit
+:Keywords:      automotive, car, cars, consumption, engine, engine-map, fitting, fuel, vehicle, vehicles
 :Copyright:     2014 European Commission (`JRC-IET <http://iet.jrc.ec.europa.eu/>`_)
 :License:       `EUPL 1.1+ <https://joinup.ec.europa.eu/software/page/eupl>`_
 
@@ -145,7 +146,7 @@ and try the following *console-commands*:
     .. code-block:: console
 
         $ fuefit --version
-        0.0.6-alpha.1
+        0.0.6
         
         $ fuefit --help
         ...
@@ -294,7 +295,7 @@ so type this console-command:
 .. code-block:: console
 
     $ fuefit --version
-    0.0.6-alpha.1
+    0.0.6
 
 
 
@@ -351,7 +352,7 @@ Then open a *bash-shell* inside them and type the following commands:
     $ pip install lmfit             ## Workaround lmfit-py#149 
     $ python setup.py install
     $ fuefit --version
-    0.0.6-alpha.1
+    0.0.6
 
 
 
@@ -467,7 +468,7 @@ So fire-up a :command:`python` or :command:`ipython` shell and first try to impo
     >>> import fuefit
 
     >>> fuefit.__version__                ## Check version once more.
-    '0.0.6-alpha.1'
+    '0.0.6'
 
     >>> fuefit.__file__                   ## To check where it was installed.         # doctest: +SKIP
     /usr/local/lib/site-package/fuefit-...
