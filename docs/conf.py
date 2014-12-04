@@ -46,16 +46,16 @@ if on_rtd:
     class Mock(MagicMock):
         @classmethod
         def __getattr__(cls, name):
-            if name in ('__file__', '__path__'):
-                return '/dev/null'
-            elif name[0] == name[0].upper():
-                mockType = type(name, (), {})
-                mockType.__module__ = __name__
-                return mockType
-            else:
-                return Mock()
+            return Mock()
 
-    MOCK_MODULES = ['matplotlib', 'matplotlib.sphinxext', 'matplotlib.sphinxext.plot_directive', 'xlwings']
+    MOCK_MODULES = [
+        'numpy', 'numpy.dtype', 
+        'scipy',
+        'pandas', 'pandas.core.generic',
+        'lmfit', 'networkx', 'networkx.exception',
+        'matplotlib', 'matplotlib.sphinxext', 'matplotlib.sphinxext.plot_directive',
+        'jsonschema', 
+        'xlwings']
     sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 ## Trick from https://github.com/rtfd/readthedocs.org/issues/283

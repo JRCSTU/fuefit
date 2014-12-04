@@ -145,7 +145,7 @@ and try the following *console-commands*:
     .. code-block:: console
 
         $ fuefit --version
-        0.0.6
+        0.0.7-alpha.1
         
         $ fuefit --help
         ...
@@ -294,7 +294,7 @@ so type this console-command:
 .. code-block:: console
 
     $ fuefit --version
-    0.0.6
+    0.0.7-alpha.1
 
 
 
@@ -351,7 +351,7 @@ Then open a *bash-shell* inside them and type the following commands:
     $ pip install lmfit             ## Workaround lmfit-py#149 
     $ python setup.py install
     $ fuefit --version
-    0.0.6
+    0.0.7-alpha.1
 
 
 
@@ -467,7 +467,7 @@ So fire-up a :command:`python` or :command:`ipython` shell and first try to impo
     >>> import fuefit
 
     >>> fuefit.__version__                ## Check version once more.
-    '0.0.6'
+    '0.0.7-alpha.1'
 
     >>> fuefit.__file__                   ## To check where it was installed.         # doctest: +SKIP
     /usr/local/lib/site-package/fuefit-...

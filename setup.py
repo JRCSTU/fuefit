@@ -183,7 +183,6 @@ setup(
         'nose>=1.0',
         'sphinx', # >=1.3',
         'sphinx_rtd_theme',
-        'matplotlib',
         'wheel',
     ],
     tests_require = [
