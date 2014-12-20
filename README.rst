@@ -220,8 +220,10 @@ Fuefit-|version| runs on **Python-3.3+**, and it is distributed on `Wheels <http
 .. Note::
     This project depends on the *numpy/scipy*, *pandas* and *win32* python-packages
     that themselfs require the use of *C* and *Fortran* compilers to build from sources. 
-    To avoid this hussle, you can choose instead a self-wrapped python distribution like
-    *Anaconda/minoconda*, *Winpython*, or *Canopy*.
+    To avoid this hussle, you can choose instead one of the methods below:
+    
+    a self-wrapped python distribution like
+    *Anaconda/miniconda*, *Winpython*, or *Canopy*.
 
     .. Tip::
         * Under *Windows* you can try the self-wrapped `WinPython <http://winpython.github.io/>`_ distribution,
@@ -603,7 +605,6 @@ Contributing Authors
 ^^^^^^^^^^^^^^^^^^^^^
 * Stefanos Tsiakmakis
 * Biagio Ciuffo
-* Alessandro Marotta
 
 Authors would like to thank experts of the SGS group for providing useful feedback.
 
