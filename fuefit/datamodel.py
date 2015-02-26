@@ -234,14 +234,14 @@ def model_schema(additional_properties = False):
             },
 
             "fuel_spec": {
-                "type": "object",
+                "type": "object", "additionalProperties": additional_properties,
                 "required": ['lhv'],
                 "properties": {
                     'lhv': {'title': "Fuel's Specific Heat-Value (kjoule/kgr)", "$ref": "#/definitions/positiveInteger"}
                 }
             },
             "fitting_param": {
-                "type": "object",
+                "type": "object", "additionalProperties": additional_properties,
                 "properties": {
                     'value': {'type': ['null', 'number']},
                     'vary': {'type': ['null', 'boolean']},
